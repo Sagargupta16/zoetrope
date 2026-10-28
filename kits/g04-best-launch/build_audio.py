@@ -17,7 +17,6 @@ import synth as Y  # noqa: E402
 SR = Y.SR
 N = int(round(S.DURATION * SR))
 B, T, CUE = S.B, S.T, S.CUE
-rng = np.random.RandomState(96)
 
 
 def tt(n):
@@ -86,8 +85,8 @@ def pad(notes, dur, att=0.8, rel=0.9, bright=0.3):
     x = np.zeros(n)
     for m in notes:
         f = hz(m)
-        for d in (-0.004, 0.0, 0.005):
-            ph = rng.uniform(0, 2 * np.pi)
+        for d in (-0.004, 0.0, 0.005):  # each partial's phase from its own stream
+            ph = Y.rng_for("pad", m, d).uniform(0, 2 * np.pi)
             w = 2 * np.pi * f * (1 + d) * t + ph
             x += np.sin(w) + bright * 0.5 * np.sin(2 * w) + bright * 0.2 * np.sin(3 * w)
     x /= 3 * len(notes)
@@ -111,7 +110,7 @@ def kick():
     n = int(0.45 * SR)
     t = tt(n)
     ph = 2 * np.pi * np.cumsum(46 + 90 * np.exp(-t * 28)) / SR
-    click = Y.lp(rng.uniform(-1, 1, n) * np.exp(-t / 0.002), 3000) * 0.5
+    click = Y.lp(Y.noise("kick click", n) * np.exp(-t / 0.002), 3000) * 0.5
     return np.tanh(1.5 * np.sin(ph) * np.exp(-t / 0.2)) * 0.9 + click
 
 
@@ -160,32 +159,33 @@ def tok(f):
     t = tt(n)
     x = np.sin(2 * np.pi * f * t * (1 + 0.12 * np.exp(-t / 0.01))) * np.exp(-t / 0.035)
     x += 0.4 * np.sin(2 * np.pi * 2.6 * f * t) * np.exp(-t / 0.012)
-    x += Y.hp(rng.uniform(-1, 1, n), 1500) * np.exp(-t / 0.002) * 0.3
+    x += Y.hp(Y.noise("tok", n, f), 1500) * np.exp(-t / 0.002) * 0.3
     return x * 0.8
 
 
 def crash(dur=1.4):
     n = int(dur * SR)
     t = tt(n)
-    return Y.hp(rng.uniform(-1, 1, n), 5000) * np.exp(-t / 0.45)
+    return Y.hp(Y.noise("crash", n, dur), 5000) * np.exp(-t / 0.45)
 
 
-def typekey():
+def typekey(k):
     n = int(0.05 * SR)
     t = tt(n)
-    click = Y.hp(rng.uniform(-1, 1, n), 2500) * np.exp(-t / 0.004)
+    click = Y.hp(Y.noise("typekey", n, k), 2500) * np.exp(-t / 0.004)
     thunk = np.sin(2 * np.pi * 170 * t) * np.exp(-t / 0.012) * 0.5
     return click * 0.7 + thunk
 
 
-# pre-rendered kit (seeded, reused: identical every build)
+# pre-rendered kit, every sound seeded on its own (synth.rng_for, synth.noise): adding or moving one sound
+# leaves every other sample as it was; the round-robin hats and keys get one seed each
 KICK = kick()
 SNARE = Y.lp(Y.snare(0.8), 4200)
-HATS = [Y.lp(Y.hat(), 9000) for _ in range(4)]
+HATS = [Y.lp(Y.hat(seed=k), 9000) for k in range(4)]
 CLAP = Y.clap()
 TICK = Y.tick(4200)
 TAP = Y.tick(2600)
-KEYS = [typekey() for _ in range(3)]
+KEYS = [typekey(k) for k in range(3)]
 
 CH = {
     "F": [53, 57, 60, 64, 67],  # Fmaj9
@@ -251,7 +251,7 @@ for bar in range(1, 25):
             chord_rhodes(music, CH["C"], t0 + 2 * B, 1.4 * B, 0.85, 0.8)
             chord_rhodes(music, CH["C"], t0 + (3 + SWING) * B, 0.4 * B, 0.6, 0.6)
         else:
-            v = 0.8 + 0.1 * rng.uniform()
+            v = 0.8 + 0.1 * Y.rng_for("rhodes velocity", bar).uniform()
             chord_rhodes(music, notes, t0, 1.4 * B, v, 0.8)
             chord_rhodes(music, notes[1:], t0 + (1 + SWING) * B, 0.45 * B, v * 0.7, 0.6)
             chord_rhodes(music, notes[2:], t0 + 3 * B, 0.6 * B, v * 0.75, 0.6)
@@ -386,11 +386,12 @@ for i, tf in enumerate(CUE["fills"]):
         sfx.put(marimba(next(streak_notes), 0.9), tf, 0.22, pan=-0.3 + 0.1 * i)
 for i, tk in enumerate(CUE["type_t"]):
     if S.DICT_TEXT[i] != " ":
+        jit = Y.rng_for("type key", i)
         sfx.put_peak(
             KEYS[i % 3],
             tk,
-            0.10 + 0.04 * rng.uniform(),
-            pan=-0.15 + 0.3 * rng.uniform(),
+            0.10 + 0.04 * jit.uniform(),
+            pan=-0.15 + 0.3 * jit.uniform(),
         )
 r0, rd = CUE["riser"]
 sfx.put(Y.riser(rd), r0, 0.10)
@@ -401,13 +402,15 @@ sfx.put_peak(tok(880), CUE["lk_dot"][1], 0.2)
 
 # lo-fi dust: sparse crackle and a faint hiss (seeded)
 dust = np.zeros(N)
-for p in np.sort(rng.uniform(0, S.DURATION, int(4 * S.DURATION))):
+crackle = Y.rng_for("crackle").uniform(0, S.DURATION, int(4 * S.DURATION))
+for j, p in enumerate(np.sort(crackle)):
     i = int(p * SR)
     n = min(N - i, 40)
+    one = Y.rng_for("crackle", j)
     dust[i : i + n] += (
-        rng.uniform(-1, 1, n) * np.exp(-np.arange(n) / 6) * rng.uniform(0.2, 1.0)
+        one.uniform(-1, 1, n) * np.exp(-np.arange(n) / 6) * one.uniform(0.2, 1.0)
     )
-hiss = np.convolve(rng.uniform(-1, 1, N), np.ones(6) / 6, "same")
+hiss = np.convolve(Y.noise("hiss", N), np.ones(6) / 6, "same")
 dust = dust * 0.02 + hiss * 0.004
 
 L = mix_bus_L + sfx.L + dust

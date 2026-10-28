@@ -17,7 +17,6 @@ SR = S.SR
 DUR = SC.DURATION
 N = int(round(DUR * SR))
 B = SC.BEAT
-rng = np.random.default_rng(2026)
 T = np.arange(N) / SR
 
 
@@ -55,6 +54,7 @@ def piano(m: float, dur: float = 3.5, vel: float = 0.5) -> np.ndarray:
     t = tt(n)
     f = hz(m)
     tau = float(np.clip(2.4 * (440 / f) ** 0.35, 0.7, 5.5))
+    rng = S.rng_for("piano", m, dur, vel)  # one stream per note
     y = np.zeros(n)
     for k in range(1, 10):
         fk = k * f * np.sqrt(1 + 0.0004 * k * k)
@@ -84,7 +84,8 @@ def strings(
         for det in (-0.004, -0.0015, 0.0012, 0.0035):
             f = hz(m) * (1 + det)
             vib = 1 + 0.0018 * np.sin(
-                2 * np.pi * (4.6 + det * 200) * t + rng.uniform(0, 6.283)
+                2 * np.pi * (4.6 + det * 200) * t
+                + S.rng_for("strings", m, det).uniform(0, 6.283)
             )
             ph = np.cumsum(f * vib) / SR
             y += 2 * (ph % 1.0) - 1
@@ -111,9 +112,8 @@ def shimmer(
     y = np.zeros(n)
     for i, m in enumerate(notes):
         for det in (-0.003, 0.0028):
-            y += np.sin(2 * np.pi * hz(m) * (1 + det) * t + rng.uniform(0, 6.283)) / (
-                1 + 0.4 * i
-            )
+            ph = S.rng_for("shimmer", m, det).uniform(0, 6.283)
+            y += np.sin(2 * np.pi * hz(m) * (1 + det) * t + ph) / (1 + 0.4 * i)
     trem = 0.75 + 0.25 * np.sin(2 * np.pi * 7.0 * t)
     env = np.where(t < rise, (t / rise) ** 2, np.exp(-(t - rise) / tail))
     return y * trem * env * vel / len(notes)
@@ -137,7 +137,8 @@ def foghorn(dur: float = 3.4) -> np.ndarray:
 def tick(f: float) -> np.ndarray:
     n = int(0.06 * SR)
     t = tt(n)
-    click = fft_filter(rng.standard_normal(n) * np.exp(-t / 0.003), lo=1800, hi=6000)
+    nz = S.rng_for("tick", f).standard_normal(n)
+    click = fft_filter(nz * np.exp(-t / 0.003), lo=1800, hi=6000)
     return click * 0.6 + np.sin(2 * np.pi * f * t) * np.exp(-t / 0.014) * 0.5
 
 
@@ -148,11 +149,16 @@ def thump() -> np.ndarray:
     return np.sin(ph) * np.exp(-t / 0.16) * np.minimum(1, t / 0.006)
 
 
-def key_click() -> np.ndarray:
+def key_click(i: int) -> np.ndarray:
     n = int(0.05 * SR)
     t = tt(n)
     return (
-        fft_filter(rng.standard_normal(n) * np.exp(-t / 0.003), lo=1500, hi=6000) * 0.5
+        fft_filter(
+            S.rng_for("key click", i).standard_normal(n) * np.exp(-t / 0.003),
+            lo=1500,
+            hi=6000,
+        )
+        * 0.5
         + np.sin(2 * np.pi * 310 * t) * np.exp(-t / 0.01) * 0.3
     )
 
@@ -181,18 +187,14 @@ def build():
     dry = np.zeros((N, 2))  # pre-panned, no reverb
     cues: dict[str, list] = {"bar_lines": [SC.BAR * k for k in range(15)]}
 
-    # open-fifth drone D2 A2 D3, the whole piece
+    # open-fifth drone D2 A2 D3, the whole piece. Its own stream, seeded 2026 as the approved build drew it, so the
+    # 6 s beating of its detuned pairs lands where it did; no other sound draws from it
     dr = np.zeros(N)
+    ph = iter(np.random.default_rng(2026).uniform(0, 6.283, 18))
     for m, g in ((38, 0.5), (45, 0.35), (50, 0.22)):
         for det in (-0.0012, 0.0011):
             for k, a in ((1, 1.0), (2, 0.35), (3, 0.12)):
-                dr += (
-                    g
-                    * a
-                    * np.sin(
-                        2 * np.pi * hz(m) * k * (1 + det) * T + rng.uniform(0, 6.283)
-                    )
-                )
+                dr += g * a * np.sin(2 * np.pi * hz(m) * k * (1 + det) * T + next(ph))
     dr *= np.minimum(1, T / 2.5) * (0.8 + 0.2 * np.sin(2 * np.pi * T / 9.0)) / 2.5
     dr *= 1 - 0.35 * sm(T, 40.0, 40.05) * (
         1 - sm(T, 52.0, 52.5)
@@ -349,7 +351,7 @@ def build():
     dt = (SC.TYPE_T1 - SC.TYPE_T0) / (n_ch - 1)
     for i in range(n_ch):
         tmp = np.zeros(N)
-        S.put(tmp, key_click(), SC.TYPE_T0 + i * dt)
+        S.put(tmp, key_click(i), SC.TYPE_T0 + i * dt)
         dry[:, 0] += tmp * 0.035
         dry[:, 1] += tmp * 0.035
 

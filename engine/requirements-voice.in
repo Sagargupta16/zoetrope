@@ -1,0 +1,26 @@
+# requirements-voice.in : optional text-to-speech packages for voice.py (Z05), per engine. Versions read from PyPI on
+# 2026-10-28. NOT installed by setup.sh and NOT compiled to a hashed lock yet. voice.py does not install from this
+# file either: it runs each engine in its own uv environment with these same pins (uv run --no-project --with ...),
+# so engine/requirements.txt stays Pillow and numpy only. Those pins (each engine class's `packages`, with numpy
+# 2.5.4 in every one) are hashed into the cache key: change them in both places. Model and voice files are separate
+# downloads (sizes and licences in references/voice.md); none is fetched without Sagar's yes. sapi needs nothing:
+# it is part of Windows.
+
+# kokoro: Kokoro-82M int8 through sherpa-onnx, Apache-2.0, cp314 win_amd64 wheel (plus sherpa-onnx-core 2.0.1).
+# Audio only, no word times; since 2.0.0 no espeak-ng fallback, so words missing from the lexicon are not spoken.
+sherpa-onnx==2.0.1
+
+# piper: Piper 1.8.0, GPL-3.0-or-later, cp39-abi3 win_amd64 wheel; voices are separate, each under its own licence.
+piper-tts==1.8.0
+onnxruntime==1.31.1
+
+# later, not wired yet: faster-whisper to re-transcribe a finished mix. Hand it voice.dec(path, sr=16000) as a numpy
+# array so it never opens a file itself; with av 19 its file path fails (SYSTRAN/faster-whisper#1589, fixed on main,
+# not in the 1.2.1 release).
+faster-whisper==1.2.1
+av<19
+
+# kokoro-ts runs in a side Python 3.13 environment, because kokoro-onnx 0.6.1 declares requires-python <3.14.
+# Every package that changes the phonemes or the sound is pinned:
+#   kokoro-onnx==0.6.1 (MIT), onnxruntime==1.31.1, phonemizer==3.4.0 (GPL-3.0),
+#   espeakng-loader==0.2.4 (bundles espeak-ng, GPL-3.0), numpy==2.5.4

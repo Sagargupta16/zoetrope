@@ -78,19 +78,19 @@ def glide(f0, f1, dur, g=1.0):
 
 def shaker():
     n = int(0.05 * SR)
-    return S.hp(S.rng.uniform(-1, 1, n), 6000) * S.ex(n, 0.012) * 0.5
+    return S.hp(S.noise("shaker", n), 6000) * S.ex(n, 0.012) * 0.5
 
 
 def crash(dur=1.6):
     n = int(dur * SR)
-    return S.hp(S.rng.uniform(-1, 1, n), 5000) * S.ex(n, 0.45)
+    return S.hp(S.noise("crash", n, dur), 5000) * S.ex(n, 0.45)
 
 
 def thunk():
     n = int(0.35 * SR)
     t = S.tt(n)
     body = np.sin(2 * np.pi * (85 + 40 * np.exp(-t * 40)) * t) * np.exp(-t / 0.09)
-    knock = S.lp(S.rng.uniform(-1, 1, n), 900) * np.exp(-t / 0.03) * 3
+    knock = S.lp(S.noise("thunk knock", n), 900) * np.exp(-t / 0.03) * 3
     return np.tanh(1.5 * (body + knock))
 
 
@@ -306,15 +306,16 @@ def build():
     nclick = int(
         0.015 * SR
     )  # a short low click on the attack, so the box shutting has an edge
-    click = S.lp(S.rng.uniform(-1, 1, nclick), 1800) * S.ex(nclick, 0.0025)
+    click = S.lp(S.noise("lid click", nclick), 1800) * S.ex(nclick, 0.0025)
     both(click / (np.abs(click).max() + 1e-9), t_lid - 0.002, CLICK_G)
     both(bell(96), 58.1, 0.20)
     both(bell(84), 58.1, 0.12)
     both(S.whoosh(0.9), 11.45, 0.22, peak=True)  # pull up to the map
     both(marimba(96, 0.5), 12.2, 0.22)  # pin lands
-    for fa, fb in scenes.FOLDS:  # page swishes, peak mid-fold
-        both(S.whoosh(0.4), (fa + fb) / 2, 0.12, peak=True)
-    both(S.whoosh(0.4), 42.3, 0.12, peak=True)  # Nepal drops in
+    # every whoosh seeds its own noise (seed=): one whoosh more or less leaves the others' samples as they were
+    for k, (fa, fb) in enumerate(scenes.FOLDS):  # page swishes, peak mid-fold
+        both(S.whoosh(0.4, seed=f"fold {k}"), (fa + fb) / 2, 0.12, peak=True)
+    both(S.whoosh(0.4, seed="nepal"), 42.3, 0.12, peak=True)  # Nepal drops in
     for _ in range(7):  # digital chirps under the scrambled digits
         tb = rnd.uniform(*scenes.GLITCHES[0])
         n = int(0.03 * SR)
@@ -322,9 +323,9 @@ def build():
             n, 0.01
         )
         both(sq, tb, 0.04)
-    both(S.whoosh(0.4), 51.7, 0.10, peak=True)  # box slides in
+    both(S.whoosh(0.4, seed="box"), 51.7, 0.10, peak=True)  # box slides in
     both(
-        S.whoosh(0.4), 52.85, 0.10, peak=True
+        S.whoosh(0.4, seed="lid"), 52.85, 0.10, peak=True
     )  # lid flips (was 0.15; it sat right before the thunk)
     both(S.whoosh(0.75), 54.35, 0.22, peak=True)  # the film shrinks into the phone
     both(glide(700, 350, 0.25), 56.5, 0.06)  # the hand outline breaks

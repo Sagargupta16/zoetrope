@@ -8,25 +8,25 @@ How we make a video, start to finish, with the tools we really have (see `engine
 2. **Style pick.** Use the style router. Offer 2 to 3 styles with one line each (mood, palette, type), recommend one, and move on if the user says "you choose".
 3. **One-sentence message.** Write the single sentence the viewer must believe, plus the before and after. If we cannot say it in one sentence, the brief is not ready.
 4. **Script.** One idea per beat. English scenes carry about 3 to 7 words of on-screen text. Voiceover: write it to be spoken, numbers as spoken words. Muted test: the arc must read with sound off.
-5. **Storyboard table + approval gate.** Run `qa.py holds <scenario.md>` first and fix every SHORT line, then show a beat sheet and wait for "go".
+5. **Storyboard table + approval gate.** Run `qa.py holds <scenario.md>` first (with `--profile caption` or `slow` when the card reads at that pace) and fix every SHORT line, then show a beat sheet and wait for "go".
 
    | Time | On screen | Visual form | Purpose | Transition in |
    |---|---|---|---|---|
 
    Rules: every row names one purpose (cut or merge rows that cannot); every payload row names a visual form that passes the squint test (remove the words: does the shape still say something? a bar chart passes, three boxed stat cards fail); note what carries continuity across each cut. Never print internal phase names (hook, develop) in the table the user sees.
 6. **Assets.** Palette and fonts from the style, shapes drawn in code, user-supplied images loaded from disk. No downloaded music or footage. Credit anything third party.
-7. **Build.** Write `scenes.py` (`engine.md`). One `SCHEDULE`, one pure `draw(t)`.
-8. **Audio.** Voice first (measure its length), then music on a BPM grid, SFX on the cuts, mix (`mixing.md`).
-9. **Proof frames + approval gate.** Render 6 to 12 stills (scene midpoints and boundaries), show them as one contact sheet in a session tab, fix layout, then ask for approval. Fix before the full render, never after.
-10. **Full render** of every frame, then encode (ladder in `engine.md`).
-11. **QA.** Check frame count x fps = duration, spot-check 5+ frames (first, each cut, last), text not clipped, no element overlapping at rest, loudness and peak. Fix and re-render if any check fails.
-12. **Deliver.** Report per `formats.md` and `delivery-report.md`.
+7. **Build.** Write `scenes.py` (`engine.md`). One `TIMELINE`, one pure `draw(t)`, and the registry: `text_items(t)` for every text drawn and `CUES` for every moment sound and picture share (`qa-gates.md`). Read `python kit_index.py` before writing a helper.
+8. **Audio.** Voice first (`voice.synthesize`; the slots in `narration.json` size the scenes), then music on a BPM grid, SFX on the cuts placed by their landmark inside `synth.recording()`, mix (`mixing.md`, `beat-sync.md`).
+9. **Proof frames + approval gate.** `run_all.py proof` runs the proof gates and writes `proof.png` (up to 12 stills) and `proof_keys.png` (every moment a reviewer must see). Fix every FIX and NOT CHECKED row, show the sheets in a session tab, fix layout, then ask for approval. Fix before the full render, never after.
+10. **Full render.** `run_all.py full` draws every frame into the encode, makes and masters the audio, muxes and runs every gate (ladder in `engine.md`).
+11. **QA.** The run ends with one `DELIVERED` line, or a `<name>.rejected.mp4` and the rows that failed. Spot-check the frames in `review_times.json` (first, each cut, last, every finding), text not clipped, no element overlapping at rest, loudness and peak. Fix and run again: an audio-only fix is `run_all.py audio` (no frame redrawn); a visual fix redraws every frame unless the build kept them (`--keep-frames --redraw T0-T1`).
+12. **Deliver.** Report per `formats.md` and `delivery-report.md`, quoting the `DELIVERED` and `APPROVAL` lines. After the final REVIEW PASS, save the reviewer's reply to a file and run `qa.py approve --review <reply file>`; before delivering, `qa.py verify <the DELIVERED path>` must say SAME. A change after that: `qa.py diff --expect <its windows>` names every frame it touched, for the re-review.
 
 ## 2. Timing math
 
-- **Voiceover pieces:** generate the voice first, measure its real length (ffprobe), then schedule. Scene length = spoken length of its line + a hold (about 0.4 to 0.8 s for breath and landing). Total = sum of scenes. Voices differ in pace (one voice speaks about half as fast as Matthew), so never guess duration from word count.
+- **Voiceover pieces:** run `voice.synthesize` first; `narration.json` gives each line's measured slot (the speech plus 0.35 s before and 0.7 s after, never under the reading hold, on whole frames). Scene length = its line's slot; total = sum of slots. Voices differ a lot in pace, so never guess duration from word count.
 - **Music-only pieces:** pick a BPM, then everything snaps to the grid. Beat = 60 / BPM seconds. Bar = 4 beats. Cuts land on bars (downbeats), UI hits and text lands on beats. Worked example at 120 BPM: beat 0.5 s, bar 2.0 s, 10 bars = 20 s. Pick a BPM and a bar count whose product is the target length (at 120 BPM a 15 s piece is 7.5 bars, so use 8 bars = 16 s or trim the tail).
-- **Reading time:** on-screen text holds at rest for at least 0.5 s + 0.3 s per word, and never under 1 s (the same rule gate 4 in `qa-gates.md` checks). A headline wants 1.5 to 2.5 s. A key element must stay readable at least 0.3 s. If copy does not fit the hold, cut copy.
+- **Reading time:** on-screen text holds at rest for at least 0.5 s + 0.3 s per word, or its characters at the card's pace plus a pad when that is longer (display 20 a second, caption 17, slow 15; `house-rules.md` rule 8), and never under 1 s: the rule gate 4 in `qa-gates.md` checks. A headline wants 1.5 to 2.5 s. A key element must stay readable at least 0.3 s. If copy does not fit the hold, cut copy.
 - **Pacing:** pattern-interrupt (change exactly one thing) if a shot runs longer than about 2.5 s. Keep something always moving (slow drift) so holds do not look frozen.
 - **Length presets (guide, not law; about 3 s per scene):**
 
@@ -65,14 +65,15 @@ Easing is the adverb: the same move reads confident (expo out), dreamy (sine in-
 | Travel, camera, morph | `ease_in_out_cubic` | smooth |
 | Exit | `ease_in_cubic` | accelerates away |
 | Mechanical (progress, scrub) | `linear` | neutral |
+| Physical settle | `spring(t, stiffness, damping, mass)` | Remotion's spring: the default overshoots to 1.163; `damping=200` settles with no bounce; `settle_time()` says when it is at rest |
 
 - **Durations:** fast 0.15 to 0.3 s (energy), medium 0.3 to 0.5 s (most content), slow 0.5 to 0.8 s (gravity), very slow 0.8 to 2.0 s (cinematic). The slowest scene should be about 3x the fastest. Entrances are longer than exits (about 0.4 s in, 0.25 s out).
 - **Vary on purpose:** no more than 2 independent moves with the same ease per scene; vary direction (left, right, scale, opacity only); vary stagger per scene.
 - **Stagger:** between groups 0.15 to 0.4 s; inside a group 0.05 to 0.1 s; a single group's whole sequence under about 0.5 s. Stagger by importance and gaze path.
 - **Scene shape:** build (first 30%), breathe (30 to 70%, one ambient motion), resolve (last 30%, decisive exit). Hold still after motion; stillness is powerful.
 - **Camera:** push in 1.00 to 1.04 per shot, origin on the subject. Establish wide, then push in. Two-layer parallax (background slower than foreground) adds depth. Never reveal empty canvas at the edges.
-- **Transitions are meaning.**
-  - Text: never crossfade two strings in the same spot. Fade the old one out, then the new one in (gate Q203 catches it).
+- **Transitions are meaning.** Declare one as `Transition(kind, dur)` between two scenes in `TIMELINE` and draw its window with a `transitions.py` function (crossfade, wipe, push, slide, iris, clock, blinds, dip, luma); a dip is flash_risk "check", so run `qa.flash_window` over it.
+  - Text: never crossfade two strings in the same spot. Fade the old one out, then the new one in (gate Q203 catches it). A text replaced in one place leaves 1 empty frame, or 0.5 s or more (Q207, Q1104): a title kept out of a 0.4 s transition leaves 13 frames, so with a transition under 0.5 s put the incoming title in another place, or keep the place clear for 0.5 s.
   - Cut: disruption, "wake up", a register shift. Land it on a downbeat.
   - Crossfade (0.3 to 0.5 s): "this continues".
   - Slow dissolve (0.8 s+): "drift with me".

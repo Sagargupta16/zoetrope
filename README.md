@@ -17,7 +17,7 @@ This folder is the skill: the junction `~/.claude/skills/zoetrope` points here.
 | --- | --- |
 | `SKILL.md` | The skill: brief, style pick, storyboard and proof approvals, delivery, and the style router linking every card. |
 | `setup.sh` | First-use check of uv, ffmpeg with libx264, ffprobe, the pinned Pillow and numpy, and the default font. Safe to run again. |
-| `engine/` | The Python engine as real files: `engine.py`, `scenes.py`, `proof.py`, `render.py`, `audio.py`, `synth.py`, `voice.py`, `qa.py` (also the `check`, `look` and `holds` CLI), `run_all.py`, and `requirements.txt` (pinned, hashed). The builder copies the folder into each video's working folder. |
+| `engine/` | The Python engine as real files. Drawing: `engine.py` (helpers, frame clock, `compile_schedule`), `scenes.py` (the per-video template), `transitions.py`, `grain.py`. Sound: `audio.py` (template bed, cue sheet and stems, the true-peak master), `synth.py` (instruments, landmark placement), `voice.py` and `voice_samples.py` (offline narration). Build: `render.py` (frames piped into ffmpeg through shared memory), `run_all.py` (`proof`, `full`, `audio` stages), `proof.py` (review sheets). Checks: `qa.py` (the gate CLI: `check`, `look`, `holds`, `purity`, `lint`, `owner`, `approve`, `diff`, `verify`, `calib`, `audiostrip`, `selftest`) with its gate modules `qa_scan.py`, `qa_stack.py`, `qa_sync.py`, `qa_registry.py`, `qa_approve.py`, `qa_purity.py`, `qa_lint.py`, `qa_audiostrip.py`, `qa_selftest.py` and `qa_fixtures/`. `contract.py` is what they all share (frame clock, the QA row, file formats, the Q code table). `kit_index.py` lists every helper. `requirements.txt` pins Pillow and numpy with hashes; `requirements-voice.in` lists the optional narration engines. The builder copies the folder into each video's working folder. |
 | `references/` | Small topic files (playbook, engine, formats, voice, music, mixing, beat sync, house rules, QA gates, pitfalls, delivery report, troubleshooting). |
 | `references/styles/` | One file per style card (33) plus `families.md`, the intro each family shares. |
 | `kits/` | Working code from approved builds for five cards, one folder each with a README of what to reuse. |
@@ -34,7 +34,7 @@ This folder is the private GitHub repo `Sagargupta16/zoetrope`. No copy of the o
 
 - Python with the pinned Pillow and numpy: run scripts from a video's working folder with `uv run --no-project --with-requirements requirements.txt python ...`, nothing installed globally. Check the whole toolchain from Git Bash with `bash setup.sh` (from PowerShell: `& "C:\Program Files\Git\bin\bash.exe" C:/Code/GitHub/tools/zoetrope/setup.sh`).
 - ffmpeg 9.0.2 (Gyan full build, winget `Gyan.FFmpeg`, installed 2026-10-28): libx264, libaom-av1, libsvtav1, libvpx-vp9, libopus, ebur128 and loudnorm all present. On PATH for shells opened after the install; a Claude session started earlier needs a restart to see it.
-- Voice: no text-to-speech is wired up yet (a natural-sounding one is being chosen), so videos are music plus captions.
+- Voice: the narration harness works with the built-in Windows voices, which are robotic and serve only to test timing. The natural engines (Kokoro, Piper) are written but need their model files, 65 to 330 MB each, downloaded once Sagar has chosen from samples. Until then videos are music plus captions.
 
 Every change made to the package, with its reason, is in [CHANGELOG.md](CHANGELOG.md).
 

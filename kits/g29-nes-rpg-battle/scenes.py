@@ -4,6 +4,7 @@
 # that the chip synth plays, and every hit frame lands LAG frames after its kick, snare or crash.
 import math
 import random
+import zlib
 from functools import lru_cache
 
 import numpy as np
@@ -667,7 +668,7 @@ def fx_maelstrom(c, f):
     hf = bf(80) + LAG
     for name in ("KNIGHT", "MAGE", "RANGER"):
         x, y = PARTY_POS[name]
-        fx_bolt(c, x + 8, y + 4, f - hf, seed=hash(name) % 997 + 7)
+        fx_bolt(c, x + 8, y + 4, f - hf, seed=zlib.crc32(name.encode()) % 997 + 7)  # hash() changes per process
 
 
 def pop(c, s, cx, y, k, boxes, col=WHITE, scale=1):
