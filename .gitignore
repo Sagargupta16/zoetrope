@@ -1,0 +1,16 @@
+# Private repo: never make it public.
+__pycache__/
+*.pyc
+.ruff_cache/
+
+# Every video and its working folder lives under outputs/, which is never committed
+outputs/
+frames/
+review/
+*.mp4
+*.webm
+*.gif
+*.wav
+*.mp3
+*.raw
+proof.png

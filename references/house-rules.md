@@ -1,0 +1,9 @@
+# House rules
+
+1. Write as "we" in the script, captions and the delivery message. Plain English, no em-dashes (use commas, colons, parentheses), no emoji. Keep em-dashes out of on-screen text unless the user asks for them.
+2. No invented numbers. Do not make up metrics, ratings, prices, testimonials, user counts, awards or press quotes. If the user gives a number, use it as given and put its source and date on screen when it can go stale (for example "as of 2 Oct").
+3. Check facts. For every factual claim (dates, statistics, definitions, names, how a tool works) run a web search or fetch, keep a short list "claim -> source -> date checked", and include that list in the delivery report. If a claim cannot be checked, cut it or label it as unverified. If a diagram is simplified (a schematic, a rough map, a storyline), say so in a short on-screen note.
+4. Logos and trademarks. Use the user's own logos and trademarks only from official assets they provide. Never draw or approximate a logo. No third-party logos at all. Use {brand} and {product} placeholders until the user supplies real names. Do not add store badges, launch dates, prices or availability lines the user did not give us.
+5. User-supplied media (photos, clips, music, fonts). Before use, record in the delivery report: file name, source, licence, and who gave it to us. If the licence needs attribution, add an end credits card and list it. If the licence is unknown, ask or leave the item out. Synthesized music, drawn graphics and system fonts need no credit, and we say "no third-party media" in the report.
+6. People. Use a real person's name, photo or voice only with their consent. If the user has not said they have it, ask once and wait.
+7. Do not claim we listened. We mix and check by measurement (loudness, per-second RMS, spectrum), not by ear. The report says "checked by measurement only, not by ear".
