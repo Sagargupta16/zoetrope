@@ -1,0 +1,13 @@
+Copyright (c) 2026 Sagar Gupta. All rights reserved.
+
+This repository is private. No license is granted: nobody may use, copy,
+modify, merge, publish, distribute, sublicense or sell any part of it, in
+source or rendered form, without the copyright holder's written permission.
+
+Parts of this repository are adapted from a third-party video-producer agent
+package that the copyright holder does not own. Nothing in this repository
+grants any right to that material.
+
+Third-party software keeps its own license. Pillow (MIT-CMU), numpy
+(BSD-3-Clause and others) and ffmpeg (LGPL or GPL, depending on the build) are
+installed dependencies and are not distributed here.

@@ -14,3 +14,7 @@ review/
 *.mp3
 *.raw
 proof.png
+
+# The one exception: the README's promo, made with the skill, and its GIF preview
+!docs/*.mp4
+!docs/*.gif

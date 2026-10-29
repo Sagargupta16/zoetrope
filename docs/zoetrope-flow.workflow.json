@@ -1,0 +1,453 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "How zoetrope makes a video",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "outputs/archify/zoetrope-flow.html",
+    "repository": {
+      "url": "https://github.com/Sagargupta16/zoetrope.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "d664a97d89423c40459018bff85ce50e0c8d010f"
+    },
+    "legend": {
+      "entries": {
+        "frontend": {
+          "label": "Main chat step"
+        },
+        "backend": {
+          "label": "Agent work"
+        },
+        "security": {
+          "label": "Gate or review"
+        },
+        "database": {
+          "label": "Saved approval"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "chat",
+      "label": "Main chat (/zoetrope)"
+    },
+    {
+      "id": "builder",
+      "label": "zoetrope-builder agent"
+    },
+    {
+      "id": "reviewer",
+      "label": "zoetrope-reviewer agent"
+    },
+    {
+      "id": "gates",
+      "label": "Gates (qa.py + contract.py)"
+    }
+  ],
+  "phases": [
+    {
+      "id": "plan",
+      "label": "Plan",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "proofphase",
+      "label": "Proof",
+      "fromCol": 2,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "renderphase",
+      "label": "Render + deliver",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "mainPath": [
+    "brief",
+    "storyboard",
+    "proof",
+    "proofreview",
+    "proofok",
+    "render",
+    "finalreview",
+    "approved",
+    "deliver"
+  ],
+  "nodes": [
+    {
+      "id": "brief",
+      "lane": "chat",
+      "col": 0,
+      "type": "frontend",
+      "label": "Brief + style pick",
+      "sublabel": "3 questions, 33 style cards",
+      "sources": [
+        {
+          "path": "SKILL.md",
+          "line": 67,
+          "end_line": 69,
+          "label": "workflow steps 1 to 3"
+        }
+      ]
+    },
+    {
+      "id": "storyboard",
+      "lane": "chat",
+      "col": 1,
+      "type": "security",
+      "label": "Storyboard gate",
+      "sublabel": "qa.py holds, you approve",
+      "sources": [
+        {
+          "path": "SKILL.md",
+          "line": 71,
+          "end_line": 71,
+          "label": "workflow step 5"
+        },
+        {
+          "path": "engine/qa.py",
+          "line": 184,
+          "end_line": 267,
+          "label": "storyboard_holds"
+        }
+      ]
+    },
+    {
+      "id": "proof",
+      "lane": "builder",
+      "col": 2,
+      "type": "backend",
+      "label": "Proof build",
+      "sublabel": "scenes.py, run_all.py proof",
+      "tag": "PROOF line",
+      "sources": [
+        {
+          "path": "engine/run_all.py",
+          "line": 85,
+          "end_line": 104,
+          "label": "proof_stage"
+        },
+        {
+          "path": "agents/zoetrope-builder.md",
+          "line": 59,
+          "end_line": 135,
+          "label": "proof mode"
+        }
+      ]
+    },
+    {
+      "id": "proofgates",
+      "lane": "gates",
+      "col": 2,
+      "type": "security",
+      "label": "Proof gates",
+      "sublabel": "registry, purity, lint",
+      "sources": [
+        {
+          "path": "engine/qa.py",
+          "line": 1205,
+          "end_line": 1225,
+          "label": "proof_rows"
+        },
+        {
+          "path": "engine/qa_purity.py",
+          "line": 467,
+          "end_line": 701,
+          "label": "purity run"
+        },
+        {
+          "path": "engine/qa_lint.py",
+          "line": 1276,
+          "end_line": 1325,
+          "label": "lint run"
+        }
+      ]
+    },
+    {
+      "id": "proofreview",
+      "lane": "reviewer",
+      "col": 3,
+      "type": "security",
+      "label": "Proof review",
+      "sublabel": "key cells, strips, gantt",
+      "sources": [
+        {
+          "path": "agents/zoetrope-reviewer.md",
+          "line": 52,
+          "end_line": 102,
+          "label": "proof stage"
+        },
+        {
+          "path": "engine/proof.py",
+          "line": 725,
+          "end_line": 741,
+          "label": "key_sheet"
+        },
+        {
+          "path": "engine/proof.py",
+          "line": 540,
+          "end_line": 692,
+          "label": "gantt"
+        }
+      ]
+    },
+    {
+      "id": "proofok",
+      "lane": "chat",
+      "col": 3,
+      "type": "security",
+      "label": "Proof approval",
+      "sublabel": "you approve the sheet",
+      "sources": [
+        {
+          "path": "SKILL.md",
+          "line": 74,
+          "end_line": 74,
+          "label": "workflow step 8"
+        }
+      ]
+    },
+    {
+      "id": "render",
+      "lane": "builder",
+      "col": 4,
+      "type": "backend",
+      "label": "run_all.py full",
+      "sublabel": "frames, audio, master, mux",
+      "tag": "APPROVAL + DELIVERED",
+      "sources": [
+        {
+          "path": "engine/render.py",
+          "line": 300,
+          "end_line": 392,
+          "label": "render_to_ffmpeg"
+        },
+        {
+          "path": "engine/audio.py",
+          "line": 257,
+          "end_line": 306,
+          "label": "master"
+        },
+        {
+          "path": "engine/run_all.py",
+          "line": 305,
+          "end_line": 370,
+          "label": "deliver"
+        }
+      ]
+    },
+    {
+      "id": "filegates",
+      "lane": "gates",
+      "col": 4,
+      "type": "security",
+      "label": "qa.py check",
+      "sublabel": "58 Q codes on the file",
+      "tag": "FIX: .rejected.mp4",
+      "sources": [
+        {
+          "path": "engine/qa.py",
+          "line": 1283,
+          "end_line": 1524,
+          "label": "check"
+        },
+        {
+          "path": "engine/contract.py",
+          "line": 517,
+          "end_line": 674,
+          "label": "CODES"
+        }
+      ]
+    },
+    {
+      "id": "finalreview",
+      "lane": "reviewer",
+      "col": 5,
+      "type": "security",
+      "label": "Final review",
+      "sublabel": "check, look, audiostrip",
+      "sources": [
+        {
+          "path": "agents/zoetrope-reviewer.md",
+          "line": 103,
+          "end_line": 153,
+          "label": "final stage"
+        }
+      ]
+    },
+    {
+      "id": "approved",
+      "lane": "gates",
+      "col": 5,
+      "type": "database",
+      "label": "approved/",
+      "sublabel": "approve, diff, verify",
+      "tag": "per content hash",
+      "sources": [
+        {
+          "path": "engine/qa_approve.py",
+          "line": 794,
+          "end_line": 1013,
+          "label": "approve"
+        },
+        {
+          "path": "engine/qa_approve.py",
+          "line": 1589,
+          "end_line": 1892,
+          "label": "diff"
+        },
+        {
+          "path": "engine/qa_approve.py",
+          "line": 1917,
+          "end_line": 1948,
+          "label": "verify"
+        }
+      ]
+    },
+    {
+      "id": "deliver",
+      "lane": "chat",
+      "col": 5,
+      "type": "frontend",
+      "label": "Deliver",
+      "sublabel": "VERIFY: SAME, report",
+      "sources": [
+        {
+          "path": "SKILL.md",
+          "line": 79,
+          "end_line": 79,
+          "label": "workflow step 11"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-brief",
+      "from": "brief",
+      "to": "storyboard",
+      "label": "scenario.md",
+      "variant": "default"
+    },
+    {
+      "id": "e-board",
+      "from": "storyboard",
+      "to": "proof",
+      "label": "approved table",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-proof-rows",
+      "from": "proof",
+      "to": "proofgates",
+      "label": "PROOF rows",
+      "variant": "security",
+      "role": "branch",
+      "fromSide": "left",
+      "toSide": "left"
+    },
+    {
+      "id": "e-proof-pass",
+      "from": "proof",
+      "to": "proofreview",
+      "label": "PROOF: PASS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-proof-fix",
+      "from": "proofreview",
+      "to": "proof",
+      "label": "REVIEW FIX",
+      "variant": "security",
+      "role": "return"
+    },
+    {
+      "id": "e-proof-ok",
+      "from": "proofreview",
+      "to": "proofok",
+      "label": "REVIEW PASS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-render",
+      "from": "proofok",
+      "to": "render",
+      "label": "render",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-check",
+      "from": "render",
+      "to": "filegates",
+      "label": "every gate",
+      "variant": "security",
+      "role": "branch"
+    },
+    {
+      "id": "e-delivered",
+      "from": "render",
+      "to": "finalreview",
+      "label": "DELIVERED",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-approve",
+      "from": "finalreview",
+      "to": "approved",
+      "label": "qa.py approve",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-verify",
+      "from": "approved",
+      "to": "deliver",
+      "label": "verify SAME",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Review loops",
+      "items": [
+        "REVIEW FIX at either stage goes back to the builder as one numbered list",
+        "3 rounds for a FIX row, 2 for a note, then the open items go to you",
+        "Any change after approval: qa.py diff --expect, then a fresh review"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Shared contract (engine/contract.py)",
+      "items": [
+        "One frame clock, frame_of, for every module",
+        "Row: PASS, FIX, NOTE, NOT CHECKED (exit 2)",
+        "58 Q codes, each with its owner module",
+        "Ctx decodes the file once for every gate"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "What a build writes",
+      "items": [
+        "video.mp4: frames piped into ffmpeg through shared memory",
+        "frames.hash, thumbs.npy: one digest and thumb per frame",
+        "mix_raw.wav, sfx.wav, cuesheet.json: stems and cue sheet",
+        "approved/: hashes the reviewer passed"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Proved by",
+      "items": [
+        "qa.py selftest: 144 planted faults cover all 58 codes",
+        "Template smoke at 1920x1080 and 1080x1920"
+      ]
+    }
+  ]
+}

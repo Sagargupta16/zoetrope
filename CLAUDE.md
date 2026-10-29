@@ -21,8 +21,9 @@ This folder is the `zoetrope` skill itself, not a copy: `~/.claude/skills/zoetro
 - **Private, always.** It is adapted from a package that is not ours to publish. Never change the visibility, and never copy its files into claude-home, svg-forge, orrery, sagar-dev-skills, the portfolio or a post.
 - **Keep the scrub clean.** The original platform's tool names, portal link, team, author and chat channel were rewritten out on 2026-10-28 and the history was squashed. Do not add them back. Before every push, run the identifier grep kept in `~/.claude/projects/c--Code-GitHub/memory/zoetrope-internal-skill.md`; the only hits allowed are the English word "quick".
 - Every change gets a CHANGELOG line under a concrete version, and README wherever it describes the changed part.
+- **The README diagram** `docs/zoetrope-flow.svg` is exported from `docs/zoetrope-flow.workflow.json` with the archify skill. When the flow changes, edit the JSON and set `meta.repository.revision` to the new commit, run archify `finalize workflow` with `--repo-root .`, open the HTML in a Chrome DevTools page (the browser pane cannot open `file://`), run `Archify.exportMenu.run('svg')` while catching the blob from `URL.createObjectURL`, replace its two non-ASCII separators (U+203A, U+00B7) with `&gt;` and `|`, and look at it at 880 px in both themes.
 - Files are LF (`.gitattributes` sets `eol=lf`), unlike most Windows repos in this workspace. Check the bytes before assuming either way.
-- Everything a build makes goes in `outputs/` (gitignored): videos, working folders, scratch scripts, history bundles.
+- Everything a build makes goes in `outputs/` (gitignored): videos, working folders, scratch scripts, history bundles. The one exception is the README's promo in `docs/` (`.gitignore` lets `docs/*.mp4` and `docs/*.gif` through).
 
 ## Loading and agents
 
