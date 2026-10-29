@@ -28,6 +28,12 @@ def snap(t, fps):
     return frame_of(t, fps) / fps
 
 
+def mid_frame(a, b, fps):
+    """Middle frame of a span [a, b) whose end b is the first frame after it (qa.text_spans), never b itself: a
+    text on screen for one frame has its middle on the half frame, which frame_of rounds into the next frame."""
+    return min(frame_of((a + b) / 2, fps), frame_of(b, fps) - 1)
+
+
 def sample_of(t, sr):
     """Nearest sample index of time t (int(t * sr) truncates and drifts up to one sample early)."""
     return math.floor(t * sr + 0.5 + 1e-9)

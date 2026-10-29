@@ -2,6 +2,11 @@
 
 Every change to this copy of the video-producer package it was adapted from. The version numbers are this copy's own; the package as received is 1.0.0. File and section names in 1.0.0 and 1.1.0 refer to the package's original layout (`references/01-producer-playbook.md` to `10-qa-and-house-rules.md`).
 
+## 2.2.2 - 2026-10-29
+
+- **`qa.py look` shows the frame it is asked for.** It seeked with `-ss t`, and ffmpeg returns the first frame at or after that time, so a time just past a frame's start came back as the next frame. In the promo's final review, 2.467, 5.967 and 7.967 s returned the cut frame after them, and 8.367 and 8.467 s the next odometer value. Each time now goes onto the frame clock (`contract.frame_of`), and the decode seeks half a frame before that frame. On the promo, all five copies match their frame decoded by index, and each copy's label carries the frame number. The default set ends on the real last frame (the stream's frame count) instead of two frames before the end.
+- **Proof key cells for text shown on one frame sit on that frame.** The middle of a one-frame rest span [a, b) falls on the half frame, which `frame_of` rounds into the next frame. So on the promo's sheet each odometer value was labelled on the frame after it: 15 of the 32 rest cells. The new `contract.mid_frame` gives the middle frame of such a span, never its end. `proof.py` now uses it for the rest cells (0 of 32 off on the same build), and `qa.py` for its contrast and hold samples, which already clamped this way in a private helper.
+
 ## 2.2.1 - 2026-10-29
 
 - **README rebuilt around a flow diagram.** `docs/zoetrope-flow.svg` shows the whole flow, from brief to delivered file, across the main chat, both agents and the gates. It is a dual-theme SVG with no scripts and no external links. Its archify source, `docs/zoetrope-flow.workflow.json`, cites file and line ranges at commit `d664a97` and passes archify's validate, check and browser gates. The README adds how a video gets made in six steps, a table of what is in it and a table of the commands, and keeps every earlier section. CLAUDE.md says how to re-export the SVG when the flow changes.

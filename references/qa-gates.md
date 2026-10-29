@@ -144,7 +144,7 @@ Sizes come from `build.json` (run_all.py writes it in every stage), else `frames
 
 | Command | What it does |
 |---|---|
-| `qa.py look <video> [--times t,...] [--width 480]` | Small JPEG copies of frames and `review/look.jpg` (default every 5 s plus the last frame), so a model never reads a full-size frame |
+| `qa.py look <video> [--times t,...] [--width 480]` | Small JPEG copies of the frames the film shows at those times and `review/look.jpg` (default every 5 s plus the last frame), so a model never reads a full-size frame. Each time goes onto the frame clock first, and each copy is labelled with its time and frame number |
 | `qa.py holds <scenario.md> [--section N] [--profile display\|caption\|slow]` | Storyboard check before any build: each line's slot against its reading hold, with the words and characters the slot fits; exit 1 on any SHORT |
 | `qa.py purity [--n 16] [--t T1,T2] [--grid S]` | Q1201 alone |
 | `qa.py lint [scenes.py] [--all]` | Q1202 to Q1206, Q904 and Q905 |

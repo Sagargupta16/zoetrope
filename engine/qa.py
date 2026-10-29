@@ -591,11 +591,6 @@ def _worst(hits):
     return tied[len(tied) // 2], best
 
 
-def _mid(a, b, fps):
-    """Middle frame of a rest span [a, b) (b is the first frame after it)."""
-    return min(C.frame_of((a + b) / 2, fps), C.frame_of(b, fps) - 1)
-
-
 def _readable(items):
     """The registry items on screen that someone must read (alpha over VISIBLE, not texture)."""
     return [
@@ -810,7 +805,11 @@ def _contrast_rows(scenes, frames, spans, fps, scale, passing=()):
             continue
         for a, b in sp:
             fa, fb = C.frame_of(a, fps), C.frame_of(b, fps)
-            ks = range(fa, fb) if fb - fa <= 3 else (fa + 1, _mid(a, b, fps), fb - 2)
+            ks = (
+                range(fa, fb)
+                if fb - fa <= 3
+                else (fa + 1, C.mid_frame(a, b, fps), fb - 2)
+            )
             for k in ks:
                 samples.setdefault(k, set()).add(s)
     measured = {}  # string -> [(t, ratio, minimum)]
@@ -893,7 +892,7 @@ def _hold_rows(scenes, frames, spans, fps, scale, passing=()):
     n_held = sum(s not in passing for s in spans)
     for s, sp in spans.items():
         a, b = max(sp, key=lambda x: x[1] - x[0])
-        k = _mid(a, b, fps)
+        k = C.mid_frame(a, b, fps)
         it = _item(frames[k][1], s) or {}
         sp_in = [(round(x, 3), round(y - 1 / fps, 3)) for x, y in sp]  # last frames
         px = it.get("px")
@@ -1602,16 +1601,25 @@ def _silence_rows(a, scenes):
 
 
 def look(path, times=None, width=480, out="review", cols=4, ff="ffmpeg"):
-    """Small JPEG copies of frames at times (default every 5 s plus the last frame) and one review/look.jpg sheet."""
+    """Small JPEG copies of the frames at times (default every 5 s plus the last frame) and one review/look.jpg
+    sheet. Each time goes onto the frame clock first (contract.frame_of, as the proof sheets count) and the decode
+    seeks half a frame before that frame: ffmpeg returns the first frame at or after -ss, so seeking to t itself
+    gave the next frame for any t just past a frame's start (2.467 s at 30 fps came back as frame 75, the cut)."""
     p = probe(path, ff)
     n, d = (int(x) for x in p["fps"].split("/"))
-    last = (
-        int((p["duration"] - 2 * d / n) * 100) / 100
-    )  # rounded down, so the seek never passes the final frame
-    times = times or sorted({*[t for t in range(0, int(last) + 1, 5)], last})
+    fps = n / d
+    # the final frame; without a frame count, two frames back from the duration, which audio can lengthen
+    last = p["frames"] - 1 if p["frames"] else C.frame_of(p["duration"], fps) - 2
+    if times:
+        frames = sorted({min(max(C.frame_of(t, fps), 0), last) for t in times})
+    else:
+        frames = sorted(
+            {*(C.frame_of(s, fps) for s in range(0, int(last / fps) + 1, 5)), last}
+        )
     Path(out).mkdir(exist_ok=True)
     thumbs = []
-    for t in times:
+    for k in frames:
+        t = k / fps
         f = Path(out) / f"t{t:06.2f}.jpg"
         subprocess.run(
             [
@@ -1621,7 +1629,7 @@ def look(path, times=None, width=480, out="review", cols=4, ff="ffmpeg"):
                 "error",
                 "-y",
                 "-ss",
-                str(t),
+                f"{max(k - 0.5, 0) / fps:.6f}",
                 "-i",
                 str(path),
                 "-frames:v",
@@ -1634,7 +1642,7 @@ def look(path, times=None, width=480, out="review", cols=4, ff="ffmpeg"):
             check=True,
         )
         im = Image.open(f).convert("RGB")
-        ImageDraw.Draw(im).text((6, 6), f"{t:.2f}s", fill=(255, 0, 0))
+        ImageDraw.Draw(im).text((6, 6), f"{t:.2f}s f{k}", fill=(255, 0, 0))
         thumbs.append(im)
     rows = (len(thumbs) + cols - 1) // cols
     sheet = Image.new("RGB", (cols * width, rows * thumbs[0].height), (30, 30, 30))

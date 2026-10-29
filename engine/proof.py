@@ -193,7 +193,7 @@ def key_entries(fps=None):
         add(t1 - 1 / fps, f"window end {a}>{b}", "window")
     for s, sp in _registry(fps)[1].items():
         a, b = max(sp, key=lambda x: x[1] - x[0])
-        add((a + b) / 2, f"at rest: {s[:40]}", "rest")
+        add(C.mid_frame(a, b, fps) / fps, f"at rest: {s[:40]}", "rest")
     for k in getattr(sc, "KEY_TIMES", None) or []:
         t, why = (k, "key time") if isinstance(k, (int, float)) else k
         add(t, why, "key")
