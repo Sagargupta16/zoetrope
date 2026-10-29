@@ -39,7 +39,7 @@ The diagram's source is `docs/zoetrope-flow.workflow.json` (an archify workflow 
 | QA gates | 58 coded checks (`qa.py check`): safe area, overlap, contrast, reading holds, WCAG 2.2 flashes, pops and freezes, true peak, cue sync on the stems, the mux, colour tags, size. |
 | Approval | `approved/` keeps the hashes of what the reviewer passed; stale approval, regressions and changed frames are found mechanically. |
 | Selftest | `qa.py selftest` plants a fault for every one of the 58 codes (144 fixtures) and proves each gate still catches it. |
-| Narration | A per-line text-to-speech harness with word times (`voice.py`); see Requirements for its status. |
+| Narration | Offline narration in Kokoro's `af_heart` voice, one cached file per line with word times for cues (`voice.py`); see Requirements for the model files. |
 
 ## Run it
 
@@ -86,7 +86,7 @@ This folder is the private GitHub repo `Sagargupta16/zoetrope`. No copy of the o
 
 - Python with the pinned Pillow and numpy: run scripts from a video's working folder with `uv run --no-project --with-requirements requirements.txt python ...`, nothing installed globally. Check the whole toolchain from Git Bash with `bash setup.sh` (from PowerShell: `& "C:\Program Files\Git\bin\bash.exe" C:/Code/GitHub/tools/zoetrope/setup.sh`).
 - ffmpeg 9.0.2 (Gyan full build, winget `Gyan.FFmpeg`, installed 2026-10-28): libx264, libaom-av1, libsvtav1, libvpx-vp9, libopus, ebur128 and loudnorm all present. On PATH for shells opened after the install; a Claude session started earlier needs a restart to see it.
-- Voice: the narration harness works with the built-in Windows voices, which are robotic and serve only to test timing. The natural engines (Kokoro, Piper) are written but need their model files, 65 to 330 MB each, downloaded once Sagar has chosen from samples. Until then videos are music plus captions.
+- Voice: the narrator is Kokoro-82M's `af_heart`, which Sagar picked from `voice_samples.py` on 2026-10-29. The model (the timestamped ONNX export, fp32, 325.5 MB) and four voices (0.5 MB each) were downloaded that day to `%USERPROFILE%\.cache\zoetrope\voices`, outside the repo, with their sha256 checked. Its engine runs in a side Python 3.13 environment that uv sets up on first use. The built-in Windows voices stay as a robotic timing fallback; Piper and the sherpa-onnx Kokoro build are written but not downloaded.
 
 ## License
 

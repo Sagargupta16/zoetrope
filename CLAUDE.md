@@ -80,6 +80,6 @@ All five went from launch to finished file in about 1 h 16 min. Writing `scenes.
 
 ## Open
 
-- Voice: the narration harness is built (`voice.synthesize`, narration.json, word cues), tested only with the robotic Windows SAPI voices as plumbing. The natural engines (Kokoro through sherpa-onnx or the timestamped export, Piper) are written but untested until Sagar approves their model downloads (65 to 330 MB each); `voice_samples.py` then renders the same three lines with each so he can pick. Until then, music plus captions.
+- Voice: the narrator is settled, Kokoro `af_heart` through `kokoro-ts` (Sagar's pick from `voice_samples.py`, 2026-10-29; model and four voices in `~/.cache/zoetrope/voices`, 327.6 MB, sha256 checked). Still open: Piper and the sherpa-onnx Kokoro build are written but untested, and nothing for them is downloaded; a second voice for two-host videos needs its own pick.
 - Builder prompt cache: a 1 h cache TTL for the builder agent (research Z08) changes billing; not added, waiting on Sagar.
 - Size cap: under `BUDGET_MB` a CRF encode spends only about 70 percent of the budget on heavy grain; a two-pass encode at the cap is not built.

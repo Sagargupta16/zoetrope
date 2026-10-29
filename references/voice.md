@@ -20,13 +20,14 @@ Defaults when the user says "you choose" (our suggestions, state them out loud):
 | Social / retro / game | Music only, chiptune 140 or upbeat pop 112 |
 | Interview / chat explainer | Two voices (host A, host B) + very quiet ambient bed |
 
-Until Sagar has picked a natural voice from samples, only the robotic Windows SAPI voices are installed: say so, and offer music with captions, or SAPI for a timing draft. Always confirm the target length first: music length and voice length both drive the schedule.
+The narrator is Kokoro `af_heart` (engine `kokoro-ts`), Sagar's pick from samples on 2026-10-29; the robotic Windows SAPI voices stay for timing drafts. Always confirm the target length first: music length and voice length both drive the schedule.
 
 ## Narration: `voice.synthesize` (offline, one file per line)
 
 ```python
 import voice as V
-N = V.synthesize(lines, engine="sapi", voice=None, speed=1.0, folder="narration")  # once, in the build step
+N = V.synthesize(lines, folder="narration")  # once, in the build step: the narrator, kokoro-ts af_heart
+N = V.synthesize(lines, engine="sapi", folder="narration")  # a robotic timing draft
 ```
 
 `lines` are strings (ids L01, L02 ...), `{id, text}` dicts or `(id, text)` pairs; one voice per call.
@@ -58,7 +59,7 @@ The shape of showtime's timeline.json. Times are seconds on the narration timeli
 
 `V.word_cue(N, "square", n=1)` is the start of the n-th "square"; a phrase ("Vatican City") gives its first word. Case, punctuation, curly quotes and accents are ignored. A missing word raises with the closest words; a word on a line whose engine gives no word times raises naming the line; a time that was shared out rather than heard (`est`, for example the "2026" in SAPI's single token "In 2026") raises unless `est=True`. Snap it before using it: `C.snap(V.word_cue(N, "square"), FPS)`, and trigger a reveal at the start of the word that names it.
 
-SAPI reads numbers, dates and prices as several words and reports each with the text token it read, which can cover two script words ("In 2026", "3:45 pm"); voice.py groups those events back into one time per script word. `V.onset_offsets("narration/narration.json")` lists, for each word after a pause, its start minus the audio onset in ms: near 0 when an engine's word clock is right (SAPI: -10 to +7 ms over 7 words, 2026-10-28). Run it on an engine's first real narration; Kokoro's 50 ms shift is showtime's measurement, not ours.
+SAPI reads numbers, dates and prices as several words and reports each with the text token it read, which can cover two script words ("In 2026", "3:45 pm"); voice.py groups those events back into one time per script word. `V.onset_offsets("narration/narration.json")` lists, for each word after a pause, its start minus the audio onset in ms: near 0 when an engine's word clock is right (SAPI: -10 to +7 ms over 7 words, 2026-10-28). Run it on an engine's first real narration. Kokoro's shift is 70 ms: showtime's 50 ms left af_heart's words a median 22 ms late over 24 words (2026-10-29), and at 70 ms they read +2 ms (p10 -31, p90 +51). The spread is the check itself: it waits for voicing, so a soft p, f or th reads early and a vowel start reads late.
 
 ### Engines
 
@@ -66,11 +67,11 @@ SAPI reads numbers, dates and prices as several words and reports each with the 
 |---|---|---|---|---|
 | `sapi` | tested 2026-10-28 on Windows 11, as a timing and plumbing fallback only | SAPI's word events: starts within 10 ms of the onset after pauses; ends from the audio | none (the Windows David and Zira desktop voices) | part of Windows |
 | `kokoro` | UNTESTED | none | sherpa-onnx 2.0.1, about 19 MB of wheels; `kokoro-int8-multi-lang-v1_0.tar.bz2`, 132 MB | Apache-2.0 (code and weights) |
-| `kokoro-ts` | UNTESTED | per-phoneme durations, moved 50 ms earlier | kokoro-onnx 0.6.1 in a side Python 3.13 env, about 40 MB of wheels; `onnx/model.onnx` 325.5 MB (or `model_fp16.onnx` 163.2 MB) and `voices/<name>.bin`, 0.5 MB each | MIT code, Apache-2.0 weights; phonemizer and espeak-ng GPL-3.0 |
+| `kokoro-ts` | tested 2026-10-29 on Windows 11 (af_heart, af_bella, am_michael, bf_emma); af_heart is the narrator | per-phoneme durations, moved 70 ms earlier | kokoro-onnx 0.6.1 in a side Python 3.13 env, about 40 MB of wheels; `onnx/model.onnx` 325.5 MB (or `model_fp16.onnx` 163.2 MB) and `voices/<name>.bin`, 0.5 MB each. Downloaded 2026-10-29 from `onnx-community/Kokoro-82M-v1.0-ONNX-timestamped` at commit `dd4401a9`: the fp32 model and the four voices above, sha256 checked | MIT code, Apache-2.0 weights; phonemizer and espeak-ng GPL-3.0 |
 | `piper` | UNTESTED | none | piper-tts 1.8.0, about 65 MB of wheels; a voice, 63 to 114 MB | GPL-3.0-or-later; voices: ljspeech, john, kristin, norman public domain, lessac Blizzard 2013 |
 
 - `sapi` is a timing and plumbing fallback, not a quality option: it sounds robotic. It writes 16 kHz on purpose: at the default 22.05 kHz SAPI's word clock ran 1.378x fast. Its speed is SAPI's integer rate, so 0.95 to 1.05 all map to the normal rate.
-- `kokoro`, `kokoro-ts` and `piper` are written to their APIs and their plumbing ran on fake models; they stay untested until Sagar approves the model downloads. Each needs a named voice (no default), and `synthesize` prints that an untested engine spoke.
+- `kokoro` and `piper` are written to their APIs and their plumbing ran on fake models; they stay untested until Sagar approves their downloads, and `synthesize` prints when an untested engine speaks. Each needs a named voice; `kokoro-ts` defaults to the narrator, af_heart.
 - `kokoro` (sherpa-onnx 2.0) has no espeak-ng fallback: a word missing from its lexicon is skipped without a sound, so synthesize refuses such lines first and lists the words. Write numbers as words, spell names as they sound, or add the word to the lexicon file.
 - `kokoro-ts`: kokoro-onnx 0.6.1 declares Python below 3.14, so it runs in a side 3.13 environment; voice.py points it at the export's `durations` output, prefers the fp32 model and stops on NaN audio from the fp16 one.
 - Model files live outside the repo in `%USERPROFILE%\.cache\zoetrope\voices\<engine folder>` (`ZOETROPE_VOICES` moves them). Packages never go into requirements.txt: each engine runs in its own uv environment with the pins in `engine/requirements-voice.in`, which setup.sh does not install.
@@ -95,7 +96,7 @@ Rules and pitfalls with any engine:
 
 ### Voice picks by tone
 
-Voice lists do not rank voices by tone, so pick by audition, not by assumption: `voice_samples.py` renders the same lines with every ready voice (or generate a 1-line test per candidate, 2 or 3). For a two-host chat pick one male and one female voice so listeners can tell them apart. A slow voice works for a deliberate, spaced style (a 92 s mobiles-deals video ran a slow voice at 1.04x). Record the chosen voice ids in the plan.
+Voice lists do not rank voices by tone, so pick by audition, not by assumption: `voice_samples.py` renders the same lines with every ready voice (or generate a 1-line test per candidate, 2 or 3). For a two-host chat pick one male and one female voice so listeners can tell them apart. A slow voice works for a deliberate, spaced style (a 92 s mobiles-deals video ran a slow voice at 1.04x). Record the chosen voice ids in the plan. The narrator, af_heart, read the three sample lines at 3.19 words a second (af_bella 3.03, bf_emma 3.19, am_michael 2.83).
 
 ### Script-writing rules for the ear
 

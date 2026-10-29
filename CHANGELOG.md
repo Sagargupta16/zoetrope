@@ -2,6 +2,11 @@
 
 Every change to this copy of the video-producer package it was adapted from. The version numbers are this copy's own; the package as received is 1.0.0. File and section names in 1.0.0 and 1.1.0 refer to the package's original layout (`references/01-producer-playbook.md` to `10-qa-and-house-rules.md`).
 
+## 2.2.3 - 2026-10-29
+
+- **Narration has a voice: Kokoro `af_heart`.** Sagar picked it by ear from `voice_samples.py`. On the engine's first real run it rendered the same three lines in af_heart, af_bella, am_michael and bf_emma, plus the two Windows SAPI voices: 6 of 6 samples, with word times on 3 of 3 lines each, matched to -21.0 LUFS for the audition. `voice.synthesize` now speaks as the narrator (`NARRATOR_ENGINE`, `NARRATOR_VOICE`: `kokoro-ts`, `af_heart`) when no engine is named, and SAPI stays as the timing fallback. The model (`onnx/model.onnx`, fp32, 325.5 MB) and the four voices (0.5 MB each) come from `onnx-community/Kokoro-82M-v1.0-ONNX-timestamped` at commit `dd4401a9`, sha256 checked, into `~/.cache/zoetrope/voices`. `kokoro-ts` is marked tested.
+- **Kokoro's word clock moves 70 ms, not 50.** `onset_offsets` on 24 af_heart words that open a line or follow a pause read a median +22 ms late after showtime's 50 ms shift (p10 -11, p90 +56). At 70 ms they read +2 ms (p10 -31, p90 +51). The spread comes from the check itself: it waits for voicing, so a soft p, f or th reads early and a vowel start reads late.
+
 ## 2.2.2 - 2026-10-29
 
 - **`qa.py look` shows the frame it is asked for.** It seeked with `-ss t`, and ffmpeg returns the first frame at or after that time, so a time just past a frame's start came back as the next frame. In the promo's final review, 2.467, 5.967 and 7.967 s returned the cut frame after them, and 8.367 and 8.467 s the next odometer value. Each time now goes onto the frame clock (`contract.frame_of`), and the decode seeks half a frame before that frame. On the promo, all five copies match their frame decoded by index, and each copy's label carries the frame number. The default set ends on the real last frame (the stream's frame count) instead of two frames before the end.

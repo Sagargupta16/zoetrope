@@ -90,8 +90,14 @@ GAP, END_TAIL = 0.4, 0.8
 WORD_MIN = 0.02  # shortest word when an engine reports only word starts
 # showtime measured Kokoro's duration-grid times about 50 ms late against acoustic onsets and a CTC aligner (6 voices,
 # 3 speeds) and its code moves them 50 ms earlier, as _phoneme_words does; its comment words the direction the other
-# way round. Not measured by us: check it with onset_offsets on the first real kokoro-ts run.
-KOKORO_LAG = 0.05
+# way round. Measured by us on 2026-10-29 (onset_offsets, after that 50 ms): af_heart, 24 words that open a line or
+# follow a pause on 12 lines, median +22 ms late (p10 -11, p90 +56; vowel onsets run later, unvoiced consonants read
+# early because the onset check waits for voicing); af_bella, am_michael and bf_emma medians +19 to +45 ms on 7 to 10
+# words each. So 70 ms: the same 24 words then read median +2 ms (p10 -31, p90 +51).
+KOKORO_LAG = 0.07
+# The narration voice, picked by Sagar from voice_samples.py on 2026-10-29: synthesize uses it when no engine is
+# named. Another voice is named with engine= and voice=; sapi stays the timing fallback.
+NARRATOR_ENGINE, NARRATOR_VOICE = "kokoro-ts", "af_heart"
 # bump when the sidecar format changes; engine code, programs, pins and model files are hashed into the key anyway
 CACHE_VERSION = 2
 # model and voice files, one folder per engine; never inside the repo
@@ -102,7 +108,7 @@ VOICE_DIR = Path(
 
 def synthesize(
     lines,
-    engine="sapi",
+    engine=NARRATOR_ENGINE,
     voice=None,
     speed=1.0,
     folder="narration",
@@ -116,7 +122,7 @@ def synthesize(
     synthesizes nothing and render needs no engine. A new file is checked (speech found, word times inside it) before
     it is cached; a bad one is deleted and named. Writes folder/narration.wav (mono, 44.1 kHz, each line in its slot)
     and folder/narration.json, and returns the narration dict. Slots end on whole frames when fps is set; rule and
-    profile size them (see slot)."""
+    profile size them (see slot). With no engine named it speaks as the narrator (NARRATOR_ENGINE, NARRATOR_VOICE)."""
     eng = get_engine(engine)
     eng.require()
     if speed <= 0 or rule not in ("ours", "showtime"):
@@ -468,7 +474,7 @@ def word_cue(narration, word, n=1, est=False):
 def onset_offsets(narration, folder=None, gap=0.1):
     """[(line id, word, ms)] for each heard word that opens a line or follows a pause over `gap` s: its start minus
     the first voiced window of narration.wav from 50 ms before it. Near 0 when an engine's word clock is right; run
-    it on an engine's first real narration (KOKORO_LAG is showtime's number, not ours)."""
+    it on an engine's first real narration (KOKORO_LAG was set from it on 2026-10-29)."""
     narr = load_narration(narration)
     if folder is None:
         folder = Path(narration).parent if isinstance(narration, (str, Path)) else "."
@@ -944,7 +950,7 @@ class Kokoro(_Worker):
 
 class KokoroTs(_Worker):
     name = "kokoro-ts"
-    status = "UNTESTED: written to the kokoro-onnx 0.6.1 API; needs Sagar's yes on the model download (164 to 326 MB)"
+    status = "tested 2026-10-29 on Windows 11 (af_heart, af_bella, am_michael, bf_emma); af_heart is the narrator"
     use = "Kokoro-82M timestamped export through kokoro-onnx: word times from its per-phoneme durations"
     licence = "kokoro-onnx MIT, onnxruntime MIT, phonemizer and espeak-ng GPL-3.0; Kokoro-82M weights Apache-2.0"
     folder = "kokoro-82m-v1.0-onnx-timestamped"
@@ -988,6 +994,9 @@ class KokoroTs(_Worker):
 
     def voices(self):
         return self.voices_found() if not self.missing() else []
+
+    def default_voice(self):
+        return NARRATOR_VOICE
 
     def model_id(self, voice):
         return f"{self._file_id(self._model())} {self._file_id(self.dir() / 'voices' / f'{voice}.bin')}"
