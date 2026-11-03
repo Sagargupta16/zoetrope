@@ -74,14 +74,16 @@ All five went from launch to finished file in about 1 h 16 min. Writing `scenes.
 
 ## Verify before a commit
 
-- `bash setup.sh` ends `SETUP: PASS`, with the line that the 14 free font families are cached (`python engine/fonts.py fetch` when it says they are not).
+- `bash setup.sh` ends `SETUP: PASS`, with the lines that the 14 free font families and the speech model are cached (`python engine/fonts.py fetch`, `python engine/qa_speech.py fetch` when they are not).
 - Smoke render: copy the engine with `cp -r engine/. outputs/smoke/` (so `qa_fixtures/` comes along), then at `--size 1920x1080` and again at `--size 1080x1920`: `run_all.py proof` ends `PROOF: PASS`, `run_all.py full` ends with its `APPROVAL` line and one `DELIVERED` line, and `qa.py check out.mp4 --scenes . --size WxH --fps 30 --bpm 120` ends `QA: PASS` with 0 FIX and 0 NOT CHECKED.
-- `qa.py selftest` (from the same folder) ends `SELFTEST: PASS (144 fixtures, 58 of 58 codes covered, 0 expected gaps)`: every Q code fires on its planted fault with the right item, time and value, and the template passes `run_all.py proof` and `full` at 1920x1080 and 1080x1920 (36 s on 2026-10-29; `--quick` skips the two full renders, 28 s).
+- `qa.py selftest` (from the same folder) ends `SELFTEST: PASS (158 fixtures, 60 of 60 codes covered, 0 expected gaps)`: every Q code fires on its planted fault with the right item, time and value, and the template passes `run_all.py proof` and `full` at 1920x1080 and 1080x1920 (45 s on 2026-11-03; `--quick` skips the two full renders, about 28 s). The count is one per expected result, not per case: 84 cases.
+- A change to `voice.py` or `qa_speech.py`: narrate a few lines and run `qa.py speech` on them (Q806 must read what the voice said), and run one narrated build to `DELIVERED` so Q807 finds the stem in the file. The calibration narrations are in `outputs/voice-samples-2026-11-03/` and `outputs/voice-samples-2026-10-29/`.
+- `python engine/cards.py check` ends `CARDS: OK (33 cards ...)` after any change to a card, the router or a kit.
 - `uvx ruff format --check engine` is clean. `uvx ruff check engine kits` is not (184 findings on 2026-10-29: the template's `from engine import *` by design, plus lint debt in the kits), so compare its count before and after a change instead of expecting zero.
 - `node C:\Code\GitHub\community\skillcheck\dist\cli.js lint .` is clean.
 
 ## Open
 
-- Voice: the narrator is settled, Kokoro `af_heart` through `kokoro-ts` (Sagar's pick from `voice_samples.py`, 2026-10-29; model and four voices in `~/.cache/zoetrope/voices`, 327.6 MB, sha256 checked). Still open: Piper and the sherpa-onnx Kokoro build are written but untested, and nothing for them is downloaded; a second voice for two-host videos needs its own pick.
+- Voice: the narrator is settled, Kokoro `af_heart` through `kokoro-ts` (Sagar's pick from `voice_samples.py`, 2026-10-29). Every English male and Hindi Kokoro voice is downloaded (2026-11-03) and sampled in `outputs/voice-samples-2026-11-03/`; a second voice for two-host videos waits for Sagar's pick by ear, and two-voice narration (two `voice.synthesize` calls on one timeline) is not built. Hindi narrates with word times, but Q806 cannot check it (base.en is English only; a multilingual model is a separate download).
 - Builder prompt cache: a 1 h cache TTL for the builder agent (research Z08) changes billing; not added, waiting on Sagar.
 - Size cap: under `BUDGET_MB` a CRF encode spends only about 70 percent of the budget on heavy grain; a two-pass encode at the cap is not built.

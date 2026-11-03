@@ -2,6 +2,7 @@
 **Source:** @emollick, https://x.com/emollick/status/2103272686570918334 · our build: g21-anime-remix
 **Use when:** "anime style explainer", "make it interesting for a social audience", "compressed learning", "TikTok or Reels short", "mascot character teaches a concept", "manga panels recap"
 **Defaults:** 46.5 s · 9:16 1080x1920 · 30 fps (character drawn on twos, 12 drawings/s) · music-only (no narration unless asked; big type carries every idea)
+**Spec:** family=game length=46.5 size=1080x1920 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Take {topic} and make the same message much more interesting to a social media audience that loves anime, quick clips and compressed learning. Use an original anime-inspired style only: no existing characters, logos or catchphrases.

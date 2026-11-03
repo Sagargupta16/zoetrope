@@ -2,6 +2,7 @@
 **Source:** @mr_igor_sanz, https://x.com/mr_igor_sanz/status/2104000986981486650 · our build: g05-logo-animation
 **Use when:** "logo animation", "logo sting", "animate our logo", "elastic bounce", "morphing shapes", "logo reveal with tagline"
 **Defaults:** 8.5 s · 16:9 1920x1080 · 60 fps in the build (30 fps here) · music and sound design, no voice
+**Spec:** family=logo length=8.5 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Build me a good logo animation with {brand}. Use cool motion, shapes, morphing and elastic easing. The mark is a tile with a cut corner and a dot (swap for the user's own mark); the animation is the dot's story: it drops in, the world shapes itself around it, it carves its own nook, spells the name, and comes home.

@@ -2,6 +2,7 @@
 **Source:** @sachingmt, https://x.com/sachingmt/status/2104077647206821899 · our build: g28-camera-evolution
 **Use when:** "evolution of {thing}", "futuristic motion graphics", "short history in 15 seconds", "tech timeline", "holographic HUD look"
 **Defaults:** 15 s · 16:9 1920x1080 · 60 fps in the build (30 fps is fine here) · music-only
+**Spec:** family=story length=15 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Futuristic motion graphics about the evolution of {product category}. About 15 s, correct dates, generic objects (no logos or trademarks), soundtrack synthesized, loudness -14 LUFS, no fast full-screen flashing.

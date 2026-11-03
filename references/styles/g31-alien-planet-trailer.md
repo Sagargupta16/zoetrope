@@ -2,6 +2,7 @@
 **Source:** @VoidStateKate, https://x.com/VoidStateKate/status/2104041451084517742 (request paraphrased in the post) · our build: g31-alien-planet-trailer
 **Use when:** "cinematic trailer", "teaser for a series", "sci-fi trailer", "movie-style voiceover with title card", "launch trailer with a story", "mood piece with logline and tagline"
 **Defaults:** 81 s (brief said 60 to 90 s) · 16:9 1920x1080 with 2.39:1 letterbox inside the picture · 30 fps · narrated (calm voice-over plus a second, radio-filtered voice)
+**Spec:** family=game length=60-90 size=1920x1080 fps=30 audio=voice kit=-
 
 ## The brief (reusable prompt)
 Make a trailer about {character} arriving in {setting}, for a short series. Write the story, design the characters and the world, direct the camera, compose the score and sound design, voice it, and edit it. No stock assets and no video generators.

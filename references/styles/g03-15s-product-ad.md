@@ -2,6 +2,7 @@
 **Source:** @tstfully, https://x.com/tstfully/status/2104033772949680192 · our build: g03-15s-product-ad
 **Use when:** "15 second product ad", "tool explainer ad", "paste X get Y", "short SaaS ad", "yellow highlighter style ad"
 **Defaults:** 15 s · 16:9 1920x1080 · 30 fps · music-only
+**Spec:** family=launch length=15 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Make a 15-second motion graphics product ad: {one-line input to output promise, for example "paste a link, get every word"}.

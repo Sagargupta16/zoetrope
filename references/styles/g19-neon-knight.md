@@ -2,6 +2,7 @@
 **Source:** @SpikeRiser, https://x.com/SpikeRiser/status/2104019121377583446 · our build: g19-neon-knight
 **Use when:** "pixel art animation", "neon city at night", "synthwave scene", "one continuous shot reveal", "colossal figure watching over a city", "atmospheric title sting"
 **Defaults:** 26 s · 16:9 1920x1080 (drawn at 480x270, scaled x4 nearest-neighbour) · 30 fps · music-only (original synthwave, no voice)
+**Spec:** family=game length=26 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 A colossal {character} on a throne watches over a neon city at night, with waterfalls pouring down the steps and a crowd gathered in the plaza below. Real pixel art, one continuous camera move, original synthwave score, title in pixel neon.

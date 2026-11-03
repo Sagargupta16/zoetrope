@@ -2,6 +2,7 @@
 **Source:** @LinearUncle, https://x.com/LinearUncle/status/2103705625075331442 · our build: g24-new-york-5min
 **Use when:** "travel promo", "introduce a city or destination", "tourism video for {audience}", "5 minute narrated tour", "city intro with captions"
 **Defaults:** about 5 min (the build ran 5:29.27 including 13 s of credits) · 16:9 1920x1080 · 30 fps · narrated (male English voice) with captions and music
+**Spec:** family=story length=300-330 size=1920x1080 fps=30 audio=voice kit=-
 
 ## The brief (reusable prompt)
 Make a video introducing {city}. Use only footage that the user owns or has licensed, a synthesized original music bed, a male English voiceover, and English subtitles, about 5 minutes long, to attract people from {origin city or country} to travel there. Facts must be accurate. Leave out prices, visa rules, flight times and opening hours unless verified and dated, and tell viewers to check official sources.

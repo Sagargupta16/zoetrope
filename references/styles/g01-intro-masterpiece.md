@@ -2,6 +2,7 @@
 **Source:** @BogdanDragomir, https://x.com/BogdanDragomir/status/2104045641538412658 · our build: g01-intro-masterpiece
 **Use when:** "intro for our product", "show what it does", "portfolio masterpiece", "music-synced brand film", "feature tour with a logo reveal"
 **Defaults:** 45 s · 16:9 1920x1080 · 60 fps in the build (use 30 fps here) · music-only, type does the talking
+**Spec:** family=logo length=45 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Create an intro for {product} highlighting what it does. Create the music too and make sure the video is synced with it. Give your best, as if it is your portfolio masterpiece. Keep on-screen claims to the facts the user supplies (features, tagline); no metrics, prices or ratings unless given.

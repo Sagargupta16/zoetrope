@@ -2,6 +2,7 @@
 **Source:** @kloss_xyz, https://x.com/kloss_xyz/status/2104021884350439465 · our build: g26-claude-sketchbook
 **Use when:** "sketchbook", "hand-drawn notebook video", "journal flip-through", "doodles and diagrams drawing themselves", "personal thoughts as a book"
 **Defaults:** 156 s in our build (shorter is better here, see notes) · 1:1 1080x1080 · 60 fps in our build (30 fps is fine) · soft solo piano with paper and pencil foley
+**Spec:** family=handmade length=60-156 size=1080x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Make a sketchbook of {topic or persona}. It starts closed on a desk under a warm lamp: a worn sketchbook with an elastic band and a pencil clipped to the cover. Invent your own handwriting and use it throughout. 20 pages of real thoughts, doodles, studies, diagrams, lists and half-formed ideas; not a portfolio. Treat it like a real used sketchbook: mixed media, smudges, bleed, mistakes left in, one page torn out and taped back in. The last page is blank. Each page draws itself stroke by stroke with a moving pencil tip. Soft felt-piano score, pencil and paper sound synced to the drawing. Back cover shows the total stroke count.

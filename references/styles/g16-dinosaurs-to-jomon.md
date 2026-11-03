@@ -2,6 +2,7 @@
 **Source:** @mellow_neet2000, https://x.com/mellow_neet2000/status/2103487198758834408 · our build: g16-dinosaurs-to-jomon
 **Use when:** "educational motion graphics", "how the Earth changed over millions of years", "timeline from X to Y", "museum-style science explainer", "no narration, on-screen text only"
 **Defaults:** 128 s (a 60 to 90 s cut works by trimming chapters) · 16:9 1920x1080 · 30 fps · music-only (no narration; all teaching is on-screen text)
+**Spec:** family=story length=60-128 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Using motion graphics, show how {subject} changed from {start era} to {end era}, both as an educational explanation and as visual expression. Language: English. One continuous camera, not a slideshow: start wide (the planet), end close (the people), so the frame shrinks as the story nears us. Keep two instruments on screen the whole time: a years-ago counter and a timeline ruler. Split the story into numbered chapters of about 8 to 21 s, each with a kicker, a name, a date range and up to three short facts that build in on the beat. Include one dramatic event beat and a closing "if the whole span were one day" clock.

@@ -48,7 +48,8 @@ Do not page through the engine or a kit to find a helper: read the index
   (gitignored; never commit anything from `outputs/`).
 - **Storyboard**: the approved table, style id, size, length, fps.
 - **Audio plan**: music only (BPM, mood), or `narration/narration.json` and
-  `narration/narration.wav` made in the parent session.
+  `narration/narration.wav` made in the parent session, which has already
+  cleared `qa.py speech` (Q806) on them.
 - **Facts and media**: facts the user supplied with their sources; user media
   paths with their licence.
 
@@ -94,7 +95,10 @@ voice-led piece with no narration files), and say so under `blocked`.
    line's `slot.duration`, a reveal cues on `voice.word_cue` snapped with
    `contract.snap`, and `narration.wav` is mixed with `voice.duck_mix`. Never
    call `voice.synthesize` from scenes.py. Measure any other voice file with
-   `voice.dec` and `voice.span`.
+   `voice.dec` and `voice.span`. Set `CARD` in scenes.py to the style id
+   (`"g14-what-is-git"`): a narrated card's build without narration is then
+   NOT CHECKED (Q806), and `qa.py check` holds the file's sound against the
+   narration (Q807: a word the music masks, or a mix from an older take).
 5. Fonts: when the style names one of the free families in `fonts.py`
    (`python fonts.py list`: Inter, Nunito, IBM Plex Mono and 11 more), draw
    with it by name: `bold="Nunito:800"` (family, weight, and `:italic` when

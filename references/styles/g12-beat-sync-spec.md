@@ -2,6 +2,7 @@
 **Source:** @twoclipping, https://x.com/twoclipping/status/2102554209166000267 · our build: g12-beat-sync-spec
 **Use when:** "beat-synced product ad", "high-end minimal promo", "10 bars at 120 BPM", "drop opens into the product", "cuts on the downbeat"
 **Defaults:** 20 s · 16:9 1920x1080 · 60 fps in the build (30 fps here) · music-only
+**Spec:** family=music length=20 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 High-end minimal spot for {product}: one idea per shot, lots of empty space, one accent colour, one clean sans with tight tracking, masked type reveals, match cuts, one smooth camera language. Real footage only (the user's own clips), never placeholder cards. No full stops in on-screen text. Banned: shockwave rings, particle bursts, RGB split, camera shake, lens flares, neon glows, grid floors, flashing backgrounds, bouncy easing. Structure: 10 bars at 120 BPM, 2 s each. Every cut on a downbeat, every UI hit on a beat. Show a storyboard with every timing on the beat grid before building. Ask for: product name and one-line promise, 3 to 5 UI moments, one accent colour, 10 to 20 clips the user owns, and a song with a clear drop (or synthesize one).

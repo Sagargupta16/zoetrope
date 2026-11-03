@@ -2,6 +2,7 @@
 **Source:** @tanabe_fragm, https://x.com/tanabe_fragm/status/2103802156675706979 · our build: g30-structured-self-intro
 **Use when:** "15-second self intro", "resume reel", "personal intro video", "team intro", "motion design showreel", "introduce me / us in a quick animation"
 **Defaults:** 15 s · 16:9 1920x1080 · 60 fps in the build (30 fps here) · music-only (120 BPM)
+**Spec:** family=logo length=15 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 You are a top motion designer. Make a self-introduction video so a hiring manager, after 15 seconds, thinks "I want this person to work for me". The star is {person or brand}. Process, in order: (1) state the idea in one sentence; (2) pick 3-4 colours and at most 2 typefaces, one line of reason each; (3) show a storyboard table every 0.5 s (time, on screen, technique, purpose); (4) build; (5) self-check against the pass criteria and fix. Structure: 0-2 s hook (grab in the first 0.5 s); 2-10 s showcase, change technique every 1.5-2 s; 10-13 s densest build-up; 13-15 s the name lands cleanly. Use at least 6 techniques: per-letter text, shape morph, mask transitions, depth (parallax, 3D rotation), particle gather and scatter, count-ups or line drawing. Pass criteria: no constant-speed motion; overlap scenes; main moves on the 0.5 s beat (120 BPM); a 0.3-0.5 s anticipation before each highlight; every paused frame looks good; avoid clichés (all fade-ins, rainbow colours, meaningless spin). Deliver at exactly 15 s with the name as the final beat.

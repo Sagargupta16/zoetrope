@@ -2,6 +2,7 @@
 **Source:** @Ror_Fly, https://x.com/Ror_Fly/status/2102853258582880547 · our build: g18-cocktail-recipe
 **Use when:** "recipe video", "step by step how-to", "show the ingredients and amounts as they go in", "empty to finished", "explainer with a count-up"
 **Defaults:** 30 s · 16:9 1920x1080 · 30 fps · music-only (no narration unless asked)
+**Spec:** family=handmade length=30 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Render a recipe motion graphic that shows the full recipe from start to finish (empty glass to completed {product}), explainer-video style, showing each ingredient and its measurement as it goes into the glass. 30 seconds.

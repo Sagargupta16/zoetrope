@@ -3,7 +3,16 @@
 # the gate it goes through, and what the gate must say about it (code, status, item, time and measured value).
 # fake.py and media.py are the shared makers. Nothing here reads outputs/ or downloads anything.
 
-MODULES = ("text", "registry", "source", "files", "sound", "scans", "approval")
+MODULES = (
+    "text",
+    "registry",
+    "source",
+    "files",
+    "sound",
+    "speech",
+    "scans",
+    "approval",
+)
 
 
 def want(

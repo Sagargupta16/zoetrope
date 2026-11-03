@@ -2,6 +2,7 @@
 **Source:** our own build, no external source · our build: mobiles-deals
 **Use when:** "deals video", "top offers roundup", "price drop list", "festival sale reel", "vertical product-by-product ad"
 **Defaults:** about 90 s (33 s and 30 s short cuts also built) · 9:16 1080x1920 · 30 fps · narrated plus music
+**Spec:** family=launch length=30-90 size=1080x1920 fps=30 audio=voice kit=-
 
 ## The brief (reusable prompt)
 Make a vertical English video of the best offers on {store page or category}: a hook, one card per product with struck price and deal price, a bank or coupon offer card, a wall of everything, and a shop-now end card. Voiceover on every product.

@@ -2,6 +2,7 @@
 **Source:** @LinearUncle, https://x.com/LinearUncle/status/2103128559174971663 · our build: g17-manim-derivative
 **Use when:** "teach {math concept} with graphs", "Manim-style explainer", "make people think", "easy to understand with examples", "narrated lesson"
 **Defaults:** 225 s in the original (we recommend 60 to 120 s for chat, 3 to 5 sections) · 16:9 1920x1080 · 30 fps · narrated with burned-in captions and a quiet music bed
+**Spec:** family=explainer length=60-120 size=1920x1080 fps=30 audio=voice kit=g17-manim-derivative
 **Kit:** `kits/g17-manim-derivative/` holds working code from the 2026-10-28 sample of this style (60 s, reviewed PASS); start from its README.
 
 ## The brief (reusable prompt)

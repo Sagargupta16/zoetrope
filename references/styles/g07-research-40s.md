@@ -2,6 +2,7 @@
 **Source:** @ajith_io, https://x.com/ajith_io/status/2103469807375208546 · our build: g07-research-40s
 **Use when:** "research the brand and make a 40-second motion graphics video", "showreel for our product", "go all out", "show every feature in motion", "dynamic product film with no voice"
 **Defaults:** 40 s · 16:9 1920x1080 · 60 fps in the original (30 fps is fine here) · music-only
+**Spec:** family=explainer length=40 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Research {brand} (read the brand folder or the user's material, do not invent facts). Make a dynamic 40-second motion graphics video on {brand} that shows what an incredible motion designer you are, like a showreel. Go all out. Use only real features and sample content from the brand material.

@@ -2,6 +2,7 @@
 **Source:** @emollick, https://x.com/emollick/status/2103688362960019567 · our build: g15-recursion-styles
 **Use when:** "explain {concept} where every explanation has a different video style", "self-referential", "clever and fast moving", "style showcase that teaches", "loops into itself"
 **Defaults:** 69 s · 16:9 1920x1080 · 30 fps (60 fps would be smoother for the fast zooms) · music-only, all explanation as on-screen text
+**Spec:** family=explainer length=69 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 A video explaining {concept}, where every explanation of it has a radically different video style. Make it self-referential, clever and fast moving.

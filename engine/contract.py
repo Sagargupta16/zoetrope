@@ -643,6 +643,18 @@ CODES = {
         "heavy sounds stacked within 3 frames, or over 2 cues in 100 ms",
     ),
     "Q805": ("audio", 8, "FIX", "master not linear, or missed its loudness target"),
+    "Q806": (
+        "qa_speech",
+        8,
+        "FIX",
+        "narration stem does not say its script: a word missing, added or changed (NOTE when close in letters)",
+    ),
+    "Q807": (
+        "qa_speech",
+        8,
+        "NOTE",
+        "a word the narration stem says is lost in the file's sound (FIX: the file does not carry the stem)",
+    ),
     "Q901": ("qa", 9, "NOTE", "scene start or cut off the BPM grid"),
     "Q902": (
         "qa_sync",
@@ -706,12 +718,20 @@ CODES = {
 }
 
 # Modules whose check_rows(ctx) -> [Row] qa.py check calls, in this order, and whose add_cli(sub) adds subcommands.
-GATE_MODULES = ("qa_scan", "qa_stack", "qa_sync", "qa_registry", "qa_approve")
+GATE_MODULES = (
+    "qa_scan",
+    "qa_stack",
+    "qa_sync",
+    "qa_speech",
+    "qa_registry",
+    "qa_approve",
+)
 CLI_MODULES = (
     "qa_purity",
     "qa_lint",
     "qa_approve",
     "qa_sync",
+    "qa_speech",
     "qa_audiostrip",
     "qa_selftest",
 )

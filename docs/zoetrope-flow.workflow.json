@@ -248,7 +248,7 @@
       "col": 4,
       "type": "security",
       "label": "qa.py check",
-      "sublabel": "58 Q codes on the file",
+      "sublabel": "60 Q codes on the file",
       "tag": "FIX: .rejected.mp4",
       "sources": [
         {
@@ -427,7 +427,7 @@
       "items": [
         "One frame clock, frame_of, for every module",
         "Row: PASS, FIX, NOTE, NOT CHECKED (exit 2)",
-        "58 Q codes, each with its owner module",
+        "60 Q codes, each with its owner module",
         "Ctx decodes the file once for every gate"
       ]
     },
@@ -445,7 +445,7 @@
       "dot": "emerald",
       "title": "Proved by",
       "items": [
-        "qa.py selftest: 144 planted faults cover all 58 codes",
+        "qa.py selftest: 158 planted faults cover all 60 codes",
         "Template smoke at 1920x1080 and 1080x1920"
       ]
     }

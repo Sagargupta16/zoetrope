@@ -2,6 +2,7 @@
 **Source:** @gizakdag, https://x.com/gizakdag/status/2103566030916239768 · our build: g20-overthinking
 **Use when:** "motion graphics showreel", "show off motion design", "abstract video about a feeling or concept", "kinetic type piece", "typography-led reel"
 **Defaults:** 15 s · 16:9 1920x1080 · 60 fps in our build (30 fps is fine here) · music and sound design only, no voice
+**Spec:** family=handmade length=15 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Make a dynamic 15-second motion graphics video that shows what an incredible motion designer you are, like a showreel exploring the concept of "{concept}".

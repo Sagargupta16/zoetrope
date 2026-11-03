@@ -24,6 +24,7 @@ CUES = sorted(
     CUES + [(c, f"cut to {n}", "both") for c, n in zip(CUTS, list(SCHEDULE)[1:])]
 )
 CUE_LAG = 0  # frames the picture may trail its cue by design (a pixel-art hit lands 2 to 4 frames late)
+CARD = None  # the style card this video follows, "g14-what-is-git": a narrated card's build must carry narration/
 KEY_TIMES = []  # extra moments the proof sheet must show (punchlines, reveals); captions and cuts are added for you
 
 

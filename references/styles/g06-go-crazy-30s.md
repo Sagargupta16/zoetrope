@@ -2,6 +2,7 @@
 **Source:** @macrohou, https://x.com/macrohou/status/2103545787875733862 · our build: g06-go-crazy-30s
 **Use when:** "go crazy", "show off motion and sound design", "dynamic 30-second motion graphics", "app launch with a beat", "every sound has a visible cause"
 **Defaults:** 30 s · 16:9 1920x1080 · 60 fps in the build (30 fps is the default; use 60 only if the machine renders fast enough) · music-only, no voice
+**Spec:** family=music length=30 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Make a dynamic 30-second motion graphics video for {brand} that shows off your motion and sound design. Go crazy. Use only the brand folder (colours, font, logo, real feature list).

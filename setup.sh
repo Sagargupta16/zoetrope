@@ -65,5 +65,15 @@ if [ "$fail" -eq 0 ]; then
   fi
 fi
 
+# the speech model (engine/qa_speech.py): a note, since only a narrated build needs it; there Q806 is NOT CHECKED
+# without it, so the build is rejected until it is fetched
+if [ "$fail" -eq 0 ]; then
+  if speech_out=$(uv run --no-project --with-requirements "$here/engine/requirements.txt" python "$here/engine/qa_speech.py" missing 2>&1); then
+    echo "ok   the speech model for Q806 and Q807 is cached (engine/qa_speech.py)"
+  else
+    echo "NOTE the speech model is not cached -> python engine/qa_speech.py fetch (147.8 MB, MIT; narrated builds need it)"
+  fi
+fi
+
 if [ "$fail" -eq 0 ]; then echo "SETUP: PASS"; else echo "SETUP: FIX"; fi
 exit "$fail"

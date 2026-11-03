@@ -2,6 +2,7 @@
 **Source:** @SteeveDor7, https://x.com/SteeveDor7/status/2104027894217572848 · our build: g04-best-launch
 **Use when:** "launch video", "app launch film", "best launch video for {product}", "feature tour with a story", "30 to 60 s product film"
 **Defaults:** 50 s · 16:9 1920x1080 · 30 fps · music-only
+**Spec:** family=launch length=50 size=1920x1080 fps=30 audio=music kit=g04-best-launch
 **Kit:** `kits/g04-best-launch/` holds working code from the 2026-10-28 sample of this style (60 s, reviewed PASS); start from its README.
 
 ## The brief (reusable prompt)

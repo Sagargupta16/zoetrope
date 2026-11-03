@@ -2,6 +2,7 @@
 **Source:** @tonytonggg, https://x.com/tonytonggg/status/2104021942638674231 · our build: g09-showreel-15s
 **Use when:** "motion designer showreel", "résumé reel", "go all out 15 s", "show range and taste", "portfolio opener"
 **Defaults:** 15 s · 16:9 1920x1080 · 60 fps · music-only
+**Spec:** family=launch length=15 size=1920x1080 fps=60 audio=music kit=-
 
 ## The brief (reusable prompt)
 Make a dynamic 15-second motion graphics video that shows what an incredible motion designer you are, like a showreel for a résumé. Go all out.

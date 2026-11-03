@@ -2,6 +2,7 @@
 **Source:** @goodside, https://x.com/goodside/status/2102937913726235004 · our build: g11-movie-credits
 **Use when:** "opening credits", "film title sequence", "movie intro about us", "end credits", "credits with made-up names", "cinematic title card"
 **Defaults:** 75 s in the build (30 to 45 s is plenty for most asks) · 2.39:1 letterbox inside 16:9 1920x1080 · 24 fps · music-only
+**Spec:** family=logo length=30-45 size=1920x1080 fps=24 audio=music kit=g11-movie-credits
 **Kit:** `kits/g11-movie-credits/` holds working code from the 2026-10-28 sample of this style (60 s, reviewed PASS); start from its README.
 
 ## The brief (reusable prompt)

@@ -2,6 +2,7 @@
 **Source:** @gigabit_million, https://x.com/gigabit_million/status/2104048491295318358 · our build: g29-nes-rpg-battle
 **Use when:** "8-bit game", "NES or Famicom style", "chiptune battle theme", "retro RPG battle animation", "pixel art game trailer", "tracker or DAW visual"
 **Defaults:** 75.2 s · 16:9 1920x1080 (drawn at 320x180, nearest x6) · 60 fps in the source (use 30 fps here) · music-only (chiptune)
+**Spec:** family=game length=75.2 size=1920x1080 fps=30 audio=music kit=g29-nes-rpg-battle
 **Kit:** `kits/g29-nes-rpg-battle/` holds working code from the 2026-10-28 sample of this style (60 s, reviewed PASS); start from its README.
 
 ## The brief (reusable prompt)

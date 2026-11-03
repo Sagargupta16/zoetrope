@@ -88,6 +88,17 @@ LEAD, TAIL = 0.35, 0.7
 # rule "showtime": silence after each line, and after the last line
 GAP, END_TAIL = 0.4, 0.8
 WORD_MIN = 0.02  # shortest word when an engine reports only word starts
+# [pause], [pause 300ms], [pause 1.5s] inside a line: exact silence from the end of one part's speech to the start of
+# the next. A bare [pause] is 0.35 s, VoiceStudio's default for its marker; PAUSE_MAX is our cap.
+PAUSE = re.compile(r"\[\s*pause(?:\s+(\d+(?:\.\d+)?)\s*(ms|s))?\s*\]", re.IGNORECASE)
+TAG = re.compile(
+    r"\[[^\]]*\]"
+)  # any other bracket tag: an engine would say it as words
+PAUSE_DEFAULT, PAUSE_MAX = 0.35, 5.0
+# a line given fit= is spoken faster, never slower, until its speech fits its slot. 1.2 is our cap, not a measured
+# limit (VoiceStudio's dubbing allows up to 1.5 by default): listen to a line spoken near it.
+FIT_FAST = 1.2
+FIT_ROUNDS = 6  # SAPI's rate moves in whole steps, so its speed can take a few rounds to change at all
 # showtime measured Kokoro's duration-grid times about 50 ms late against acoustic onsets and a CTC aligner (6 voices,
 # 3 speeds) and its code moves them 50 ms earlier, as _phoneme_words does; its comment words the direction the other
 # way round. Measured by us on 2026-10-29 (onset_offsets, after that 50 ms): af_heart, 24 words that open a line or
@@ -115,21 +126,28 @@ def synthesize(
     fps=30,
     rule="ours",
     profile=None,
+    lexicon=None,
 ):
-    """Narrate lines (strings, or dicts with id and text) offline and lay them out on one timeline. Each line is
-    cached as folder/<key>.wav, key = sha256 of engine, model id (every model file it reads), code id (the engine's
-    code, its bridge or worker program and package pins), voice, speed and text: per line, as showtime caches. A re-run
-    synthesizes nothing and render needs no engine. A new file is checked (speech found, word times inside it) before
-    it is cached; a bad one is deleted and named. Writes folder/narration.wav (mono, 44.1 kHz, each line in its slot)
-    and folder/narration.json, and returns the narration dict. Slots end on whole frames when fps is set; rule and
-    profile size them (see slot). With no engine named it speaks as the narrator (NARRATOR_ENGINE, NARRATOR_VOICE)."""
+    """Narrate lines (strings, or dicts with id, text and an optional fit) offline and lay them out on one timeline.
+    Each part of a line is cached as folder/<key>.wav, key = sha256 of engine, model id (every model file it reads),
+    code id (the engine's code, its bridge or worker program and package pins), voice, speed and the text spoken: per
+    part, as showtime caches per line. A re-run synthesizes nothing and render needs no engine. A new file is checked
+    (speech found, word times inside it) before it is cached; a bad one is deleted and named. Writes
+    folder/narration.wav (mono, 44.1 kHz, each line in its slot) and folder/narration.json, and returns the
+    narration dict. Slots end on whole frames when fps is set; rule and profile size them (see slot). With no engine
+    named it speaks as the narrator (NARRATOR_ENGINE, NARRATOR_VOICE).
+    lexicon {word: respelling} makes the engine say a word as the respelling reads ("Kalchar": "Kul char"), while
+    captions, holds and word_cue keep the script's word. A line may hold [pause], [pause 300ms] or [pause 1.5s]: its
+    parts are spoken apart and joined with exactly that silence between their speech. A line {id, text, fit} gets a
+    slot of exactly fit seconds; speech that overruns it is spoken faster, up to FIT_FAST, and a line that would need
+    more raises with how many words to cut."""
     eng = get_engine(engine)
     eng.require()
     if speed <= 0 or rule not in ("ours", "showtime"):
         raise ValueError(
             f"need speed above 0 and rule 'ours' or 'showtime', got {speed}, {rule!r}"
         )
-    items = _lines(lines)
+    items = _lines(lines, _lexicon(lexicon))
     voice = voice or eng.default_voice()
     if voice is None:
         raise ValueError(
@@ -143,53 +161,40 @@ def synthesize(
         )
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
-    model, code = eng.model_id(voice), eng.code_id()
-    keys = [_key(engine, model, code, voice, speed, text) for _, text in items]
-    todo = {}  # key -> first line index; a line said twice is synthesized once
-    for i, k in enumerate(keys):
-        if not _cached(folder, k):
-            todo.setdefault(k, i)
-    if todo:
-        if eng.status.startswith("UNTESTED"):
-            print(f"voice: {engine} is {eng.status}")
-        got = eng.synth(
-            [items[i][1] for i in todo.values()],
-            voice,
-            speed,
-            [folder / f"{k}.wav" for k in todo],
+    job = {
+        "eng": eng,
+        "model": eng.model_id(voice),
+        "code": eng.code_id(),
+        "voice": voice,
+        "folder": folder,
+        "units": {},
+    }
+    speeds = {ln["id"]: speed for ln in items}
+    made = set()
+    for _ in range(FIT_ROUNDS):
+        made |= _make(job, items, speeds)
+        refit = _refit(job, items, speeds, rule, profile)
+        if not refit:
+            break
+        speeds |= refit
+    else:
+        raise ValueError(
+            f"fit did not settle in {FIT_ROUNDS} rounds on {', '.join(refit)}: give those lines more time"
         )
-        bad = []
-        for (k, i), raw in zip(todo.items(), got):
-            wav = folder / f"{k}.wav"
-            try:  # check before caching: a bad file left in the cache would fail every later run
-                _timed(eng, raw, items[i][1], dec(str(wav)))
-            except (ValueError, KeyError, subprocess.CalledProcessError) as e:
-                wav.unlink(missing_ok=True)
-                bad.append(f"{items[i][0]} ({wav}, deleted, not cached): {e}")
-                continue
-            side = {
-                "v": CACHE_VERSION,
-                "engine": engine,
-                "model": model,
-                "code": code,
-                "voice": voice,
-                "speed": speed,
-                "text": items[i][1],
-                "raw": raw,  # the engine's own timing data, turned into words at every layout
-            }
-            # written last and whole (temp file, then rename): a line counts as cached only once this exists
-            tmp = folder / f"{k}.json.tmp"
-            tmp.write_text(json.dumps(side, indent=1), encoding="utf-8")
-            os.replace(tmp, folder / f"{k}.json")
-        if bad:
-            raise ValueError(f"{engine} wrote unusable audio: {'; '.join(bad)}")
-    narr = _layout(items, keys, folder, eng, model, voice, speed, fps, rule, profile)
+    narr = _layout(job, items, speeds, speed, fps, rule, profile, lexicon)
     (folder / "narration.json").write_text(json.dumps(narr, indent=1), encoding="utf-8")
     untimed = [ln["id"] for ln in narr["lines"] if ln["timing"] == "none"]
     partial = [ln["id"] for ln in narr["lines"] if ln["timing"] == "partial"]
+    final = {_part_key(job, ln, p, speeds) for ln in items for p in ln["parts"]}
+    tries = len(made - final)
     print(
-        f"voice: {engine} ({voice}): synthesized {len(todo)} of {len(items)} lines, "
-        f"{len(items) - len(todo)} from cache -> {folder / 'narration.json'} ({narr['duration']:.2f} s)"
+        f"voice: {engine} ({voice}): synthesized {len(made & final)} of {len(final)} parts "
+        f"({len(items)} lines), {len(final - made)} from cache"
+        + (f", {tries} fit tries" if tries else "")
+        + f" -> {folder / 'narration.json'} ({narr['duration']:.2f} s)"
+    )
+    print(
+        f"voice: check what it says with: qa.py speech {folder / 'narration.json'} (Q806)"
     )
     if untimed:
         print(
@@ -204,22 +209,195 @@ def synthesize(
     return narr
 
 
-def _lines(lines):
-    """[(id, text)] from strings (ids L01, L02, ...), dicts {id, text} or (id, text) pairs."""
+def _lines(lines, lex=None):
+    """[{id, script, text, fit, parts}] from strings (ids L01, L02, ...), dicts {id, text[, fit]} or (id, text) pairs.
+    text is the script without pause markers: what captions, holds and word_cue read. Each part {spoken, own, pause}
+    is the text between two markers as the engine says it (lexicon respellings in), the script word each spoken word
+    says, and the silence after it."""
     out = []
     for i, ln in enumerate(lines):
+        fit = None
         if isinstance(ln, str):
-            lid, text = f"L{i + 1:02d}", ln
+            lid, script = f"L{i + 1:02d}", ln
         elif isinstance(ln, dict):
-            lid, text = ln.get("id") or f"L{i + 1:02d}", ln["text"]
+            lid, script = ln.get("id") or f"L{i + 1:02d}", ln["text"]
+            fit = ln.get("fit")
         else:
-            lid, text = ln
-        if not str(text).strip():
+            lid, script = ln
+        lid, script = str(lid), str(script).strip()
+        if not script:
             raise ValueError(f"line {lid} has no text")
-        out.append((str(lid), str(text).strip()))
-    ids = [lid for lid, _ in out]
+        if fit is not None and not float(fit) > 0:
+            raise ValueError(f"line {lid}: fit is seconds above 0, got {fit!r}")
+        out.append(
+            {
+                "id": lid,
+                "script": script,
+                "fit": None if fit is None else float(fit),
+            }
+            | _parts(lid, script, lex or {})
+        )
+    ids = [ln["id"] for ln in out]
     if not out or len(set(ids)) != len(ids):
         raise ValueError(f"need at least one line and unique ids, got {ids}")
+    return out
+
+
+def _parts(lid, script, lex):
+    """{text, parts} of one line: split at its pause markers, each piece respelled from the lexicon."""
+    bits, pauses, at = [], [], 0
+    for m in PAUSE.finditer(script):
+        bits.append(script[at : m.start()])
+        at = m.end()
+        unit = 1 if (m.group(2) or "s").lower() == "s" else 1000
+        n = PAUSE_DEFAULT if m.group(1) is None else float(m.group(1)) / unit
+        if not 0 < n <= PAUSE_MAX:
+            raise ValueError(f"{lid}: {m.group()} is outside 0 to {PAUSE_MAX:g} s")
+        pauses.append(n)
+    bits = [" ".join(b.split()) for b in bits + [script[at:]]]
+    for b in bits:
+        tag = TAG.search(b)
+        if tag:
+            raise ValueError(
+                f"{lid}: {tag.group()} is not a marker voice.py reads ([pause], [pause 300ms], [pause 1.5s]); "
+                f"the engine would say it as words"
+            )
+    if not all(_words(b) for b in bits):
+        raise ValueError(
+            f"{lid}: a pause marker at the start or end of the line, or two in a row: a pause goes between words "
+            f"(the slot already holds silence before and after a line)"
+        )
+    parts, k = [], 0
+    for b, p in zip(bits, pauses + [0.0]):
+        spoken, own = _respell(lid, b, lex, k)
+        parts.append({"spoken": spoken, "own": own, "pause": p})
+        k += len(_words(b))
+    return {"text": " ".join(bits), "parts": parts}
+
+
+def _lexicon(lexicon):
+    """{word as word_cue compares it: respelling} from {word: respelling}."""
+    lex = {}
+    for w, say in (lexicon or {}).items():
+        k, say = _norm(w), " ".join(str(say).split())
+        if not k or len(str(w).split()) != 1 or not _words(say) or TAG.search(say):
+            raise ValueError(
+                f"lexicon {w!r}: {say!r}: each entry is one word and the respelling the engine reads for it"
+            )
+        lex[k] = say
+    return lex
+
+
+def _respell(lid, text, lex, base=0):
+    """(spoken, own): text with every word the lexicon names said as its respelling (a trailing 's kept), and for each
+    spoken word the index (from base) of the script word it says."""
+    out, own, at = [], [], 0
+    for i, (w, a, b) in enumerate(_word_spans(text)):
+        k = _norm(w)
+        tail = "'s" if k.endswith("'s") and k[:-2] in lex and k not in lex else ""
+        say = lex.get(k[: len(k) - len(tail)])
+        if say:
+            out += [text[at:a], say + tail]
+            at = b
+        own += [base + i] * (len(_words(say + tail)) if say else 1)
+    spoken = "".join(out) + text[at:]
+    if len(_words(spoken)) != len(own):
+        raise ValueError(
+            f"{lid}: the respelled text {spoken!r} does not split into the words it says: check the lexicon entries"
+        )
+    return spoken, own
+
+
+def _part_key(job, ln, part, speeds):
+    return _key(
+        job["eng"].name,
+        job["model"],
+        job["code"],
+        job["voice"],
+        speeds[ln["id"]],
+        part["spoken"],
+    )
+
+
+def _make(job, items, speeds):
+    """Synthesize and cache every part not cached yet, one engine run per speed; returns the keys made. A part said
+    twice is made once."""
+    eng, folder = job["eng"], job["folder"]
+    todo = {}  # key -> (spoken, speed, line id)
+    for ln in items:
+        for p in ln["parts"]:
+            k = _part_key(job, ln, p, speeds)
+            if not _cached(folder, k):
+                todo.setdefault(k, (p["spoken"], speeds[ln["id"]], ln["id"]))
+    bad = []
+    for s in sorted({v[1] for v in todo.values()}):
+        ks = [k for k, v in todo.items() if v[1] == s]
+        got = eng.synth(
+            [todo[k][0] for k in ks], job["voice"], s, [folder / f"{k}.wav" for k in ks]
+        )
+        for k, raw in zip(ks, got):
+            spoken, _, lid = todo[k]
+            wav = folder / f"{k}.wav"
+            try:  # check before caching: a bad file left in the cache would fail every later run
+                _timed(eng, raw, spoken, dec(str(wav)))
+            except (ValueError, KeyError, subprocess.CalledProcessError) as e:
+                wav.unlink(missing_ok=True)
+                bad.append(f"{lid} ({wav}, deleted, not cached): {e}")
+                continue
+            side = {
+                "v": CACHE_VERSION,
+                "engine": eng.name,
+                "model": job["model"],
+                "code": job["code"],
+                "voice": job["voice"],
+                "speed": s,
+                "text": spoken,
+                "raw": raw,  # the engine's own timing data, turned into words at every layout
+            }
+            # written last and whole (temp file, then rename): a part counts as cached only once this exists
+            tmp = folder / f"{k}.json.tmp"
+            tmp.write_text(json.dumps(side, indent=1), encoding="utf-8")
+            os.replace(tmp, folder / f"{k}.json")
+    if bad:
+        raise ValueError(f"{eng.name} wrote unusable audio: {'; '.join(bad)}")
+    return set(todo)
+
+
+def _refit(job, items, speeds, rule, profile):
+    """{line id: new speed} for each line with fit whose speech overruns its slot. Raises when the reading hold of its
+    words is over fit, or when it would need a speed over FIT_FAST, with about how many words to cut."""
+    out = {}
+    for i, ln in enumerate(items):
+        if not ln["fit"]:
+            continue
+        rel = _assemble(job, ln, speeds)[1]
+        if rule == "ours":
+            hold = _hold(ln["text"], profile)
+            if hold > ln["fit"] + 1e-6:
+                raise ValueError(
+                    f"{ln['id']}: fit {ln['fit']:g} s is under the reading hold of its words ({hold:.2f} s, profile "
+                    f"{profile or 'display'}): give it more time or fewer words"
+                )
+        need = _need(rel, rule, last=i == len(items) - 1)
+        if need <= ln["fit"] + 1e-6:
+            continue
+        pauses = sum(p["pause"] for p in ln["parts"][:-1])
+        spoken = rel["speech_end"] - rel["speech_start"]
+        room = ln["fit"] - (need - spoken) - pauses  # what the voiced speech may take
+        s = speeds[ln["id"]]
+        new = (
+            math.ceil(s * (spoken - pauses) / room * 101) / 100
+            if room > 0
+            else math.inf
+        )
+        if new > FIT_FAST:
+            n = len(_words(ln["text"]))
+            cut = math.ceil(n * (1 - FIT_FAST / new))
+            raise ValueError(
+                f"{ln['id']}: {spoken:.2f} s of speech at speed {s:g} would need speed {new:.2f} to fit "
+                f"{ln['fit']:g} s (FIT_FAST {FIT_FAST:g}): cut about {cut} of its {n} words, or give it more time"
+            )
+        out[ln["id"]] = max(new, round(s + 0.01, 2))
     return out
 
 
@@ -283,12 +461,17 @@ def slot(line, rule="ours", last=False, profile=None):
     gets 0.35 s before and 0.7 s after it and a caption of the same words still meets its reading hold (profile as
     in qa.HOLD_PROFILES; None is display). "showtime": the clip plus GAP (0.4 s), plus END_TAIL (0.8 s) on the last
     line; a slot then runs from one line's start to the next line's start, pause included."""
+    need = _need(line, rule, last)
+    return need if rule == "showtime" else max(need, _hold(line["text"], profile))
+
+
+def _need(line, rule="ours", last=False):
+    """The slot the speech itself takes, before any reading hold: LEAD + spoken + TAIL, or showtime's clip + gap."""
     if rule == "showtime":
         return (line["end"] - line["start"]) + (END_TAIL if last else GAP)
     if rule != "ours":
         raise ValueError(f"rule is 'ours' or 'showtime', got {rule!r}")
-    spoken = line["speech_end"] - line["speech_start"]
-    return max(LEAD + spoken + TAIL, _hold(line["text"], profile))
+    return LEAD + (line["speech_end"] - line["speech_start"]) + TAIL
 
 
 def _hold(text, profile=None):
@@ -300,65 +483,125 @@ def _hold(text, profile=None):
     return qa.min_hold(len(text.split()))
 
 
-def _layout(items, keys, folder, eng, model, voice, speed, fps, rule, profile):
-    """Trim each cached line, turn its raw engine times into words, size its slot and place it by integer sample
-    counts; write narration.wav. Word times are rebuilt here on every run, so a fix to that code needs no new audio."""
-    parts, out, pos, frames = [], [], 0, 0
-    for i, ((lid, text), k) in enumerate(zip(items, keys)):
-        path = folder / f"{k}.wav"
+def _unit(job, lid, k, spoken):
+    """(y, (c0, c1, s0, s1), words) of one cached part: its samples, trim bounds and word times in seconds of its
+    file (ends filled in). Decoded once per synthesize call."""
+    if k not in job["units"]:
+        path = job["folder"] / f"{k}.wav"
         try:
             y = dec(str(path))
-            side = json.loads((folder / f"{k}.json").read_text(encoding="utf-8"))
-            (c0, c1, s0, s1), words = _timed(eng, side["raw"], text, y)
+            side = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
+            bounds, words = _timed(job["eng"], side["raw"], spoken, y)
         except (ValueError, KeyError, subprocess.CalledProcessError) as e:
             raise ValueError(f"{lid} ({path}): {e}") from None
-        clip = y[c0:c1]
-        rel = {
-            "text": text,
-            "start": 0.0,
-            "end": len(clip) / SR,
-            "speech_start": (s0 - c0) / SR,
-            "speech_end": (s1 - c0) / SR,
-        }
-        need = slot(rel, rule, last=i == len(items) - 1, profile=profile)
+        if words:
+            _ends(y, words, bounds[3])
+        job["units"][k] = (y, bounds, words)
+    return job["units"][k]
+
+
+def _assemble(job, ln, speeds):
+    """One line as a clip: its parts with exactly their pause between one part's speech end and the next one's speech
+    start. Returns (clip, rel, words, placed): rel has the times slot() reads, words are the script's words in seconds
+    of the clip (None when the engine gives no word times), placed is [(key, c0, c1, at)] with at in clip samples."""
+    placed, heard, timed = [], [], True
+    first = end = gap = (
+        0  # clip samples: speech start of part 1, speech end so far; the pause that follows it
+    )
+    for i, p in enumerate(ln["parts"]):
+        k = _part_key(job, ln, p, speeds)
+        _, (c0, c1, s0, s1), ws = _unit(job, ln["id"], k, p["spoken"])
+        at = max(0, end + gap - (s0 - c0)) if i else 0
+        first = first if i else s0 - c0
+        placed.append((k, c0, c1, at))
+        timed = timed and ws is not None
+        if ws:
+            off = (at - c0) / SR
+            heard += [
+                w | {"start": w["start"] + off, "end": w["end"] + off} for w in ws
+            ]
+        end, gap = at + (s1 - c0), C.sample_of(p["pause"], SR)
+    clip = np.zeros(max(at + c1 - c0 for _, c0, c1, at in placed), np.float32)
+    for k, c0, c1, at in placed:
+        clip[at : at + c1 - c0] += job["units"][k][0][c0:c1]
+    rel = {
+        "text": ln["text"],
+        "start": 0.0,
+        "end": len(clip) / SR,
+        "speech_start": first / SR,
+        "speech_end": end / SR,
+    }
+    words = None
+    if timed:
+        own = [o for p in ln["parts"] for o in p["own"]]
+        words = []
+        for j, w in enumerate(_words(ln["text"])):
+            mine = [h for h, o in zip(heard, own) if o == j]
+            words.append(
+                {
+                    "w": w,
+                    "start": min(h["start"] for h in mine),
+                    "end": max(h["end"] for h in mine),
+                }
+                | ({"est": True} if any(h.get("est") for h in mine) else {})
+            )
+    return clip, rel, words, placed
+
+
+def _layout(job, items, speeds, speed, fps, rule, profile, lexicon):
+    """Assemble each line from its cached parts, size its slot (fit when given) and place it by integer sample
+    counts; write narration.wav. Word times are rebuilt here on every run, so a fix to that code needs no new audio."""
+    eng, chunks, out, pos, frames = job["eng"], [], [], 0, 0
+    for i, ln in enumerate(items):
+        clip, rel, words, placed = _assemble(job, ln, speeds)
+        need = ln["fit"] or slot(rel, rule, last=i == len(items) - 1, profile=profile)
         if fps:
             frames += math.ceil(need * fps - 1e-6)
             end = C.frame_sample(frames, fps, SR)
         else:
             end = pos + C.sample_of(need, SR)
-        pre = C.sample_of(LEAD, SR) - (s0 - c0) if rule == "ours" else 0
+        first = C.sample_of(rel["speech_start"], SR)
+        pre = C.sample_of(LEAD, SR) - first if rule == "ours" else 0
         at = pos + max(0, pre)  # first sample of the clip on the timeline
         post = end - at - len(clip)
-        parts += [np.zeros(at - pos, np.float32), clip, np.zeros(post, np.float32)]
+        chunks += [np.zeros(at - pos, np.float32), clip, np.zeros(post, np.float32)]
         if words:
-            _ends(y, words, s1)
-            off = (at - c0) / SR
             lo, hi = at / SR, (at + len(clip)) / SR
             words = [
-                {
-                    "w": w["w"],
-                    "start": round(min(max(w["start"] + off, lo), hi), 3),
-                    "end": round(min(max(w["end"] + off, lo), hi), 3),
+                w
+                | {
+                    "start": round(min(max(w["start"] + lo, lo), hi), 3),
+                    "end": round(min(max(w["end"] + lo, lo), hi), 3),
                 }
-                | ({"est": True} if w.get("est") else {})
                 for w in words
             ]
         out.append(
             {
-                "id": lid,
-                "text": text,
+                "id": ln["id"],
+                "text": ln["text"],
+                "script": ln["script"],
+                "spoken": [p["spoken"] for p in ln["parts"]],
+                "pauses": [p["pause"] for p in ln["parts"][:-1]],
+                "speed": speeds[ln["id"]],
+                "fit": ln["fit"],
                 "start": round(at / SR, 6),
                 "end": round((at + len(clip)) / SR, 6),
-                "speech_start": round((at + s0 - c0) / SR, 6),
-                "speech_end": round((at + s1 - c0) / SR, 6),
+                "speech_start": round(at / SR + rel["speech_start"], 6),
+                "speech_end": round(at / SR + rel["speech_end"], 6),
                 "slot": {
                     "start": round(pos / SR, 6),
                     "end": round(end / SR, 6),
                     "duration": round((end - pos) / SR, 6),
                 },
-                "file": f"{k}.wav",
-                # the samples of file (decoded to 44.1 kHz mono) that sit at start
-                "clip": [c0, c1],
+                # each part's cached file, the samples of it (decoded to 44.1 kHz mono) placed, and where they start
+                "parts": [
+                    {
+                        "file": f"{k}.wav",
+                        "clip": [c0, c1],
+                        "start": round((at + a) / SR, 6),
+                    }
+                    for k, c0, c1, a in placed
+                ],
                 "timing": "none"
                 if words is None
                 else "partial"
@@ -368,13 +611,16 @@ def _layout(items, keys, folder, eng, model, voice, speed, fps, rule, profile):
             }
         )
         pos = end
-    y = np.concatenate(parts)
-    _write_wav(folder / "narration.wav", y)
+    y = np.concatenate(chunks)
+    _write_wav(job["folder"] / "narration.wav", y)
     return {
         "engine": eng.name,
-        "model": model,
-        "voice": voice,
+        "model": job["model"],
+        "voice": job["voice"],
+        "lang": eng.lang(job["voice"]),
         "speed": speed,
+        "fit_fast": FIT_FAST,
+        "lexicon": dict(lexicon or {}),
         "sr": SR,
         "fps": fps,
         "rule": rule,
@@ -425,12 +671,19 @@ def _runs(seq, key):
 
 
 def _norm(w):
-    """A word as word_cue compares it: lower case, curly quotes as ', accents and other punctuation dropped."""
+    """A word as word_cue compares it: lower case, curly quotes as ', accents and other punctuation dropped. Letters,
+    digits and marks of any script stay, so a Hindi word keeps its vowel signs (only marks that combine, such as
+    accents and the virama, go)."""
     w = unicodedata.normalize(
         "NFKD", w.lower().replace("\u2018", "'").replace("\u2019", "'")
     )
-    w = "".join(ch for ch in w if not unicodedata.combining(ch))
-    return re.sub(r"[^0-9a-z']+", "", w).strip("'")
+    keep = (
+        ch
+        for ch in w
+        if not unicodedata.combining(ch)
+        and (ch == "'" or unicodedata.category(ch)[0] in "LNM")
+    )
+    return "".join(keep).strip("'")
 
 
 def word_cue(narration, word, n=1, est=False):
@@ -495,14 +748,17 @@ def onset_offsets(narration, folder=None, gap=0.1):
 
 
 def _word_spans(text):
-    """[(word, first char, end char)]: the script's words with outer punctuation removed, and where they sit."""
+    """[(word, first char, end char)]: the script's words with outer punctuation and symbols removed, and where they
+    sit. Only punctuation and symbols are taken off, so a Hindi word keeps the vowel sign it ends on."""
     out = []
     for m in re.finditer(r"\S+", text):
-        core = re.match(r"\W*(.*?)\W*$", m.group())
-        if core.group(1):
-            out.append(
-                (core.group(1), m.start() + core.start(1), m.start() + core.end(1))
-            )
+        tok, a, b = m.group(), 0, len(m.group())
+        while a < b and unicodedata.category(tok[a])[0] in "PS":
+            a += 1
+        while b > a and unicodedata.category(tok[b - 1])[0] in "PS":
+            b -= 1
+        if a < b:
+            out.append((tok[a:b], m.start() + a, m.start() + b))
     return out
 
 
@@ -547,21 +803,6 @@ def _sapi_words(events, text, total):
         for k in range(i, j):
             out[k].update(start=lo + (k - i + 1) * (hi - lo) / (j - i + 1), est=True)
         i = j
-    return out
-
-
-def oov_words(text, lexicons):
-    """Words of text missing from lexicon files (first column of each line, any case). sherpa-onnx 2.0 skips them
-    without a sound (no espeak-ng fallback since 2.0.0), so digits, brand names and acronyms would vanish."""
-    known = set()
-    for p in lexicons:
-        with open(p, encoding="utf-8") as f:
-            known.update(ln.split(maxsplit=1)[0].lower() for ln in f if ln.strip())
-    out = []
-    for w in re.findall(r"[0-9a-z']+", text.lower()):
-        w = w.strip("'")
-        if w and w not in known and w not in out:
-            out.append(w)
     return out
 
 
@@ -676,6 +917,9 @@ class Engine:
     def default_voice(self):
         return None  # Sagar picks; only SAPI falls back to the system voice
 
+    def lang(self, voice):
+        """The language the voice speaks, as a BCP 47 tag ("en-us", "hi"), or None: qa_speech checks English only."""
+
     def program(self):
         """Text of the program the engine runs outside this module (bridge or worker)."""
         return ""
@@ -738,6 +982,10 @@ class Sapi(Engine):
     def model_id(self, voice):
         v = next(v for v in self._voices() if v["name"] == voice)
         return f"{v['id']} (Windows {platform.version()})"
+
+    def lang(self, voice):
+        v = next((v for v in self._voices() if v["name"] == voice), {})
+        return (v.get("culture") or "").lower() or None
 
     def program(self):
         return _SAPI_PS1
@@ -861,96 +1109,17 @@ class _Worker(Engine):
         } | kw
 
 
-# Kokoro-82M v1.0 speakers as sherpa-onnx numbers them (sid = index), the English ones only: since 2.0.0 sherpa reads
-# words from its lexicons alone, and only the en lexicons ship with the model.
-KOKORO_EN = [
-    "af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica", "af_kore", "af_nicole", "af_nova", "af_river",
-    "af_sarah", "af_sky", "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam", "am_michael", "am_onyx", "am_puck",
-    "am_santa", "bf_alice", "bf_emma", "bf_isabella", "bf_lily", "bm_daniel", "bm_fable", "bm_george", "bm_lewis",
-]  # fmt: skip
-
-
-class Kokoro(_Worker):
-    name = "kokoro"
-    status = "UNTESTED: written to the sherpa-onnx 2.0.1 Python API; needs Sagar's yes on the 132 MB model download"
-    use = "Kokoro-82M (int8) through sherpa-onnx: audio only, no word times; words missing from its lexicon are skipped"
-    licence = "sherpa-onnx Apache-2.0; Kokoro-82M weights Apache-2.0"
-    folder = "kokoro-int8-multi-lang-v1_0"
-    packages = ("sherpa-onnx==2.0.1", "numpy==2.5.4")
-    needs = (
-        "sherpa-onnx 2.0.1 and sherpa-onnx-core 2.0.1 (Apache-2.0, about 19 MB of wheels; uv fetches them on first use), "
-        "and kokoro-int8-multi-lang-v1_0.tar.bz2 (132 MB, weights Apache-2.0) from "
-        "https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models unpacked into "
-        f"{VOICE_DIR / 'kokoro-int8-multi-lang-v1_0'}"
-    )
-
-    def _model(self):
-        return next(
-            (
-                self.dir() / m
-                for m in ("model.int8.onnx", "model.onnx")
-                if (self.dir() / m).exists()
-            ),
-            None,
-        )
-
-    def files(self):
-        need = ["voices.bin", "tokens.txt", "lexicon-us-en.txt", "lexicon-gb-en.txt"]
-        return [None if self._model() else "model.int8.onnx"] + [
-            f for f in need if not (self.dir() / f).exists()
-        ]
-
-    def voices(self):
-        return list(KOKORO_EN) if not self.missing() else []
-
-    def _lexicon(self, voice):
-        return self.dir() / (
-            "lexicon-gb-en.txt" if voice.startswith("b") else "lexicon-us-en.txt"
-        )
-
-    def model_id(self, voice):
-        d = self.dir()
-        files = [
-            self._model(),
-            d / "voices.bin",
-            d / "tokens.txt",
-            self._lexicon(voice),
-        ]
-        if (d / "dict").is_dir():
-            files += sorted(p for p in (d / "dict").rglob("*") if p.is_file())
-        return " ".join(self._file_id(p) for p in files)
-
-    def synth(self, texts, voice, speed, paths):
-        lex = self._lexicon(voice)
-        bad = [(t, oov_words(t, [lex])) for t in texts]
-        bad = [f"{t[:40]!r}: {', '.join(w)}" for t, w in bad if w]
-        if bad:
-            raise ValueError(
-                f"kokoro (sherpa-onnx 2.0) would skip these words without a sound: {'; '.join(bad)}. Write numbers "
-                f"as words, spell names the way they sound, or add a line (word, then its phonemes) to {lex}"
-            )
-        d = self.dir()
-        job = self._job(
-            texts,
-            voice,
-            speed,
-            paths,
-            model=str(self._model()),
-            voices=str(d / "voices.bin"),
-            tokens=str(d / "tokens.txt"),
-            lexicon=str(lex),
-            dict_dir=str(d / "dict") if (d / "dict").exists() else "",
-            sid=KOKORO_EN.index(voice),
-            threads=max(1, min(8, os.cpu_count() or 1)),
-        )
-        self.run(job)
-        # sherpa's GeneratedAudio has samples and sample_rate only: no word times
-        return [None] * len(texts)
+# Kokoro voice name's first letter: the espeak-ng language its words are phonemized in (hexgrad/Kokoro-82M VOICES.md
+# names a American, b British, h Hindi). Other languages Kokoro has are not wired or tested here.
+KOKORO_LANGS = {"a": "en-us", "b": "en-gb", "h": "hi"}
 
 
 class KokoroTs(_Worker):
     name = "kokoro-ts"
-    status = "tested 2026-10-29 on Windows 11 (af_heart, af_bella, am_michael, bf_emma); af_heart is the narrator"
+    status = (
+        "tested on Windows 11: af_heart, af_bella, am_michael, bf_emma (2026-10-29), every am_, bm_ and h voice "
+        "(2026-11-03); af_heart is the narrator"
+    )
     use = "Kokoro-82M timestamped export through kokoro-onnx: word times from its per-phoneme durations"
     licence = "kokoro-onnx MIT, onnxruntime MIT, phonemizer and espeak-ng GPL-3.0; Kokoro-82M weights Apache-2.0"
     folder = "kokoro-82m-v1.0-onnx-timestamped"
@@ -998,12 +1167,20 @@ class KokoroTs(_Worker):
     def default_voice(self):
         return NARRATOR_VOICE
 
+    def lang(self, voice):
+        return KOKORO_LANGS.get(voice[:1])
+
     def model_id(self, voice):
         return f"{self._file_id(self._model())} {self._file_id(self.dir() / 'voices' / f'{voice}.bin')}"
 
     def synth(self, texts, voice, speed, paths):
         if not 0.5 <= speed <= 2.0:
             raise ValueError(f"kokoro-ts speed is 0.5 to 2.0, got {speed}")
+        if not self.lang(voice):
+            raise ValueError(
+                f"kokoro-ts: {voice} speaks a language not wired here; voices starting "
+                f"{', '.join(KOKORO_LANGS)} are ({', '.join(KOKORO_LANGS.values())})"
+            )
         job = self._job(
             texts,
             voice,
@@ -1011,7 +1188,7 @@ class KokoroTs(_Worker):
             paths,
             model=str(self._model()),
             style=str(self.dir() / "voices" / f"{voice}.bin"),
-            lang="en-gb" if voice.startswith("b") else "en-us",
+            lang=self.lang(voice),
         )
         out = []
         for line, got in zip(job["lines"], self.run(job)):
@@ -1029,47 +1206,7 @@ class KokoroTs(_Worker):
         return _phoneme_words(*p)
 
 
-class Piper(_Worker):
-    name = "piper"
-    status = "UNTESTED: written to the piper-tts 1.8.0 API; needs Sagar's yes on a voice download (63 to 114 MB each)"
-    use = "Piper voices (VITS): fast, plainer than Kokoro; audio only, no word times"
-    licence = "piper-tts GPL-3.0-or-later (keep it out of shared kits); each voice has its own licence (MODEL_CARD)"
-    folder = "piper"
-    packages = ("piper-tts==1.8.0", "onnxruntime==1.31.1", "numpy==2.5.4")
-    needs = (
-        "piper-tts 1.8.0 (GPL-3.0-or-later, 34 MB wheel with espeak-ng data) and onnxruntime 1.31.1, about 65 MB of "
-        "wheels fetched by uv on first use, and voices from https://huggingface.co/rhasspy/piper-voices, each "
-        f"<name>.onnx plus <name>.onnx.json into {VOICE_DIR / 'piper'}: en_US-ljspeech-high 114.2 MB, "
-        "en_US-john-medium 63.5 MB, en_US-kristin-medium 63.5 MB, en_US-norman-medium 63.5 MB (all public domain), "
-        "en_US-lessac-medium 63.2 MB (Blizzard 2013 licence)"
-    )
-
-    def voices_found(self):
-        return sorted(
-            p.stem for p in self.dir().glob("*.onnx") if Path(f"{p}.json").exists()
-        )
-
-    def files(self):
-        return [None if self.voices_found() else "<voice>.onnx with <voice>.onnx.json"]
-
-    def voices(self):
-        return self.voices_found() if not self.missing() else []
-
-    def model_id(self, voice):
-        onnx = self.dir() / f"{voice}.onnx"
-        return f"{self._file_id(onnx)} {self._file_id(Path(f'{onnx}.json'))}"
-
-    def synth(self, texts, voice, speed, paths):
-        self.run(
-            self._job(
-                texts, voice, speed, paths, model=str(self.dir() / f"{voice}.onnx")
-            )
-        )
-        # word times would need a voice patched for alignments (piper.patch_voice_with_alignment)
-        return [None] * len(texts)
-
-
-ENGINES = {e.name: e for e in (Sapi(), Kokoro(), KokoroTs(), Piper())}
+ENGINES = {e.name: e for e in (Sapi(), KokoroTs())}
 
 
 def get_engine(name):
@@ -1128,7 +1265,7 @@ $s.Dispose()
 """
 
 _WORKER = r'''# voice_worker.py : written and run by zoetrope voice.py inside uv run --no-project --with <engine packages>
-# One job file in; one WAV per line plus out.json out. UNTESTED engines: written to their documented APIs.
+# One job file in; one WAV per line plus out.json out.
 import json
 import sys
 import tempfile
@@ -1145,34 +1282,6 @@ def write(path, y, sr):
         f.setsampwidth(2)
         f.setframerate(sr)
         f.writeframes(pcm.tobytes())
-
-
-def kokoro(job):
-    """Kokoro through sherpa-onnx 2.0: audio only (GeneratedAudio has samples and sample_rate, no timings)."""
-    import sherpa_onnx as so
-
-    k = so.OfflineTtsKokoroModelConfig(
-        model=job["model"],
-        voices=job["voices"],
-        tokens=job["tokens"],
-        lexicon=job["lexicon"],
-        dict_dir=job["dict_dir"],
-    )
-    cfg = so.OfflineTtsConfig(
-        model=so.OfflineTtsModelConfig(kokoro=k, num_threads=job["threads"]),
-        max_num_sentences=1,
-    )
-    if not cfg.validate():
-        raise SystemExit(
-            f"sherpa-onnx rejected the model files in {Path(job['model']).parent}"
-        )
-    tts = so.OfflineTts(cfg)
-    out = []
-    for line in job["lines"]:
-        a = tts.generate(line["text"], sid=job["sid"], speed=job["speed"])
-        write(line["wav"], a.samples, a.sample_rate)
-        out.append({"sr": a.sample_rate})
-    return out
 
 
 def kokoro_ts(job):
@@ -1214,22 +1323,8 @@ def kokoro_ts(job):
     return out
 
 
-def piper(job):
-    """Piper 1.8.0: synthesize_wav sets the WAV format itself; length_scale is the inverse of speed."""
-    from piper import PiperVoice, SynthesisConfig
-
-    v = PiperVoice.load(job["model"])
-    cfg = SynthesisConfig(length_scale=1 / job["speed"])
-    out = []
-    for line in job["lines"]:
-        with wave.open(line["wav"], "wb") as f:
-            v.synthesize_wav(line["text"], f, syn_config=cfg)
-        out.append({"sr": v.config.sample_rate})
-    return out
-
-
 if __name__ == "__main__":
     job = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-    res = {"kokoro": kokoro, "kokoro-ts": kokoro_ts, "piper": piper}[job["engine"]](job)
+    res = {"kokoro-ts": kokoro_ts}[job["engine"]](job)
     Path(job["out"]).write_text(json.dumps(res), encoding="utf-8")
 '''

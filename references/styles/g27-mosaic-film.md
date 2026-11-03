@@ -2,6 +2,7 @@
 **Source:** @LCSlates, https://x.com/LCSlates/status/2102503028859211905 · our build: g27-mosaic-film
 **Use when:** "abstract art film", "mosaic or tile animation", "figures made of particles", "ambient generative film with sound", "square animated short"
 **Defaults:** 80 s · 1:1 1080x1080 · 60 fps in the build (30 fps here) · music-only (generated score)
+**Spec:** family=music length=80 size=1080x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Make an 80 second square animated film that looks like a glass and gold leaf wall mosaic whose tiles were never glued down, so they can lift, flip, fly and click back into place. Figures are flocks of tiles, so a fish swims by its tiles swimming. (The original text stops mid-sentence; we carried the rule through every scene: no figure is ever redrawn, every figure is the wall's own tiles leaving their sockets and coming back.)

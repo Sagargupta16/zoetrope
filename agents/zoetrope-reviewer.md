@@ -123,6 +123,10 @@ first, then everything else.
    Q902 row (Q902 rows name the cue and its ms; a row from the no-cue-sheet
    detector is a guess); a grey tick on a cue that must sound goes under
    cannot verify. Report what only the picture shows as R801, with the time.
+   For a narrated piece, the Q806 and Q807 rows are what a speech model heard
+   the narration say: hold every caption that repeats a line against them,
+   and list each NOTE's line and time under cannot verify (a person has to
+   listen to it).
 4. **Re-review after a change** (the brief lists changes after the last PASS,
    or `qa.py check` shows Q1301 STALE). Without `approved/` there is nothing
    to compare with: review the whole film. With it, run
@@ -136,7 +140,7 @@ first, then everything else.
    sheets after a global change. Then, on the encoded file, view every
    `changed` time and its neighbours about 0.5 s either side. The diff
    compares draw(t), not the encode, so step 1 still runs; when it says
-   frames unchanged, check the audio rows (Q801 to Q805, Q902, Q903) and
+   frames unchanged, check the audio rows (Q801 to Q807, Q902, Q903) and
    audio.png instead. A fix can break something next to it: on 2026-10-28 a
    damage plate moved onto the hero, and a line-height change hid a counted
    outline under a header. Review the changed frames, not only the reported

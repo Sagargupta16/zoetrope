@@ -2,6 +2,7 @@
 **Source:** @feiflow, https://x.com/feiflow/status/2104039666093572362 · our build: g02-promo-any-tools
 **Use when:** "promote my app", "make it stunning", "animated promo with sound effects and music", "show the problem then the product"
 **Defaults:** 48 s · 16:9 1920x1080 · 30 fps · music and SFX only (no voice)
+**Spec:** family=launch length=48 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 I need to promote {product}. Make me an animated video, including sound effects and music, to promote it. Use any technique that works and make it the best, most stunning result possible.

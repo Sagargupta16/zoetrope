@@ -29,6 +29,7 @@ QA run: {the QA: line as printed, for example "QA: PASS (49 checks, 0 FIX, 0 NOT
 - Purity and lint (Q1201 to Q1206): {frames checked / findings}
 - Audio and video sync at hits (Q902, Q903): {worst ms on the stem, mux ms / list}
 - Loudness and true peak (Q801, Q802, Q805): {values}
+- What the narration says (Q806, Q807): {words heard as written / each NOTE and what listening found / no narration}
 - Frame scans (Q1101 to Q1105): {NOTEs and what each turned out to be / none}
 - Not checked: {every NOT CHECKED row and anything skipped, and listening by ear: checked by measurement only, not by ear}
 

@@ -2,6 +2,7 @@
 **Source:** our own brief (no external author) · our build: bonus-rectangle
 **Use when:** "fun fact film for Reels or Shorts", "everything is a {shape/idea}", "world tour with captions only", "running counter gag", "vertical caption-led short with no voice"
 **Defaults:** 45 s (about 40 to 45) · 9:16 1080x1920 · 30 fps · music-only, captions are the only storytelling layer
+**Spec:** family=explainer length=40-45 size=1080x1920 fps=30 audio=music kit=bonus-rectangle
 **Kit:** `kits/bonus-rectangle/` holds working code from the 2026-10-28 sample of this style (60 s, reviewed PASS); start from its README.
 
 ## The brief (reusable prompt)

@@ -2,6 +2,7 @@
 **Source:** @Yunn260414, https://x.com/Yunn260414/status/2104044910769016888 · our build: g14-what-is-git
 **Use when:** "explain {topic} to someone with zero background", "what is X in simple terms", "beginner tutorial with common commands or terms", "narrated explainer with captions", "use metaphors"
 **Defaults:** 3:30 in the original (we recommend 60 to 90 s for chat, fewer concepts) · 16:9 1920x1080 · 30 fps · narrated with always-on captions
+**Spec:** family=explainer length=60-90 size=1920x1080 fps=30 audio=voice kit=-
 
 ## The brief (reusable prompt)
 Make a video on the topic: What is {topic}. Explain it simply so someone with zero background can understand, then introduce the common commands or terms and what each means. It must have sound, narrated in English.

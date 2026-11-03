@@ -2,6 +2,7 @@
 **Source:** @en______ra, https://x.com/en______ra/status/2104035188061986980 · our build: g08-product-showreel-15s
 **Use when:** "motion reel for {brand}", "brand showreel", "feature montage in 15 s", "show what motion design can do for our product"
 **Defaults:** 15 s · 16:9 1920x1080 · 60 fps · music-only
+**Spec:** family=launch length=15 size=1920x1080 fps=60 audio=music kit=-
 
 ## The brief (reusable prompt)
 Make a dynamic 15-second motion graphics video for {brand} that shows what an incredible motion designer you are, like a showreel for a résumé. Go all out.

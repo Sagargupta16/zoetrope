@@ -2,6 +2,7 @@
 **Source:** @Michaelzsguo, https://x.com/Michaelzsguo/status/2102593579604377636 · our build: g25-sand-us-history
 **Use when:** "sand animation", "history of {country} in 2 minutes", "tasteful, even-handed history", "anniversary video", "chapters by year with carved captions"
 **Defaults:** 120 s · 16:9 1920x1080 · 30 fps (art animated "on twos" at 15 fps) · music and sound design only, no voice
+**Spec:** family=story length=120 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Make a 2-minute sand animation that tells the story of {N} years of {country} history. Keep it lively, engaging, and tasteful. Add appropriate background music and sound design. History must be accurate and even-handed.

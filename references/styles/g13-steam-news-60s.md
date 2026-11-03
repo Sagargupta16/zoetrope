@@ -2,6 +2,7 @@
 **Source:** @gigabit_million, https://x.com/gigabit_million/status/2104068536041959719 · our build: g13-steam-news-60s
 **Use when:** "new releases news video", "60-second roundup", "top N things this week", "motion graphics news show", "what's new in {topic}"
 **Defaults:** 60 s · 16:9 1920x1080 · 60 fps in the build (30 fps here) · music-only, no narration
+**Spec:** family=music length=60 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Make a news-style video introducing {items released in this period}, from the viewer's point of view so the interesting points of each are clear, as an easy-to-watch motion graphics video about 60 seconds long. Facts (titles, dates, what each is) must come from real pages you fetch; list the sources. No key art or logos unless clearly licensed; describe each with type and abstract motion instead.

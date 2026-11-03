@@ -2,6 +2,7 @@
 **Source:** @ishuagra02, https://x.com/ishuagra02/status/2102543638689460488 · our build: g22-photo-to-3d
 **Use when:** "turn this photo into a cartoon 3D scene", "cel-shaded", "camera flies through my picture", "before and after wipe", "illustrated version of a landscape"
 **Defaults:** 19 s · 16:9 1920x1080 · 30 fps · music-only
+**Spec:** family=handmade length=19 size=1920x1080 fps=30 audio=music kit=-
 
 ## The brief (reusable prompt)
 Create a highly detailed 3D scenery that faithfully captures this photo in a cel-shaded cartoon art style. Show the photo first for comparison, then a camera move through the scene (about 15 to 20 s).

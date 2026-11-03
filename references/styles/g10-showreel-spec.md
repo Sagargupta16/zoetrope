@@ -2,6 +2,7 @@
 **Source:** @darel023, https://x.com/darel023/status/2103424524297420829 · our build: g10-showreel-spec
 **Use when:** "résumé reel", "hook in the first second", "cut to music", "typography, shape, camera, colour chapters", "self-aware spec-sheet reel"
 **Defaults:** 15 s · 16:9 1920x1080 · 60 fps · music-only
+**Spec:** family=launch length=15 size=1920x1080 fps=60 audio=music kit=-
 
 ## The brief (reusable prompt)
 You're a world-class motion designer and this is your 15-second résumé reel. Make it dynamic and confident: open with a striking hook in the first second, build through distinct techniques (typography, shape play, camera moves, colour shifts), and land on a clean, memorable final frame. Pacing should feel cut to music. Go crazy.

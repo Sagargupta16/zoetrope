@@ -2,6 +2,7 @@
 **Source:** @notdwd, https://x.com/notdwd/status/2103995183255998633 · our build: g23-brand-future-55s
 **Use when:** "brand vision film", "explain our coined word", "five-year vision video", "old footage meets modern 3D", "narrated brand story"
 **Defaults:** 55 s · 16:9 1920x1080 · 30 fps · narrated (eight lines) plus music
+**Spec:** family=launch length=55 size=1920x1080 fps=30 audio=voice kit=-
 
 ## The brief (reusable prompt)
 Collect {brand}, its logo, its five-year vision, a coined concept word the film explains, old archive footage, roughly 100 to 120 BPM music and voiceover material; then make a 55-second film combining 3D animation, footage, narration and sound effects.
