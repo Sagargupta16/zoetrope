@@ -43,7 +43,7 @@ Do not page through the engine or a kit to find a helper: read the index
 
 ## Inputs (from the brief)
 
-- **Mode**: proof or render.
+- **Mode**: proof, render or resume.
 - **Working folder**: default `~/.claude/skills/zoetrope/outputs/<slug>/`
   (gitignored; never commit anything from `outputs/`).
 - **Storyboard**: the approved table, style id, size, length, fps.
@@ -95,10 +95,16 @@ voice-led piece with no narration files), and say so under `blocked`.
    `contract.snap`, and `narration.wav` is mixed with `voice.duck_mix`. Never
    call `voice.synthesize` from scenes.py. Measure any other voice file with
    `voice.dec` and `voice.span`.
-5. Fonts: for each font the style names, pick the closest installed one (on
-   Windows `C:/Windows/Fonts`), put its path first in FONT_BOLD or FONT_REG,
-   and record the substitution. A missing font raises; never fall back to the
-   Pillow default font.
+5. Fonts: when the style names one of the free families in `fonts.py`
+   (`python fonts.py list`: Inter, Nunito, IBM Plex Mono and 11 more), draw
+   with it by name: `bold="Nunito:800"` (family, weight, and `:italic` when
+   asked) in every text helper, and the same value in the registry item's
+   `bold`, which Q301 reads as bold from weight 700 up. If `list` shows a file
+   missing, run `python fonts.py fetch`. For any other font the style names
+   (most are Mac system fonts), pick the closest installed one (on Windows
+   `C:/Windows/Fonts`), put its path first in FONT_BOLD or FONT_REG, and record
+   the substitution. A missing font raises; never fall back to the Pillow
+   default font.
 6. Build the audio for a music-led piece now, from the same TIMELINE or BPM
    grid as the picture. The template score is `audio.render_audio(scenes)`,
    which `run_all.py full` and `audio` call too: every sound placed with
@@ -193,6 +199,28 @@ Only on a plain go from the parent, after an approved sheet.
    review has passed; list what you removed.
 7. Fill the template in `delivery-report.md` with numbers from tool results
    only and return it.
+
+## Resume mode
+
+When the parent sends `resume` and a working folder: a builder before you
+stopped without its report (an app restart stops every background agent;
+seven builders on 2026-10-30).
+
+1. Read what the last builder left, not what you would write: `brief.md`
+   (the brief it was sent: mode, storyboard, style, size, fps, audio plan,
+   facts), `build_state.json` (the last `run_all.py` stage; `running` means
+   it stopped inside that stage, `done` carries its verdict lines), the
+   newest `review/fixes_<n>.md` when there is one, `qa_proof.json` or
+   `qa.json`, and scenes.py and score.py.
+2. Keep every finished scene function and the score as written. Write only
+   what is missing: a scene the TIMELINE names with no function, a function
+   cut off mid-write, a fix in the newest fixes file that is not in the code
+   yet. Never rewrite a finished scene to restyle it.
+3. Continue at the first unfinished step of the mode `brief.md` names, with
+   the size, fps and SS in `build.json`: a stage that was `running` runs
+   again from its start; a proof with a FIX row gets fixed and run again.
+4. Report as that mode does, with one more line:
+   `resumed: <what was there> -> <what you did>`.
 
 ## Fixing a finding
 

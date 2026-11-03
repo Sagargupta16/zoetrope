@@ -513,6 +513,17 @@ def _rgb(c):
     return tuple(c[:3])
 
 
+def _is_bold(v):
+    """A registry item's bold flag: True or False, or the fonts.py family spec the text was drawn with
+    ("Inter:600"), which counts as bold from weight 700 up (WCAG's large text: 14 pt bold or 18 pt). Without this,
+    any spec string read as bold and let regular 24 px text pass at 3:1."""
+    if isinstance(v, str):
+        import fonts
+
+        return fonts.parse(v)[1] >= 700
+    return bool(v)
+
+
 def _shrink(b, k=1):
     return (b[0] + k, b[1] + k, b[2] - k, b[3] - k)
 
@@ -823,7 +834,7 @@ def _contrast_rows(scenes, frames, spans, fps, scale, passing=()):
                 arr = np.asarray(scenes.draw(frames[k][0]).convert("RGB"))
             px = it.get("px")
             large = px is not None and (
-                px * scale >= 36 or (px * scale >= 24 and it.get("bold", False))
+                px * scale >= 36 or (px * scale >= 24 and _is_bold(it.get("bold")))
             )
             ratio = contrast(_rgb(it["fg"]), ring_bg(arr, it["box"]))
             measured.setdefault(s, []).append(

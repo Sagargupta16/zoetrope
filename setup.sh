@@ -52,5 +52,18 @@ else
   fail=1
 fi
 
+# the free fonts the cards name (engine/fonts.py): a note, not a failure, since a card that names one says so itself
+if [ "$fail" -eq 0 ]; then
+  fonts_out=$(uv run --no-project --with-requirements "$here/engine/requirements.txt" python "$here/engine/fonts.py" list 2>&1)
+  missing=$(printf '%s\n' "$fonts_out" | grep -c "(missing)")
+  if ! printf '%s\n' "$fonts_out" | grep -q "^Inter "; then
+    echo "NOTE could not list the font cache: $fonts_out"
+  elif [ "$missing" -eq 0 ]; then
+    echo "ok   the 14 free font families the cards name are cached (engine/fonts.py)"
+  else
+    echo "NOTE $missing font families not cached -> python engine/fonts.py fetch (6.8 MB, SIL OFL)"
+  fi
+fi
+
 if [ "$fail" -eq 0 ]; then echo "SETUP: PASS"; else echo "SETUP: FIX"; fi
 exit "$fail"

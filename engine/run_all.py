@@ -88,6 +88,7 @@ def proof_stage():
     import qa_lint
     import qa_purity
 
+    C.write_state("proof", "running")
     rows = (
         qa.proof_rows(scenes, E.W, E.H, E.FPS)
         + qa_purity.run(".", E.FPS, (E.W, E.H))
@@ -100,7 +101,9 @@ def proof_stage():
     print(f"{out}: {n_shown} of {n_keys} key moments; {C.REVIEW_TIMES}, {C.QA_PROOF}")
     for r in rows:
         print(C.line(r))
-    print(C.summary(rows, "PROOF"))
+    verdict = C.summary(rows, "PROOF")
+    print(verdict)
+    C.write_state("proof", "done", [verdict])
     return C.exit_code(rows)
 
 
@@ -302,13 +305,13 @@ def set_aside(tag, why):
         print(f"{tag.upper()} {dst}: {why}")
 
 
-def deliver(ff, budget):
+def deliver(ff, budget, stage="full"):
     """Audio, master and mux with the decoded-file true-peak loop, then the scans of the drawn frames (thumbs.npy) and
     every gate on the file (Z10). Any FIX or NOT CHECKED row moves the file to <name>.rejected.mp4 and says why; the
     approval rows are a review state and give the APPROVAL line instead; an error before the verdict (in any step,
     or an interrupt) moves it to <name>.unchecked.mp4 and the error stands. The rows' moments join review_times.json
     and the review sheets are redrawn with every row the verdict used. A clean pass ends with the APPROVAL line and
-    one DELIVERED line."""
+    one DELIVERED line. build_state.json gets the verdict lines; after an error it still says the stage is running."""
     import qa_scan
 
     silent = C.declared(scenes, "SILENT")
@@ -350,7 +353,8 @@ def deliver(ff, budget):
             f"approval {APPROVAL_STATE.get(r.status, r.status)}: {r.code} {r.msg}"
             + (f" -> {r.fix}" if r.fix else "")
         )
-    print(C.summary(rows))
+    verdict = C.summary(rows)
+    print(verdict)
     bad = [f"{r.code} {r.status}" for r in rows if r.status in (C.FIX, C.NOT_CHECKED)]
     if bad:
         set_aside("rejected", ", ".join(bad))
@@ -358,15 +362,17 @@ def deliver(ff, budget):
     # proof_keys.png, proof_strips.png and proof_gantt.png with every row the verdict used
     proof.keys(rows=rows + own)
     if bad:
+        C.write_state(stage, "done", [verdict, f"REJECTED: {', '.join(bad)}"])
         return C.exit_code(rows) or 1
-    print(approval_line(own))
+    approval = approval_line(own)
+    print(approval)
     p = qa.probe(OUT)
     sound = (
         "silent" if loud is None else f"{loud['I']:.1f} LUFS, {loud['peak']:.1f} dBTP"
     )
-    print(
-        f"DELIVERED {Path(OUT).resolve().as_posix()} ({p['size_mb']:.1f} MB, {p['duration']:.2f} s, {sound})"
-    )
+    delivered = f"DELIVERED {Path(OUT).resolve().as_posix()} ({p['size_mb']:.1f} MB, {p['duration']:.2f} s, {sound})"
+    print(delivered)
+    C.write_state(stage, "done", [verdict, approval, delivered])
     return 0
 
 
@@ -433,9 +439,10 @@ def main():
     if a.stage == "audio" and not picture_is_current():
         return 1
     budget = a.budget_mb or getattr(scenes, "BUDGET_MB", None)
+    C.write_state(a.stage, "running")
     if a.stage == "full":
         picture(ff, a, budget)
-    return deliver(ff, budget)
+    return deliver(ff, budget, a.stage)
 
 
 # required: Windows runs the top of this file again in every render worker, never this block

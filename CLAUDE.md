@@ -35,7 +35,9 @@ This folder is the `zoetrope` skill itself, not a copy: `~/.claude/skills/zoetro
 ## Engine gotchas (hit on 2026-10-28 and 2026-10-29)
 
 - **Windows workers.** `run_all.py` work sits under `if __name__ == "__main__":`, and `render.py` imports `scenes` inside its functions, because each worker must set `E.W`, `E.H` before `scenes` reads them. A top-level import rendered a 9:16 piece at 16:9 size.
-- **Fonts.** The cards name Mac fonts. `engine.py` lists Windows Arial first and raises on a missing font; before that, Pillow silently fell back to its 10 px default and every headline came out tiny.
+- **Fonts.** The cards name Mac fonts. `engine.py` lists Windows Arial first and raises on a missing font; before that, Pillow silently fell back to its 10 px default and every headline came out tiny. The 14 OFL families 20 cards name are cached by `fonts.py` (2.2.4) and drawn by name. A variable file is always set to the weight asked for, because their default instances differ: Nunito's is 200, Cormorant's 300, Fraunces' 900.
+- **OpenBLAS threads.** `contract.py` sets `OPENBLAS_NUM_THREADS=1` before numpy loads. Unset, one process that loaded numpy and ran a matrix product held 27 threads and 793 MB private, against 4 threads and 54 MB at 1; seven reel builds of eight workers ran out of memory on 2026-10-30.
+- **Sleep.** The app holds the PC awake only while a session works, and on battery only with Keep awake on battery power on (turned on 2026-10-31). On 2026-10-29 the laptop went on battery at 07:19, idle-slept at 07:29 during the final review and woke only when plugged in at 13:59: 6.5 of the build's 8.4 hours. A closed lid sleeps whatever the setting.
 - **9:16 text.** Size titles with `fit_size` against the short side (`min(W, H)`), or they overflow the safe area (Q201).
 - **True peak.** The AAC encode adds true peak: up to 1.23 dB at 192k, at most 0.45 dB at 320k (9 mixes). So `audio.master` limits to -2.0 dBTP with a numpy 4x true-peak limiter, the mux encodes AAC 320k, and `run_all.py` re-masters lower when the decoded MP4 reads over -1.3. When Q802 still fails it names every sound present at that moment; lower the first one in its cut order.
 - **Cue sync (Q902).** Q902 measures each cue's own sound on the lossless SFX stem from the cue sheet, not by guessing onsets in the mix. The 37 to 87 ms lateness of the first batch was placement: slow attacks placed by their first sample (a 0.25 s pad attack is heard 44 ms in). The mux adds 0.000 ms; the old alimiter added 4.0 ms. Place sounds with `synth.place` by their landmark.
@@ -72,7 +74,7 @@ All five went from launch to finished file in about 1 h 16 min. Writing `scenes.
 
 ## Verify before a commit
 
-- `bash setup.sh` ends `SETUP: PASS`.
+- `bash setup.sh` ends `SETUP: PASS`, with the line that the 14 free font families are cached (`python engine/fonts.py fetch` when it says they are not).
 - Smoke render: copy the engine with `cp -r engine/. outputs/smoke/` (so `qa_fixtures/` comes along), then at `--size 1920x1080` and again at `--size 1080x1920`: `run_all.py proof` ends `PROOF: PASS`, `run_all.py full` ends with its `APPROVAL` line and one `DELIVERED` line, and `qa.py check out.mp4 --scenes . --size WxH --fps 30 --bpm 120` ends `QA: PASS` with 0 FIX and 0 NOT CHECKED.
 - `qa.py selftest` (from the same folder) ends `SELFTEST: PASS (144 fixtures, 58 of 58 codes covered, 0 expected gaps)`: every Q code fires on its planted fault with the right item, time and value, and the template passes `run_all.py proof` and `full` at 1920x1080 and 1080x1920 (36 s on 2026-10-29; `--quick` skips the two full renders, 28 s).
 - `uvx ruff format --check engine` is clean. `uvx ruff check engine kits` is not (184 findings on 2026-10-29: the template's `from engine import *` by design, plus lint debt in the kits), so compare its count before and after a change instead of expecting zero.

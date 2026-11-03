@@ -7,6 +7,8 @@ from functools import lru_cache
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageChops
 import numpy as np
 
+import fonts
+
 # the one frame clock (Z06), re-exported so `from engine import *` gives it to scenes.py
 from contract import frame_of, frame_sample, on_grid, sample_of, snap, stepped  # noqa: F401
 
@@ -107,7 +109,12 @@ _fc = {}
 
 
 def font(size, bold=True):
+    """The font every text helper draws with. bold: True or False for FONT_BOLD or FONT_REG above, or a free family
+    the style cards name as "Family:weight[:italic]" (fonts.py: "Nunito:800", "Inter:600", "Bodoni Moda:400:italic"),
+    so text(), text_box(), fit_size() and wrap() take a family through the same bold= argument."""
     key = (int(size), bold)
+    if key not in _fc and isinstance(bold, str):
+        _fc[key] = fonts.load(bold, int(size), SS)
     if key not in _fc:
         for p in FONT_BOLD if bold else FONT_REG:
             if os.path.exists(p):

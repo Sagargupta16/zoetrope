@@ -3,10 +3,18 @@
 import hashlib
 import json
 import math
+import os
 import shutil
 import subprocess
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+# One BLAS thread per process, set before numpy loads (run_all.py, qa.py and proof.py import this module first).
+# Unset, a process that loaded numpy and ran one matrix product held 27 threads and 793 MB private; at 1, 4 threads
+# and 54 MB (2026-10-31). Seven reel builds of eight render workers ran out of memory on 2026-10-30. A value already
+# in the environment wins.
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
 import numpy as np
 from PIL import Image
@@ -262,6 +270,7 @@ APPROVAL = "approval.json"  # inside APPROVED
 AUDIO_PNG = "review/audio.png"  # qa.py audiostrip (Z20)
 GANTT = "proof_gantt.png"  # proof.py timeline strip (Z19)
 BUILD = "build.json"  # {"w", "h", "fps", "ss"} written by run_all.py, read by every standalone CLI
+BUILD_STATE = "build_state.json"  # the last run_all.py stage, running or done, with its verdict (resume mode)
 
 CUESHEET_KEYS = {
     "i": "index, also the key c<i> in cue_sounds.npz",
@@ -319,6 +328,23 @@ def read_build(folder="."):
         return None
     b = json.loads(p.read_text(encoding="utf-8"))
     return b["w"], b["h"], b["fps"], b.get("ss", 1)
+
+
+def write_state(stage, status, verdict=None, folder="."):
+    """Record the run_all.py stage now running, or just done with its verdict lines, so a fresh builder resuming a
+    stopped build knows where the last one got to: an app restart stopped seven builders mid-task on 2026-10-30. A
+    stage still "running" with no live builder broke or was stopped there."""
+    Path(folder, BUILD_STATE).write_text(
+        json.dumps(
+            {
+                "stage": stage,
+                "status": status,
+                "verdict": verdict,
+                "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 # ---- frame digests and thumbs (Z01 writes them; Z04, Z09, Z17 read them) ----
