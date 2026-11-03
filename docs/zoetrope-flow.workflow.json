@@ -10,7 +10,7 @@
       "url": "https://github.com/Sagargupta16/zoetrope.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "d664a97d89423c40459018bff85ce50e0c8d010f"
+      "revision": "88153b53a3ecaa47a79809c51d4695ffc06f775e"
     },
     "legend": {
       "entries": {
@@ -90,8 +90,8 @@
       "sources": [
         {
           "path": "SKILL.md",
-          "line": 67,
-          "end_line": 69,
+          "line": 68,
+          "end_line": 70,
           "label": "workflow steps 1 to 3"
         }
       ]
@@ -106,8 +106,8 @@
       "sources": [
         {
           "path": "SKILL.md",
-          "line": 71,
-          "end_line": 71,
+          "line": 72,
+          "end_line": 72,
           "label": "workflow step 5"
         },
         {
@@ -130,13 +130,13 @@
         {
           "path": "engine/run_all.py",
           "line": 85,
-          "end_line": 104,
+          "end_line": 107,
           "label": "proof_stage"
         },
         {
           "path": "agents/zoetrope-builder.md",
-          "line": 59,
-          "end_line": 135,
+          "line": 60,
+          "end_line": 145,
           "label": "proof mode"
         }
       ]
@@ -151,8 +151,8 @@
       "sources": [
         {
           "path": "engine/qa.py",
-          "line": 1205,
-          "end_line": 1225,
+          "line": 1215,
+          "end_line": 1235,
           "label": "proof_rows"
         },
         {
@@ -207,8 +207,8 @@
       "sources": [
         {
           "path": "SKILL.md",
-          "line": 74,
-          "end_line": 74,
+          "line": 75,
+          "end_line": 75,
           "label": "workflow step 8"
         }
       ]
@@ -236,8 +236,8 @@
         },
         {
           "path": "engine/run_all.py",
-          "line": 305,
-          "end_line": 370,
+          "line": 308,
+          "end_line": 376,
           "label": "deliver"
         }
       ]
@@ -253,14 +253,14 @@
       "sources": [
         {
           "path": "engine/qa.py",
-          "line": 1283,
-          "end_line": 1524,
+          "line": 1293,
+          "end_line": 1534,
           "label": "check"
         },
         {
           "path": "engine/contract.py",
-          "line": 517,
-          "end_line": 674,
+          "line": 549,
+          "end_line": 718,
           "label": "CODES"
         }
       ]
@@ -276,7 +276,7 @@
         {
           "path": "agents/zoetrope-reviewer.md",
           "line": 103,
-          "end_line": 153,
+          "end_line": 157,
           "label": "final stage"
         }
       ]
@@ -320,8 +320,8 @@
       "sources": [
         {
           "path": "SKILL.md",
-          "line": 79,
-          "end_line": 79,
+          "line": 80,
+          "end_line": 80,
           "label": "workflow step 11"
         }
       ]
