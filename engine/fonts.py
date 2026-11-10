@@ -1,6 +1,6 @@
 # fonts.py : the free fonts the style cards name (SIL Open Font Licence 1.1), cached outside the repo and loaded by
 # family name. engine.font(size, "Nunito:800") draws with one, and so does every text helper (bold="Nunito:800");
-# FONT_BOLD and FONT_REG in engine.py stay for the rest. 20 of the 33 cards name one of these 14 families.
+# FONT_BOLD and FONT_REG in engine.py stay for the rest. 21 of the 34 cards name one of these 14 families.
 #   python fonts.py fetch   download what is missing, pinned to one google/fonts commit, each checked by sha256
 #   python fonts.py list    each family, its weights and whether its files are cached
 import hashlib

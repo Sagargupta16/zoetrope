@@ -8,6 +8,7 @@
 # full and audio end with an APPROVAL line and exactly one DELIVERED line, or move the file aside and say why:
 # <name>.rejected.mp4 when a row is FIX or NOT CHECKED, <name>.unchecked.mp4 when the run broke before a verdict.
 import argparse
+import ast
 import os
 import shutil
 import subprocess
@@ -40,6 +41,19 @@ def size_flags(argv):
 
 
 size_flags(sys.argv[1:])
+import plate3d
+
+# A 3D plate older than its stage script, unfinished, still being rendered or (for the full render) of proof quality:
+# say so and stop here, before scenes.py opens it, or the reader gets a traceback from that import in place of the
+# command that clears it. Only the run itself asks: a render worker runs the top of this file again under another
+# name.
+if __name__ == "__main__" and (
+    _stale := plate3d.check(final=sys.argv[1:2] == ["full"])
+):
+    for _why in _stale:
+        print(f"PLATE: {_why}")
+    sys.exit(1)
+
 import audio
 import proof
 import qa
@@ -305,6 +319,24 @@ def set_aside(tag, why):
         print(f"{tag.upper()} {dst}: {why}")
 
 
+def scorer():
+    """What makes this build's sound: score.py's render_audio when the working folder has one, else the template's
+    (audio.render_audio). The contract is the template's: render_audio(scenes, folder=".", fps=None) writes MIX_RAW,
+    SFX, the cue sheet and its sounds, and returns their paths. The file is parsed first, never run to find out: an
+    older kit's score.py is a script, not this function."""
+    p = Path("score.py")
+    if p.is_file():
+        tree = ast.parse(p.read_text(encoding="utf-8"))
+        if any(
+            isinstance(n, ast.FunctionDef) and n.name == "render_audio"
+            for n in tree.body
+        ):
+            import score
+
+            return score.render_audio
+    return audio.render_audio
+
+
 def deliver(ff, budget, stage="full"):
     """Audio, master and mux with the decoded-file true-peak loop, then the scans of the drawn frames (thumbs.npy) and
     every gate on the file (Z10). Any FIX or NOT CHECKED row moves the file to <name>.rejected.mp4 and says why; the
@@ -321,7 +353,7 @@ def deliver(ff, budget, stage="full"):
             mux(ff, None)
         else:
             t0 = time.perf_counter()
-            made = audio.render_audio(scenes, fps=E.FPS)  # cut sounds land on frames
+            made = scorer()(scenes, fps=E.FPS)  # cut sounds land on frames
             names = ", ".join(Path(p).name for p in made.values())
             print(f"wrote {names} in {time.perf_counter() - t0:.1f} s")
             rows, loud = master_and_mux(ff)

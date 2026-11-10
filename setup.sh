@@ -75,5 +75,23 @@ if [ "$fail" -eq 0 ]; then
   fi
 fi
 
+# the recorded instruments (engine/sampler.py): a note, since a score fetches only what it plays
+if [ "$fail" -eq 0 ]; then
+  if uv run --no-project --with-requirements "$here/engine/requirements.txt" python "$here/engine/sampler.py" missing >/dev/null 2>&1; then
+    echo "ok   the 14 recorded instruments are cached (engine/sampler.py)"
+  else
+    echo "NOTE not every recorded instrument is cached -> python engine/sampler.py fetch <names> (all 14: 232.8 MB, CC0)"
+  fi
+fi
+
+# Blender for 3D plates (engine/plate3d.py): a note, since only a 3D card needs it
+if [ "$fail" -eq 0 ]; then
+  if uv run --no-project --with-requirements "$here/engine/requirements.txt" python "$here/engine/plate3d.py" missing >/dev/null 2>&1; then
+    echo "ok   Blender for 3D plates has been fetched (engine/plate3d.py)"
+  else
+    echo "NOTE Blender for 3D plates is not fetched -> python engine/plate3d.py fetch (324 MB, GPL-3.0; a 3D card needs it)"
+  fi
+fi
+
 if [ "$fail" -eq 0 ]; then echo "SETUP: PASS"; else echo "SETUP: FIX"; fi
 exit "$fail"

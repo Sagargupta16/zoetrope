@@ -94,6 +94,15 @@ first, then everything else.
    safe areas, contrast that looks weak, overlaps at rest, palette and type
    against the card, and the first still (it is the thumbnail). At 9:16 it is
    one tall sheet (1920x3483 for 9 stills): cut it between rows of stills.
+   Then the directing checks (`references/playbook.md` section 5), each a P1
+   with its still: the subject under a third of the frame height at a key
+   moment, or against an edge; a caption over the subject; two stills in a
+   row with the same framing where the scenario asks for a change; a face or
+   pose that reads wrong at this size (a frown where the scenario says
+   worried). For a 3D plate build (`plates/` in the folder, `references/plates.md`),
+   read `plates/<name>/plate.json`: at the proof stage `quality` is `proof`
+   (half size, soft: judge staging, acting and light, not sharpness); at the
+   final stage it must be `final`.
 7. Grep `scenes.py` for the scenario's on-screen lines to catch spelling the
    stills are too small to show. Check that `text_items(t)` reports every line
    the scenario lists (a line missing from the registry escapes every text

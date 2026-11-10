@@ -113,9 +113,15 @@ voice-led piece with no narration files), and say so under `blocked`.
    grid as the picture. The template score is `audio.render_audio(scenes)`,
    which `run_all.py full` and `audio` call too: every sound placed with
    `synth.place` inside `synth.recording()`, written as mix_raw.wav, sfx.wav
-   and the cue sheet that Q902 and Q804 read. A score of the piece's own (a
-   kit's) writes the same files (`music.md`); point that one call in your copy
-   of run_all.py at it, returning their paths as render_audio does. Then
+   and the cue sheet that Q902 and Q804 read. A score of the piece's own
+   writes the same files (`music.md`): put it in the working folder as
+   `score.py` with `render_audio(scenes, folder=".", fps=None)` returning
+   their paths, and `run_all.py` calls it in place of the template's. (An
+   older kit's score is a script with no such function: wrap it, or point
+   that one call in your copy of run_all.py at it.) Recorded instruments
+   (`sampler.py`, `references/instruments.md`) play beside the synth kit:
+   `python sampler.py missing` lists what is not cached, and you cannot
+   download, so score with what is there and say what you wanted. Then
    master once, `audio.master("mix_raw.wav", "mix.wav")`, so the reviewer can
    read the proof audio strip.
 7. Run `python run_all.py proof --size WxH --fps N` (`--ss 2` for thin lines
@@ -142,6 +148,34 @@ voice-led piece with no narration files), and say so under `blocked`.
 
 A follow-up message with fixes is still proof mode: apply them, run the
 proof again, report and stop again.
+
+### A card with a 3D plate
+
+When the card's kit is a 3D one (S-toy-studio-3d), read
+`references/plates.md` and the kit's README before step 4. The picture is
+rendered by Blender as a plate, then scenes.py draws the type over it:
+
+- `python plate3d.py missing` first. If Blender is not cached, stop under
+  `blocked`: the parent runs `plate3d.py fetch` (324 MB), you cannot.
+- Write `beats.py` (every time both worlds share) before `stage.py` and
+  scenes.py, and take every time in both from it.
+- Stage with stills (`plate3d.py render stage.py --name look --quality proof
+  --stills T,T`), read them, and fix staging and light until each scene reads
+  and the subject fills a third of the frame height at its key moments. Then
+  step through every jump, catch and hand-over frame by frame (stills 1/fps
+  apart): nothing passes through anything, a held thing touches the hand that
+  holds it, and no pose or held thing jumps in one frame. No gate measures
+  this; on the first 3D build the head went through the star and every gate
+  passed. Place anything that is caught or held from the rig's own pose
+  (`S3.where(hand) + offset`), never from worked-out numbers, and measure
+  the contact with no render as the kit does
+  (`python plate3d.py run stage.py contact`). Delete `plates/look` when done.
+- Proof mode renders the whole plate at proof quality, then runs the proof.
+- Render mode renders the final plate first, in the background (it resumes
+  if stopped), then `run_all.py full`. `run_all.py` refuses a stale, unfinished
+  or proof-quality plate with a `PLATE:` line that carries the fix.
+- A fix to the 3D picture changes `stage.py`, so the plate is rendered again:
+  say in the report how long that took.
 
 ## Render mode
 

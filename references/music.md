@@ -28,7 +28,7 @@ audio.write_wav(C.SFX, sfx, scale=scale)
 sheet.write(".", scale)  # cuesheet.json and cue_sounds.npz
 ```
 
-Then `audio.master(C.MIX_RAW, C.MIX)`; in a build, put this score where `run_all.deliver` calls `audio.render_audio`. A score that writes into a bus without recording gets Q902 from the onset detector only (a guess) and one Q804 NOTE (`qa-gates.md`, gates 8 and 9).
+Then `audio.master(C.MIX_RAW, C.MIX)`; in a build, put this score in the working folder as `score.py`, in a function `render_audio(scenes, folder=".", fps=None)` that returns the paths as `audio.render_audio` does: `run_all.py` then calls it in place of the template's. A score that writes into a bus without recording gets Q902 from the onset detector only (a guess) and one Q804 NOTE (`qa-gates.md`, gates 8 and 9).
 
 ### Song builder on a BPM grid
 
@@ -56,3 +56,7 @@ Align the video length to a whole number of bars (or end on a bar line plus a sh
 120 BPM gives a 2 s bar and a 0.5 s beat, which maps cleanly to 30 fps (15 frames per beat). Other BPMs do not land on whole frames (Q905 notes them): place cuts on the nearest frame and let audio keep the exact beat time. A pad with a slow attack (the ambient preset) is heard late when placed by its first sample: place it with `align='pad'` on its cue, or shorten the attack under 80 ms and align its onset.
 
 Extra instruments seen in past scores (add if needed): `bell(m,dur)` = sine at f plus partials at 2.76f and 5.4f with fast decays; `blip(m)` = FM sine with `exp(-t/0.03)` modulation; `swish(dur,fc0,fc1)` = short band-passed noise with sine envelope; `crash` = high-passed noise (above 5 kHz) with `exp(-t/0.45)`. Seed their noise with `S.rng_for("crash", k)`.
+
+### Recorded instruments
+
+For real instruments instead of oscillators, `engine/sampler.py` (`import sampler as SP`) plays recorded glockenspiel, marimba, harp, pizzicato and sustained strings, flute, horn, timpani and orchestral percussion (CC0, Versilian Studios) as mono arrays at `S.SR`, placed with `S.place` beside this kit: `SP.note("harp", 60, 1.0)`, `SP.chord("violins", [60, 64, 67], 4.0)`, `SP.hit("cymbal", "swell4")`. Fetch what a score plays before the build (`python engine/sampler.py fetch harp pizz`), place sustained strings, flute and horn with `align="pad"`, and print `SP.credits(names)` in the delivery report. Ranges, layers, loops, licences and the measurements are in `instruments.md`.

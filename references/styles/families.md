@@ -36,7 +36,9 @@ Cards: S-g16-dinosaurs-to-jomon, S-g24-new-york-5min, S-g25-sand-us-history, S-g
 
 Pick a style from this family when the user wants a world, a character or a story told through picture and a composed score: a pixel-art scene, an anime-flavoured short, a retro game battle, or a cinematic trailer for a series or product. These are the most music-led and craft-heavy styles we have. They have no spoken facts to check, so the work is in design, timing on a beat grid and a clean mix. Swap every story name below for {brand} / {product} or the user's own idea, and keep all characters original.
 
-Cards: S-g19-neon-knight, S-g21-anime-remix, S-g29-nes-rpg-battle, S-g31-alien-planet-trailer.
+One card here is true 3D: S-toy-studio-3d renders its picture in Blender as a plate (`plates.md`), for a small character acting out one idea on a studio sweep; offer it when the brief asks for a 3D or animated-film look, and say what it takes (a GPU, and about 3.5 s a frame at 1080p).
+
+Cards: S-g19-neon-knight, S-g21-anime-remix, S-g29-nes-rpg-battle, S-g31-alien-planet-trailer, S-toy-studio-3d.
 
 ## Handmade, craft and personal looks
 

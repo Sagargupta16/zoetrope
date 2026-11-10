@@ -2,7 +2,7 @@
 
 Working code from approved builds, one folder per style card. A builder making that style copies the engine as usual, then the kit modules its README lists, and replaces the content while keeping the machinery. Each kit comes from the 2026-10-28 sample batch (60 s, reviewed PASS at the proof and final stages); the finished videos are in `outputs/samples-2026-10-28/videos/` (gitignored, local only).
 
-**A kit copied as is does not pass the 2.2.0 gates.** Its scenes.py predates the text and cue registry, so `run_all.py proof` stops on Q204 FIX or Q200 NOT CHECKED, and `run_all.py full` renames the file `<name>.rejected.mp4`, until you add `text_items(t)` (and `CUES`, or `NO_CUES`; see `engine/scenes.py` and `references/qa-gates.md`). What each kit gives today (qa_registry, 2026-10-28 and 2026-10-29):
+**A kit from that batch, copied as is, does not pass the 2.2.0 gates** (the 2026-11-10 `toy-studio-3d` kit does: it was built with the registry). Its scenes.py predates the text and cue registry, so `run_all.py proof` stops on Q204 FIX or Q200 NOT CHECKED, and `run_all.py full` renames the file `<name>.rejected.mp4`, until you add `text_items(t)` (and `CUES`, or `NO_CUES`; see `engine/scenes.py` and `references/qa-gates.md`). What each kit gives today (qa_registry, 2026-10-28 and 2026-10-29):
 
 | Kit | Registry as shipped | What the gates say | What to add |
 |---|---|---|---|
@@ -26,6 +26,7 @@ Working code from approved builds, one folder per style card. A builder making t
 | [g11-movie-credits](g11-movie-credits/README.md) | S-g11-movie-credits | Letterboxed 2.39:1 scenes, a rotating beam that reveals names as it passes, film grain and gate weave, a score cued to a beam clock; a grain size test | Salt and Signal credits, 24 fps |
 | [g29-nes-rpg-battle](g29-nes-rpg-battle/README.md) | S-g29-nes-rpg-battle | `chip.py` 2A03-style synth (pulse with duty, 32-step triangle, LFSR noise, 60 Hz driver), `font5x7.py` bitmap font, `pix.py` palette-index canvas with Bayer dithering and outlining, `sprites.py`, a tracker screen driven by the same note table as the audio | Storm over Saltmere, 320x180 x6 |
 | [bonus-rectangle](bonus-rectangle/README.md) | S-bonus-rectangle | An honest counter driven by one event list (outlines, boops and digits from the same data), dashed snap outlines, a stacked caption system for 9:16 | Everything is a rectangle, 9:16 |
+| [toy-studio-3d](toy-studio-3d/README.md) | S-toy-studio-3d | A 3D plate build (`references/plates.md`): `beats.py` (one timeline for the stage, the captions and the score), `stage.py` (studio set, the `Buddy` character acting through pure `pose(t)`, jumps that land on their cue's frame, a held prop, screen tracks), `scenes.py` (captions and sparks over `PLATE.frame(t)`, with the registry), `score.py` (a waltz on recorded instruments, one sound per cue) | Pip wants the star, 16:9, 24 fps, 16.5 s (2026-11-10) |
 
 What every kit has in common:
 

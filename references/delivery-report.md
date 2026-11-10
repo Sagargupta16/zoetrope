@@ -35,7 +35,7 @@ QA run: {the QA: line as printed, for example "QA: PASS (49 checks, 0 FIX, 0 NOT
 
 Facts used (checked {date}):
 - {claim} -> {source}
-Media and credits: {file, source, licence, attribution card yes/no | "no third-party media"}
+Media and credits: {file, source, licence, attribution card yes/no | "no third-party media"}{; recorded instruments: the lines `sampler.credits(names)` prints, CC0}
 Known weak spots: {honest list, for example "small labels on a phone", "mix checked by measurement, not by ear"}
 
 Want changes? Tell us the scene and the time (for example "scene 3, 0:12") and we will rebuild only what changes.

@@ -13,7 +13,7 @@ How we make a video, start to finish, with the tools we really have (see `engine
    | Time | On screen | Visual form | Purpose | Transition in |
    |---|---|---|---|---|
 
-   Rules: every row names one purpose (cut or merge rows that cannot); every payload row names a visual form that passes the squint test (remove the words: does the shape still say something? a bar chart passes, three boxed stat cards fail); note what carries continuity across each cut. Never print internal phase names (hook, develop) in the table the user sees.
+   Rules: every row names one purpose (cut or merge rows that cannot); every payload row names a visual form that passes the squint test (remove the words: does the shape still say something? a bar chart passes, three boxed stat cards fail); note what carries continuity across each cut. For a piece with a camera or a character, Visual form also names the framing and the move (section 5). Never print internal phase names (hook, develop) in the table the user sees.
 6. **Assets.** Palette and fonts from the style, shapes drawn in code, user-supplied images loaded from disk. No downloaded music or footage. Credit anything third party.
 7. **Build.** Write `scenes.py` (`engine.md`). One `TIMELINE`, one pure `draw(t)`, and the registry: `text_items(t)` for every text drawn and `CUES` for every moment sound and picture share (`qa-gates.md`). Read `python kit_index.py` before writing a helper.
 8. **Audio.** Voice first (`voice.synthesize`; the slots in `narration.json` size the scenes), then music on a BPM grid, SFX on the cuts placed by their landmark inside `synth.recording()`, mix (`mixing.md`, `beat-sync.md`).
@@ -82,3 +82,22 @@ Easing is the adverb: the same move reads confident (expo out), dreamy (sine in-
   - Zoom-through: scale the old scene up past the camera and land the new one from small; for entering a screen or a detail.
   - Match cut: carry one shape, color or position across the cut (a button center becomes the next scene's circle). Strongest transition; use it once or twice.
 - **Don't:** same ease everywhere, same entrance on every item, ambient zoom on every scene, a static element beside animated ones.
+
+## 5. Directing
+
+A piece is judged in this order: sound, rhythm, camera, performance. A good-looking frame is only where it starts. These came from lemo-opuscar's director guide (MIT, read 2026-11-10), put in our words and measured against our own builds.
+
+- **Three shapes before one.** Before the storyboard, write three candidate structures in a line each (a journey, a before and after, a countdown, a list that turns, a question and its answer), pick one and say why. The first idea for a style is usually its cliché.
+- **One subject, one want, one turn.** Someone or something wants something, it changes, and the end answers the opening: the same frame changed, the scale revealed, the thing done right the second time.
+- **A benchmark.** Name one or two works that set the bar for this style and this topic. Write what to learn from them (framing, pace, colour logic, how the score is built) and what not to take (characters, designs, melodies, shots, logos, type).
+- **One move only this style can make,** at the peak: the fold that becomes the cut, the counter that glitches, the star that lights the face that catches it.
+- **Every shot has a reason.** Each storyboard row names its framing (wide, full, medium, close, insert) and its camera move, and what that says. A piece over 20 s uses four or more different moves and has one shot people remember. 2D has a camera too: push, pull, parallax, a frame inside a frame.
+- **The subject is big.** At a key moment it fills a third of the frame height or more, with a clear silhouette, away from the edges. The first staging of the 3D pilot had its character at a fifth in three scenes of five.
+- **A sound table.** Per scene: the bed (room, air, a drone), the sound of each visible action, and what the music does. Every action the viewer sees has a sound, in the material it is made of, and each is a `CUES` entry so Q902 measures it.
+- **Two silences.** Take the music away, or nearly, before the turn and before the peak. The first sound after a silence is one of the most important in the piece. Once at least, let the next scene's sound start before its picture.
+- **Pace changes.** One clear speed-up or slow-down and one breath (a held shot). Fast means fewer words on screen, never a line cut before it is read.
+- **Performance.** Eyes first, then the body. Anticipation, the action, follow-through. Blend between poses with an ease; never switch one inside an `if`. Check faces at final size: worried and angry are one eyebrow apart.
+- **What follows a subject uses one world-to-screen function** (a 3D plate's `PLATE.at`, or the scene's own layout function), never coordinates typed by hand, so a label stays on its subject when the camera moves.
+- **One fix round.** Fix everything a review found in one round, then check once. Notes after delivery are new rounds: change only what was asked.
+
+Seen most often: the subject too small or against an edge; a colour on the same colour; a caption over the subject; a gag too quick to read; an empty frame inside a transition.
