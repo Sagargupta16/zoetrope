@@ -125,19 +125,19 @@ def hop(k, height=1.0, crouch=0.22, stretch=0.22, push=0.4):
     return 0.0, -crouch * 0.9 * settle(max(0.0, k - 0.78) / 0.22, 1.5, 3.0)  # landing
 
 
-def jump(t, land, air=0.7, height=1.0, crouch=0.22, stretch=0.22):
+def jump(t, land, air=0.7, height=1.0, crouch=0.22, stretch=0.22, wind=0.25):
     """hop() by the clock: (z, squash amount) at time t for a jump that is off the ground for air seconds and comes
     down at land. Give land a cue's time and the feet meet the ground on that cue's frame, squashed; the crouch
     starts 0.3 x air before the takeoff and the settle runs 0.37 x air after the landing. A hop under half a second
-    in the air spends more of its short crouch on the push, or it leaves the ground in one frame."""
+    in the air would crouch in under three frames (a dip with no in-between), so its crouch takes wind seconds,
+    half down and half push: six frames at 24 fps. wind=0 keeps 0.3 x air, for a flinch."""
     length = air / 0.6
-    return hop(
-        (t - (land - 0.78 * length)) / length,
-        height,
-        crouch,
-        stretch,
-        0.4 if air >= 0.5 else 0.6,
-    )
+    k = (t - (land - 0.78 * length)) / length
+    ground, short = 0.18 * length, air < 0.5
+    slow = short and wind > ground
+    if slow and k < 0.18 - EDGE:
+        k = 0.18 - (0.18 - k) * ground / wind
+    return hop(k, height, crouch, stretch, 0.5 if slow else 0.6 if short else 0.4)
 
 
 def rgb(color):
@@ -517,6 +517,15 @@ class Stage:
         li = bpy.data.lights.new(name, "POINT")
         li.energy, li.color, li.shadow_soft_size = power, rgb(color)[:3], r
         return self._add(name, li, at, None, parent)
+
+    def unlit(self, light, *obs):
+        """Keep a light off some objects (light linking): a glow that would tint the hand holding it."""
+        group = bpy.data.collections.new(light.name + " skips")
+        for ob in obs:
+            group.objects.link(ob)
+        for row in group.collection_objects:
+            row.light_linking.link_state = "EXCLUDE"
+        light.light_linking.receiver_collection = group
 
     def studio(
         self,

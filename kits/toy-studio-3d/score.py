@@ -107,9 +107,9 @@ def music(bus):
         stem="music",
     )
     for m in (C5, E5, G5):
-        play(bus, "violins", m, B.TOUCH, 0.5, 0.7, 0.28)
+        play(bus, "violins", m, B.TOUCH, 0.5, 0.7, 0.32)
     for m in (C3, G3):
-        play(bus, "cellos", m, B.TOUCH, 0.5, 0.7, 0.28)
+        play(bus, "cellos", m, B.TOUCH, 0.5, 0.7, 0.32)
     for m in (G3, B3, D4):
         play(bus, "violins", m, 11.3, 0.7, 0.5, 0.16)
     # end (bars 8 to 10): strings and horn under the tune, a harp run up to the last chord
@@ -142,7 +142,7 @@ def music(bus):
     for m in (C4, E4, G4, C5):
         play(bus, "violins", m, 15.0, 1.3, 0.55, 0.1)
     for k, m in enumerate((C4, E4, G4, C5, E5, G5, C6)):
-        play(bus, "harp", m, 15.0 + 0.085 * k, 1.2, 0.6, 0.2, seed=k)
+        play(bus, "harp", m, 15.0 + 0.085 * k, 1.2, 0.6, 0.16, seed=k)
 
 
 def cue_sounds():
@@ -150,7 +150,7 @@ def cue_sounds():
     tell them apart."""
     low = P.hit("bass_drum", vel=0.5)
     return {
-        "hop": (P.note("marimba", E4, 0.3, 0.6), 0.4),
+        "hop": (P.note("marimba", E4, 0.3, 0.6), 0.55),
         "cut to fail": (P.note("pizz", A2, 0.7, 0.75), 0.5),
         "lands short": (together(P.note("timpani", 40, 0.9, 0.6), low * 0.7), 0.55),
         "cut to idea": (P.note("pizz", D2, 0.7, 0.55), 0.4),
@@ -227,6 +227,15 @@ def render_audio(scenes, folder=".", fps=None):
             0.14,
             align="peak",
             sound="slide",
+        )
+        # and a first breath of it as the crate comes into view: Pip turned and gasped 0.2 s before anything sounded
+        S.place(
+            sfx,
+            S.whoosh(0.5, seed=8),
+            B.CRATE_IN + 0.1,
+            0.05,
+            align="peak",
+            sound="rush",
         )
     fade = C.sample_of(0.6, S.SR)
     bus[-fade:] *= np.linspace(1, 0, fade) ** 1.5

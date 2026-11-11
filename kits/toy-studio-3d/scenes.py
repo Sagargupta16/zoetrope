@@ -112,7 +112,9 @@ def sparkles(img, t):
     on screen in that frame, so they leave from the star even while it is carried."""
     k = prog(t, B.TOUCH, 0.75)
     at = PLATE.at("star", t)
-    if not 0 < k < 1 or at is None:
+    if (
+        t < B.TOUCH or k >= 1 or at is None
+    ):  # from the catch frame itself, not the frame after
         return
     lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     d, g = ImageDraw.Draw(lay), rng("sparkles")
@@ -122,7 +124,13 @@ def sparkles(img, t):
         far = (
             (0.1 + (0.08 + 0.1 * g.random()) * ease_out_cubic(k)) * H * SS
         )  # from the star's rim outward
-        r = (0.02 + 0.015 * g.random()) * H * SS * (1 - k) ** 0.6
+        r = (
+            (0.02 + 0.015 * g.random())
+            * H
+            * SS
+            * (1 - k) ** 0.6
+            * min(1.0, 0.4 + 8 * k)
+        )  # they grow in
         cx, cy = at[0] + far * math.cos(ang), at[1] + far * math.sin(ang)
         pts = [
             (

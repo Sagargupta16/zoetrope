@@ -37,6 +37,16 @@ def blink(t):
     return max(happy, *(clamp(1.45 - abs(t - b) / 0.06) for b in BLINKS))
 
 
+def swing(t, cue, length):
+    """The antenna's swing after a stop at cue: S3.settle, brought in over two frames (it starts at its full bend,
+    which read as a switch)."""
+    return (
+        S3.settle(prog(t, cue, length)) * min(1.0, (t - cue) / 0.084)
+        if t >= cue
+        else 0.0
+    )
+
+
 def mix(a, b, k):
     return tuple(lerp(x, y, k) for x, y in zip(a, b))
 
@@ -75,6 +85,7 @@ def build(st):
     gold = st.mat("star", "#ffc21f", "toy", glow=0.15)
     star = st.slab("star", S3.star(5, STAR_R, STAR_IN), 0.16, home, gold, r=0.04)
     shine = st.glow("shine", home, 14.0)
+    st.unlit(shine, pip.hands[1], pip.arms[1])
     bulb = lit.node_tree.nodes["Principled BSDF"].inputs["Emission Strength"]
     star_glow = gold.node_tree.nodes["Principled BSDF"].inputs["Emission Strength"]
     st.track("pip", pip.head)
@@ -150,7 +161,7 @@ def build(st):
             p["turn"] = lerp(
                 16, -16, sad
             )  # the slump turns to the camera, so the face is read
-            p["antenna"] = S3.settle(prog(t, B.LAND, 1.0)) if t >= B.LAND else 0.0
+            p["antenna"] = swing(t, B.LAND, 1.0)
             lift = 0.07 * clamp(z / 0.2)
             p["feet"] = [(0.0, lift), (0.0, lift)]
             k = prog(t, 3.0, 3.0)
@@ -176,12 +187,18 @@ def build(st):
                 1 - prog(t, B.IDEA - 0.17, 0.12)
             )
             z, sq = S3.jump(
-                t, B.CRATE_IN + 0.375, 0.2, height=0.06, crouch=0.05, stretch=0.06
+                t,
+                B.CRATE_IN + 0.375,
+                0.2,
+                height=0.06,
+                crouch=0.05,
+                stretch=0.06,
+                wind=0,
             )
             pump = math.sin(math.pi * prog(t, B.IDEA + 0.05, 0.7))
             p["z"], p["squash_by"] = z, p["squash_by"] + sq + 0.05 * pump
             p["arms"][1] = (lerp(12, 150, pump), 14 * pump)
-            p["antenna"] = S3.settle(prog(t, B.IDEA, 0.9)) * 0.7 if t >= B.IDEA else 0.0
+            p["antenna"] = 0.7 * swing(t, B.IDEA, 0.9)
             idea = 0.1 + 9.0 * math.exp(-(t - B.IDEA) * 1.6) if t >= B.IDEA else 0.1
             # the crate arrives still moving (at half its starting speed) and stops dead, then rocks: eased to a
             # gentle stop, the picture was still two frames before the thud (Q902 NOTE on the second build)
@@ -224,9 +241,7 @@ def build(st):
             caught = prog(t, B.TOUCH, 0.125)
             p["look"] = mix((0.35, 0.95), (0.0, 0.2), prog(t, B.HOME, 0.3))
             p["smile"] = lerp(0.7, 1.0, caught)
-            p["antenna"] = (
-                0.6 * S3.settle(prog(t, B.HOME, 0.85)) if t >= B.HOME else 0.0
-            )
+            p["antenna"] = 0.6 * swing(t, B.HOME, 0.85)
             lift = 0.07 * clamp((z1 + z2) / 0.2)
             p["feet"] = [(0.0, lift), (0.0, lift)]
             if held:
@@ -234,9 +249,19 @@ def build(st):
                 glow = 0.15 + 2.0 * math.exp(-(t - B.TOUCH) * 6.0)
             # the camera follows Pip across and then up and in; the star is whole in the frame from the first frame
             rise = ease_in_out(prog(t, 10.3, 0.7))
-            cam = {"at": (lerp(1.0, 1.45, air), -5.7, 1.2 + 0.15 * rise)}
+            # back a little with the rise, and down again behind Pip after the catch (ahead of Pip, the star rose
+            # in the frame and the sparks left by the top edge): held on the star, the camera
+            # cut the crate under the landing with the bottom edge
+            fall = ease_in_out(prog(t, B.TOUCH + 0.085, 0.5))
+            cam = {
+                "at": (
+                    lerp(1.0, 1.45, air),
+                    lerp(-5.7, -6.1, rise),
+                    1.2 + 0.15 * rise - 0.1 * fall,
+                )
+            }
             cam.update(
-                look=(lerp(-0.2, 0.55, air), 0, 1.22 + 0.36 * rise),
+                look=(lerp(-0.2, 0.55, air), 0, 1.22 + 0.36 * rise - 0.38 * fall),
                 lens=lerp(40, 45, rise),
                 fstop=3.2,
             )
@@ -270,9 +295,10 @@ def build(st):
             held = True
             glow = 0.2 + 0.25 * math.sin(math.pi * (t - 12.0) / 1.5) ** 2
             k = ease_in_out(prog(t, 12.0, 4.5))
+            # far enough back, and looking low enough, that the crate is whole from the first frame of the card
             cam = {
-                "at": (END_X - 0.2, lerp(-5.4, -6.4, k), lerp(1.35, 1.6, k)),
-                "look": (END_X, 0, 1.55),
+                "at": (END_X - 0.2, lerp(-6.2, -6.9, k), lerp(1.25, 1.4, k)),
+                "look": (END_X, 0, 1.13),
             }
             cam.update(lens=50, fstop=2.4)
             focus = (Vector(cam["at"]) - Vector((STAND_X, 0.0, 1.45))).length
@@ -285,7 +311,8 @@ def build(st):
             star_at = S3.where(pip.hands[1]) + HOLD
             star_turn *= 1 - 0.7 * prog(t, B.TOUCH, 0.25)
         star.location, star.rotation_euler = star_at, (0, 0, math.radians(star_turn))
-        # under the star, not in front of it: it warms whoever comes near and leaves the star its own gold
+        # under the star, where it warms the face and leaves the star its own gold (in front or above, it washed the
+        # gold out); it skips the holding hand and arm, which it turned gold from 12 cm
         shine.location = star_at + Vector((0, -0.08, -0.36))
         shine.data.energy = 14.0 * (1 + 2 * glow)
         star_glow.default_value, bulb.default_value = glow, idea

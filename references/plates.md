@@ -36,7 +36,7 @@ True 3D for a video, kept apart from the 2D engine. Blender renders the 3D pictu
 | Need | Helper |
 |---|---|
 | Set | `st.backdrop(color)` (a floor that curves up into a wall: no horizon), `st.sky(color, strength)` |
-| Light | `st.studio()` (key, fill, rim and a wash on the wall), `st.lamp()` (one soft box), `st.glow()` (a small light inside something that shines) |
+| Light | `st.studio()` (key, fill, rim and a wash on the wall), `st.lamp()` (one soft box), `st.glow()` (a small light inside something that shines), `st.unlit(light, *objects)` (keep that light off the hand that holds it) |
 | Surfaces | `st.mat(name, "#hex", kind)`: clay, toy, plastic, matte, metal, eye, glass; `glow=` lights it from inside |
 | Shapes | `st.ball`, `st.pill`, `st.box` (rounded edges), `st.cyl` (and cones), `st.ring`, `st.slab(outline)` with `star()`, `st.tube(points)` with `bend()`, `st.text` (solid type), `st.empty` |
 | Camera | `st.camera(at, look, lens, fstop, focus)`: call it in `pose(t)` to move it; `aim()` |
