@@ -3,7 +3,7 @@
 # from this file: each runs its job in its own uv environment with these same pins (uv run --no-project --with ...),
 # so engine/requirements.txt stays Pillow and numpy only. Those pins (KokoroTs.packages in voice.py,
 # qa_speech.PACKAGES) are hashed into the cache keys: change them in both places. Model and voice files are separate
-# downloads (sizes and licences in references/voice.md); none is fetched without Sagar's yes. sapi needs nothing:
+# downloads (sizes and licences in references/voice.md); none is fetched without the user's yes. sapi needs nothing:
 # it is part of Windows.
 #
 # One engine per job (VoiceStudio's engine-acceptance rule, adopted 2026-11-03): an engine is kept only while it

@@ -1,6 +1,6 @@
 # Audio intake and voice
 
-Everything here runs locally: numpy and ffmpeg/ffprobe through the pinned Python (no scipy; see `engine.md`), plus a text-to-speech engine through `voice.synthesize`. Nothing is downloaded at render time, and no model is downloaded without Sagar's yes.
+Everything here runs locally: numpy and ffmpeg/ffprobe through the pinned Python (no scipy; see `engine.md`), plus a text-to-speech engine through `voice.synthesize`. Nothing is downloaded at render time, and no model is downloaded without the user's yes.
 
 ## Audio intake: how to ask
 
@@ -20,7 +20,7 @@ Defaults when the user says "you choose" (our suggestions, state them out loud):
 | Social / retro / game | Music only, chiptune 140 or upbeat pop 112 |
 | Interview / chat explainer | Two voices (host A, host B) + very quiet ambient bed |
 
-The narrator is Kokoro `af_heart` (engine `kokoro-ts`), Sagar's pick from samples on 2026-10-29; the robotic Windows SAPI voices stay for timing drafts. Always confirm the target length first: music length and voice length both drive the schedule.
+The narrator is Kokoro `af_heart` (engine `kokoro-ts`), the default, picked by ear from samples on 2026-10-29; the robotic Windows SAPI voices stay for timing drafts. Always confirm the target length first: music length and voice length both drive the schedule.
 
 ## Narration: `voice.synthesize` (offline, one file per part)
 
@@ -78,7 +78,7 @@ The reviewer cannot hear, so a speech model writes down what each line says: fas
 
 One engine per job (VoiceStudio's engine-acceptance rule, adopted 2026-11-03): an engine stays only while it holds a job nothing else does and has been run here. The sherpa-onnx Kokoro build and Piper held none and were never run, so 2.3.0 removed them.
 
-| Engine | Job | Status | Word times | Download (Sagar's yes first) | Licence |
+| Engine | Job | Status | Word times | Download (the user's yes first) | Licence |
 |---|---|---|---|---|---|
 | `sapi` | timing drafts and plumbing, with nothing to download | tested 2026-10-28 on Windows 11 | SAPI's word events: starts within 10 ms of the onset after pauses; ends from the audio | none (the Windows David and Zira desktop voices) | part of Windows |
 | `kokoro-ts` | the narrator, and every voice a piece needs | tested on Windows 11: af_heart, af_bella, am_michael, bf_emma (2026-10-29), every `am_`, `bm_` and `h` voice (2026-11-03); af_heart is the narrator | per-phoneme durations, moved 70 ms earlier | kokoro-onnx 0.6.1 in a side Python 3.13 env, about 40 MB of wheels; `onnx/model.onnx` 325.5 MB (or `model_fp16.onnx` 163.2 MB) and `voices/<name>.bin`, 0.5 MB each, from `onnx-community/Kokoro-82M-v1.0-ONNX-timestamped` at commit `dd4401a9`. Downloaded: the fp32 model and af_heart, af_bella, am_michael, bf_emma (2026-10-29); am_adam, am_echo, am_eric, am_fenrir, am_liam, am_onyx, am_puck, am_santa, bm_daniel, bm_fable, bm_george, bm_lewis, hf_alpha, hf_beta, hm_omega, hm_psi (2026-11-03), each checked against the size and sha256 Hugging Face lists | MIT code, Apache-2.0 weights; phonemizer and espeak-ng GPL-3.0 |
@@ -107,7 +107,7 @@ Rules and pitfalls with any engine:
 
 ### Voice picks by tone
 
-Voice lists do not rank voices by tone, so pick by audition, not by assumption: `voice_samples.py` renders the same lines with every ready voice (or generate a 1-line test per candidate, 2 or 3). For a two-host chat pick one male and one female voice so listeners can tell them apart. A slow voice works for a deliberate, spaced style (a 92 s mobiles-deals video ran a slow voice at 1.04x). Record the chosen voice ids in the plan. The narrator, af_heart, read the three sample lines at 3.19 words a second (af_bella 3.03, bf_emma 3.19, am_michael 2.83). A second voice is not picked yet: the 2026-11-03 samples hold every English male voice (nine American, four British) and the four Hindi ones for Sagar to hear. On those samples Q806 heard am_santa and bm_george say "Shrink" as "Drink" (a NOTE): listen to those two on words that start with shr.
+Voice lists do not rank voices by tone, so pick by audition, not by assumption: `voice_samples.py` renders the same lines with every ready voice (or generate a 1-line test per candidate, 2 or 3). For a two-host chat pick one male and one female voice so listeners can tell them apart. A slow voice works for a deliberate, spaced style (a 92 s mobiles-deals video ran a slow voice at 1.04x). Record the chosen voice ids in the plan. The narrator, af_heart, read the three sample lines at 3.19 words a second (af_bella 3.03, bf_emma 3.19, am_michael 2.83). A second voice is not picked yet: the 2026-11-03 samples hold every English male voice (nine American, four British) and the four Hindi ones for the user to hear. On those samples Q806 heard am_santa and bm_george say "Shrink" as "Drink" (a NOTE): listen to those two on words that start with shr.
 
 ### Script-writing rules for the ear
 

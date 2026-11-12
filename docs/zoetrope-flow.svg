@@ -699,8 +699,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <path data-edge-from="approved" data-edge-to="deliver" data-edge-label="verify SAME" data-edge-key="10" data-edge-id="e-verify" data-composition-routing="workflow-v2-auto" data-edge-role="" data-composition-points="816.8,498;875.6,498;875.6,120;816.8,120" d="M 816.8 498 L 867.6 498 Q 875.6 498 875.6 490 L 875.6 128 Q 875.6 120 867.6 120 L 816.8 120" class="a-emphasis" data-animate="edge" style="--step: 7;" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
 
         <!-- Nodes -->
-        <g id="node-brief" data-node-id="brief" data-node-label="Brief + style pick" tabindex="0" role="button" aria-label="Focus Brief + style pick, 3 questions, 33 style cards, Main chat (/zoetrope) &gt; Plan" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="3 questions, 33 style cards" data-node-context="Main chat (/zoetrope) &gt; Plan">
-          <title>Brief + style pick | 3 questions, 33 style cards | Main chat (/zoetrope) &gt; Plan</title>
+        <g id="node-brief" data-node-id="brief" data-node-label="Brief + style pick" tabindex="0" role="button" aria-label="Focus Brief + style pick, 3 questions, 40 style cards, Main chat (/zoetrope) &gt; Plan" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="3 questions, 40 style cards" data-node-context="Main chat (/zoetrope) &gt; Plan">
+          <title>Brief + style pick | 3 questions, 40 style cards | Main chat (/zoetrope) &gt; Plan</title>
           <rect x="48" y="94" width="120" height="52" rx="8" class="c-mask"/>
           <rect x="48" y="94" width="120" height="52" rx="8" class="c-frontend" data-animate="node" style="--step: 0; --flow-node-name: archify-relay-node-0;" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(54 100) scale(0.6875)">
@@ -710,7 +710,7 @@ rect.c-bg-rect { fill: var(--bg); }
             <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
           </g>
           <text data-node-label="" x="108" y="127.4" class="t-primary" font-size="10.3" font-weight="600" text-anchor="middle">Brief + style pick</text>
-          <text x="108" y="140.8" class="t-muted" font-size="6.9" text-anchor="middle">3 questions, 33 style cards</text>
+          <text x="108" y="140.8" class="t-muted" font-size="6.9" text-anchor="middle">3 questions, 40 style cards</text>
         </g>
 
         <g id="node-storyboard" data-node-id="storyboard" data-node-label="Storyboard gate" tabindex="0" role="button" aria-label="Focus Storyboard gate, qa.py holds, you approve, Main chat (/zoetrope) &gt; Plan" aria-pressed="false" data-node-kind="security" data-node-sublabel="qa.py holds, you approve" data-node-context="Main chat (/zoetrope) &gt; Plan">

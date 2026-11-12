@@ -106,7 +106,7 @@ FIT_ROUNDS = 6  # SAPI's rate moves in whole steps, so its speed can take a few 
 # early because the onset check waits for voicing); af_bella, am_michael and bf_emma medians +19 to +45 ms on 7 to 10
 # words each. So 70 ms: the same 24 words then read median +2 ms (p10 -31, p90 +51).
 KOKORO_LAG = 0.07
-# The narration voice, picked by Sagar from voice_samples.py on 2026-10-29: synthesize uses it when no engine is
+# The narration voice, picked by ear from voice_samples.py on 2026-10-29: synthesize uses it when no engine is
 # named. Another voice is named with engine= and voice=; sapi stays the timing fallback.
 NARRATOR_ENGINE, NARRATOR_VOICE = "kokoro-ts", "af_heart"
 # bump when the sidecar format changes; engine code, programs, pins and model files are hashed into the key anyway
@@ -151,7 +151,7 @@ def synthesize(
     voice = voice or eng.default_voice()
     if voice is None:
         raise ValueError(
-            f"{engine}: name a voice; Sagar picks it from voice_samples.py. Voices here: "
+            f"{engine}: name a voice; the user picks it from voice_samples.py. Voices here: "
             f"{', '.join(eng.voices()) or 'none downloaded'}"
         )
     if voice not in eng.voices():
@@ -915,7 +915,7 @@ class Engine:
         return []
 
     def default_voice(self):
-        return None  # Sagar picks; only SAPI falls back to the system voice
+        return None  # the user picks; only SAPI falls back to the system voice
 
     def lang(self, voice):
         """The language the voice speaks, as a BCP 47 tag ("en-us", "hi"), or None: qa_speech checks English only."""

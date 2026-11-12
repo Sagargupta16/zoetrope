@@ -1,4 +1,4 @@
-# voice_samples.py : render the same three lines with every voice engine that is ready, so Sagar can listen and pick
+# voice_samples.py : render the same three lines with every voice engine that is ready, so the user can listen and pick
 # Usage: python voice_samples.py [out_folder]   (default narration_samples: <engine>/<voice>/narration.wav each)
 import hashlib
 import re
@@ -23,7 +23,7 @@ LINES = {
 }
 
 # Voices to audition per engine (references/voice.md: two or three per tone); None means every voice found. These
-# are candidates for listening, not a choice: Sagar picks.
+# are candidates for listening, not a choice: the user picks.
 CANDIDATES = {"sapi": None, "kokoro-ts": None}
 
 

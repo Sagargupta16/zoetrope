@@ -2,6 +2,12 @@
 
 Every change to this copy of the video-producer package it was adapted from. The version numbers are this copy's own; the package as received is 1.0.0. File and section names in 1.0.0 and 1.1.0 refer to the package's original layout (`references/01-producer-playbook.md` to `10-qa-and-house-rules.md`).
 
+## 2.6.1 - 2026-11-12
+
+- Plugin icon: `.claude-plugin/icon.png` (1024 px), a slotted drum with a ball bouncing through its frames, drawn with Pillow; `claude plugin validate` no longer warns about it.
+- Neutral wording: the skill, agent and engine text say "the user" (and the maintainer notes "the maintainer") where they named one person, for example the voice pick and the yes before a download.
+- The README flow diagram said 33 style cards; it says 40, and its source says 161 planted faults.
+
 ## 2.6.0 - 2026-11-12
 
 Packaged as a public Claude Code plugin: `/plugin marketplace add Sagargupta16/zoetrope`, then `/plugin install zoetrope@zoetrope`. Same skill, same content; packaging and portability only.

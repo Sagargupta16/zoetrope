@@ -120,4 +120,4 @@ The check scripts are in `outputs/scratch/sampler/` (not committed).
 - Seams: every one of the 53 sustained recordings held for three times its length: the largest sample-to-sample jump in the extended part never exceeds the recording's own (ratio 1.00 at most); the 10 ms level step at the seams is at most 0.6 dB over the largest the recording makes on its own.
 - Onset: 586 sounds (every recording at its own key and 3 semitones either side, every variant, and chords) have their onset at most 2 ms after sample 0.
 - Cue sheet: a glockenspiel note placed at 2.5 s with a label is recorded at 2.5 s, and Q902's own search (`qa_sync.locate` on the SFX stem) finds it at 2.5 s, within 0.01 ms.
-- Not checked by ear: the demo and its synth A/B were written for Sagar to listen to.
+- Not checked by ear: the demo and its synth A/B were written for a person to listen to.

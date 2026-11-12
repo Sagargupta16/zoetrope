@@ -86,7 +86,7 @@
       "col": 0,
       "type": "frontend",
       "label": "Brief + style pick",
-      "sublabel": "3 questions, 33 style cards",
+      "sublabel": "3 questions, 40 style cards",
       "sources": [
         {
           "path": "SKILL.md",
@@ -445,7 +445,7 @@
       "dot": "emerald",
       "title": "Proved by",
       "items": [
-        "qa.py selftest: 158 planted faults cover all 60 codes",
+        "qa.py selftest: 161 planted faults cover all 60 codes",
         "Template smoke at 1920x1080 and 1080x1920"
       ]
     }

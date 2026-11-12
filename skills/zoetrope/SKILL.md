@@ -36,7 +36,7 @@ Never:
 |---|---|
 | Python | Python 3 with the pinned Pillow and numpy: `uv run --no-project --with-requirements requirements.txt python <script>` from a working folder that holds a copy of `engine/`. Run `bash <skill>/setup.sh` once to check uv, ffmpeg and the fonts. |
 | ffmpeg | Local `ffmpeg` with libx264 (Windows: winget `Gyan.FFmpeg`; Mac: `brew install ffmpeg`). Check with `ffmpeg -encoders \| grep libx264`. |
-| Voice | `voice.synthesize` (`references/voice.md`): offline narration, slots and word times in `narration.json`. Narrator Kokoro `af_heart` (Sagar's pick); SAPI is a robotic timing fallback. |
+| Voice | `voice.synthesize` (`references/voice.md`): offline narration, slots and word times in `narration.json`. Narrator Kokoro `af_heart` (the default); SAPI is a robotic timing fallback. |
 | 3D | A 3D card renders its picture in Blender as a plate (`references/plates.md`): run `python <skill>/engine/plate3d.py fetch` here once (324 MB); the builder cannot download. |
 | Viewer | Open the contact sheet or video in the OS default app. |
 | Fact checks | The agent's web search and fetch. |
