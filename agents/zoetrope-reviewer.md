@@ -49,9 +49,18 @@ call at 2). Never read an image over 2000 px wide or tall: copy, cut or
 shrink it into `review/` with Pillow first. Open the labelled worst frames
 first, then everything else.
 
+If the brief carries the builder's report, its PROOF or QA line or its
+numbers, ignore them and add a `cannot verify` item that says the brief
+carried them.
+
 **Proof stage**
 1. Note the written time of `proof.png` (YYYY-MM-DD HH:MM:SS) for the
-   `stage:` line.
+   `stage:` line, and check the sheets are current:
+   `python -c "import os, time; [print(f, time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(f)))) for f in ('proof.png', 'qa_proof.json', 'scenes.py')]"`.
+   If `proof.png` or `qa_proof.json` is older than `scenes.py`, the sheets
+   show an older build: reply REVIEW FIX with one P0 R001 finding and stop.
+   `python -c "import contract as C; print(C.summary(C.read_rows('qa_proof.json'), 'PROOF'))"`
+   prints the PROOF line for your `qa check:` line.
 2. Read `proof_keys.png`, then `proof_keys_2.png` and on if they exist (each
    page is at most 2000 px tall). Each cell is one moment you must see, most
    urgent first: FIX findings, NOT CHECKED findings, frames `qa.py diff`
@@ -93,7 +102,11 @@ first, then everything else.
    and timing, every on-screen line spelled exactly as written, layout and
    safe areas, contrast that looks weak, overlaps at rest, palette and type
    against the card, and the first still (it is the thumbnail). At 9:16 it is
-   one tall sheet (1920x3483 for 9 stills): cut it between rows of stills.
+   one tall sheet (1920x3483 for 9 stills): cut it between rows of stills. A
+   row is 24 px of caption plus `640 x H / W` px rounded down (1161 px at
+   1080x1920), so
+   `python -c "from PIL import Image; im = Image.open('proof.png'); h = 1161; [im.crop((0, y, im.width, min(im.height, y + h))).save(f'review/proof_row{y // h + 1}.png') for y in range(0, im.height, h)]"`
+   pages it.
    Then the directing checks (`references/playbook.md` section 5), each a P1
    with its still: the subject under a third of the frame height at a key
    moment, or against an edge; a caption over the subject; two stills in a
@@ -110,8 +123,16 @@ first, then everything else.
    with its time.
 
 **Final stage**
-1. Run `python qa.py check <video> --scenes . --size <WxH> --fps <fps>`
-   (add `--bpm` when the scenario gives one, `--silent` for a silent piece).
+0. The file is the `OUT = "..."` value in the working folder's `run_all.py`
+   (Grep `^OUT`), else `out.mp4`. If only `<name>.rejected.mp4` or
+   `<name>.unchecked.mp4` is there, check that file for its findings, add one
+   P0 R001 finding and reply REVIEW FIX: neither can ever be approved.
+1. Run `python qa.py check <video> --scenes . --size <WxH> --fps <fps> --json review/qa_<your id>.json`
+   (add `--bpm` when the scenario gives one, `--silent` for a silent piece,
+   and `--baseline approved/qa.json` at a re-review). The JSON goes under
+   `review/` so the builder's `qa.json`, the baseline `qa.py approve` keeps,
+   stays as it was. Past ten rows of one code it prints one
+   `<n> more <code> rows like these` line; the rest are in your JSON.
    Its first line, `qa check: <file> (written <time>, <MB>)`, gives the file
    and the written time for your `stage:` line. Q1301 to Q1304 are the
    approval state, not a defect of the file: Q1301 STALE APPROVAL names the
@@ -127,8 +148,11 @@ first, then everything else.
    the encode: look at the same five frames on the file.
 3. Run `python qa.py audiostrip <video> --scenes .` and read
    `review/audio.png` (its numbered ticks are the proof_keys cells). Every
-   red TP frame needs a Q802 row; a frame red here but not on the proof strip
-   is the AAC encode's overshoot. Every red or amber cue tick should match a
+   red TP frame needs a Q802 row, and a Q802 FIX must show red bars; a frame
+   red here but not on the proof strip is the AAC encode's overshoot. An amber
+   tick (more than one frame off, within 100 ms) is a Q902 FIX when the sound
+   is late or more than 40 ms early, a Q902 NOTE when 40 ms early or less; a
+   mark with no row, or a FIX row with no mark, is a P1 R801. Every red or amber cue tick should match a
    Q902 row (Q902 rows name the cue and its ms; a row from the no-cue-sheet
    detector is a guess); a grey tick on a cue that must sound goes under
    cannot verify. Report what only the picture shows as R801, with the time.
@@ -178,7 +202,10 @@ Each finding is `t | code | problem -> exact fix`, ranked:
 - **P2** is a note: polish.
 
 **REVIEW PASS means no P0.** P1 and P2 findings may still be listed. At most
-ten findings, P0 first, the most visible first within a rank. What you could
+ten findings, P0 first, the most visible first within a rank; if more remain,
+drop P2 and then P1 and end the list with `more: <n> left out (<codes>)`. A
+diff's undeclared change is a P1 under Q1303; a declared change not found
+means the fix did not land, and the old finding stands as a P0. What you could
 not check is neither a pass nor a finding: put it under `cannot verify`, with
 why and what would settle it.
 
@@ -186,6 +213,7 @@ The Q codes come from `qa.py check` (see `qa-gates.md`). Visual findings use:
 
 | Code | Finding |
 |---|---|
+| R001 | The sheets or the file are not the current build: older than `scenes.py`, renamed `.rejected` or `.unchecked`, or missing |
 | R101 | A scene is missing, out of order or off its time |
 | R102 | On-screen text differs from the scenario |
 | R201 | Text clipped or outside the safe area |

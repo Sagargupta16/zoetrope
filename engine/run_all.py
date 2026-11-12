@@ -450,27 +450,32 @@ def main():
         print(
             f"note: scenes.py sets {E.W}x{E.H} at {E.FPS} fps, SS {E.SS} itself, which wins over --size, --fps and --ss"
         )
+    budget = a.budget_mb or getattr(scenes, "BUDGET_MB", None)
+    if a.stage != "proof":
+        ff = find_ffmpeg()
+        if not ff:
+            print(
+                "NO_FFMPEG: no ffmpeg on this machine. Every rung of the encode ladder needs one: install an ffmpeg "
+                "with libx264, then check it with setup.sh"
+            )
+            return 1
+        # every refusal comes before the clean-up, so a refused run leaves the last build and build.json as they were
+        if a.stage == "audio" and not Path(C.VIDEO).exists():
+            print(f"no {C.VIDEO} here: run `run_all.py full` first")
+            return 1
+        if a.stage == "audio" and not picture_is_current():
+            return 1
+        if a.stage == "full" and budget:
+            caps(budget, scenes.DURATION, C.declared(scenes, "SILENT"))
     # the size this build really uses (after scenes.py), for qa.py purity, lint, diff, approve and proof.py keys;
     # here and not at the top, which every render worker runs again
     C.write_build(E.W, E.H, E.FPS, E.SS)
     if a.stage == "proof":
         return proof_stage()
-    ff = find_ffmpeg()
-    if not ff:
-        print(
-            "NO_FFMPEG: no ffmpeg on this machine; see the encode ladder in references/engine.md"
-        )
-        return 1
-    if a.stage == "audio" and not Path(C.VIDEO).exists():
-        print(f"no {C.VIDEO} here: run `run_all.py full` first")
-        return 1
     built = (C.MIX_RAW, C.SFX, C.CUESHEET, C.CUE_SOUNDS, C.MIX, OUT)
     if a.stage == "full":
         built += (C.VIDEO, f"{C.VIDEO}.log", C.FRAMES_HASH, C.THUMBS)
     clean(*built)
-    if a.stage == "audio" and not picture_is_current():
-        return 1
-    budget = a.budget_mb or getattr(scenes, "BUDGET_MB", None)
     C.write_state(a.stage, "running")
     if a.stage == "full":
         picture(ff, a, budget)

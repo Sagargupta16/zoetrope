@@ -1448,27 +1448,42 @@ def check(
         )
         rows += _silence_rows(ctx.audio(8000), scn)
 
-    f0 = frame_grey(path, p["w"], p["h"], ff=ff)
-    add(
-        f0.mean() > 25 and f0.std() > 12,
-        "Q501",
-        f"first frame mean {f0.mean():.1f}, std {f0.std():.1f} (want > 25 and > 12)",
-        "draw the hook fully at t=0; animate only the extras",
-        worst_t=0.0,
-        metric=round(float(f0.mean()), 1),
-        limit=25.0,
-    )
-    f1 = frame_grey(path, p["w"], p["h"], last=True, ff=ff)
-    last_t = round(((p["frames"] or round(p["duration"] * rate)) - 1) / rate, 3)
-    add(
-        f1.mean() > 25,
-        "Q502",
-        f"last frame mean {f1.mean():.1f} (want > 25)",
-        "hold the end card instead of fading to black",
-        worst_t=last_t,
-        metric=round(float(f1.mean()), 1),
-        limit=25.0,
-    )
+    def grey(code, which, last=False):
+        """The frame Q501 or Q502 measures, or None with a NOT CHECKED row when it does not decode (a damaged or
+        cut file): like Q503, the check says so instead of stopping on a traceback."""
+        try:
+            return frame_grey(path, p["w"], p["h"], last=last, ff=ff)
+        except (ValueError, subprocess.CalledProcessError) as e:
+            rows.append(
+                C.not_checked(
+                    code,
+                    f"the {which} frame did not decode ({str(e)[:200]}), so it was not measured",
+                    "check the file plays to its end; render it again if it does not",
+                )
+            )
+            return None
+
+    if (f0 := grey("Q501", "first")) is not None:
+        add(
+            f0.mean() > 25 and f0.std() > 12,
+            "Q501",
+            f"first frame mean {f0.mean():.1f}, std {f0.std():.1f} (want > 25 and > 12)",
+            "draw the hook fully at t=0; animate only the extras",
+            worst_t=0.0,
+            metric=round(float(f0.mean()), 1),
+            limit=25.0,
+        )
+    if (f1 := grey("Q502", "last", last=True)) is not None:
+        last_t = round(((p["frames"] or round(p["duration"] * rate)) - 1) / rate, 3)
+        add(
+            f1.mean() > 25,
+            "Q502",
+            f"last frame mean {f1.mean():.1f} (want > 25)",
+            "hold the end card instead of fading to black",
+            worst_t=last_t,
+            metric=round(float(f1.mean()), 1),
+            limit=25.0,
+        )
     try:
         g = ctx.grey64().reshape(-1, 36 * 64)
     except (

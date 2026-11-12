@@ -1399,7 +1399,7 @@ def owner(t=None, traceback_text=None, path="scenes.py", fps=None):
             )
             out.update(
                 why=f"no {path.name} frame in the traceback (innermost: {where}): an engine or kit module, or the "
-                "environment (see the builder's environment table)",
+                "environment (see references/troubleshooting.md)",
                 functions=[],
             )
             return out

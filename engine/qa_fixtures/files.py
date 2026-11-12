@@ -1,8 +1,11 @@
 # files.py : the gates qa.check runs on the file itself, on short synthetic MP4s made in the case's temp folder: a
 # clean 2 s card at -14 LUFS that every gate must pass; a bad encode (25 fps, yuv444p, untagged, no audio, black
 # first and last frames, wrong duration and size asked for, the colour chain swapped for one that is 40 levels off);
-# a quiet file whose audio outlasts its picture with a silent second inside; a lossless noise file over its size cap
-# and bitrate, checked while one gate module raises. Lifted from lane Q's filecase and p_colour (notes/q.md).
+# a quiet file whose audio outlasts its picture with a silent second inside; the clean file cut short, whose last
+# second does not decode; a lossless noise file over its size cap and bitrate, checked while one gate module raises.
+# Lifted from lane Q's filecase and p_colour (notes/q.md).
+from pathlib import Path
+
 import contract as C
 import numpy as np
 import qa
@@ -51,6 +54,17 @@ def quiet(fx):
         fx.ff, v, a, fx.tmp / "quiet.mp4", shortest=False
     )  # Q704: 105 frames in a 4 s file
     return qa.check(str(out), fps=30, size=f"{W}x{H}", ff=fx.ff)
+
+
+def cut(fx):
+    v = media.encode(fx.ff, fx.tmp / "video.mp4", media.card(60, H, W), 30)
+    a = media.wav(fx.tmp / "mix.wav", media.tone(1000, 2.0, 10 ** (-14 / 20)))
+    whole = Path(media.mux(fx.ff, v, a, fx.tmp / "whole.mp4")).read_bytes()
+    # the moov box is in front (+faststart), so ffprobe still counts every frame; the last second is gone (the last
+    # frame stops decoding at a 50 percent cut on ffmpeg 9.0.2, 2026-11-01; 35 keeps a margin)
+    part = fx.tmp / "cut.mp4"
+    part.write_bytes(whole[: len(whole) * 35 // 100])
+    return qa.check(str(part), duration=2.0, fps=30, size=f"{W}x{H}", ff=fx.ff)
 
 
 def noise(fx):
@@ -122,6 +136,15 @@ CASES = [
             want("Q704", "FIX", metric=105, mtol=0.5),
             want("Q801", "FIX", metric=-30.0, mtol=1.0),
             want("Q803", "NOTE", "1-2 s", 1.5, tol=0.01),
+        ],
+    ),
+    case(
+        "files.cut",
+        cut,
+        [
+            want("Q501", "PASS"),
+            want("Q502", "NOT CHECKED", msg="last frame did not decode"),
+            want("Q503", "NOT CHECKED"),
         ],
     ),
     case(

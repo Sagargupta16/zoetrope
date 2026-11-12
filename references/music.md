@@ -60,3 +60,46 @@ Extra instruments seen in past scores (add if needed): `bell(m,dur)` = sine at f
 ### Recorded instruments
 
 For real instruments instead of oscillators, `engine/sampler.py` (`import sampler as SP`) plays recorded glockenspiel, marimba, harp, pizzicato and sustained strings, flute, horn, timpani and orchestral percussion (CC0, Versilian Studios) as mono arrays at `S.SR`, placed with `S.place` beside this kit: `SP.note("harp", 60, 1.0)`, `SP.chord("violins", [60, 64, 67], 4.0)`, `SP.hit("cymbal", "swell4")`. Fetch what a score plays before the build (`python engine/sampler.py fetch harp pizz`), place sustained strings, flute and horn with `align="pad"`, and print `SP.credits(names)` in the delivery report. Ranges, layers, loops, licences and the measurements are in `instruments.md`.
+
+### The template score as it plays
+
+`audio.render_audio(scenes, folder=".", fps=None)` is the score a build gets unless the working folder has a `score.py`. It reads `DURATION` and `BPM` (120 when absent), takes the cuts from `scenes.CUTS` (else every `SCHEDULE` start after 0), gives each cut's hit the label of the CUES entry with sound within half a frame of it, and writes `mix_raw.wav`, `sfx.wav`, `cuesheet.json` and `cue_sounds.npz`, returning their paths under `mix_raw`, `sfx`, `cuesheet` and `cue_sounds`. `audio.bed(dur, bpm, cuts=(), voice_spans=(), fps=None, labels=())` returns the two buses at 44.1 kHz:
+
+| Bus | Sound | When | Gain | Placed by |
+|---|---|---|---|---|
+| music | `audio.kick()`: 0.35 s sine falling from 135 to 45 Hz | beats 1 and 3 of each bar, left out within 3 frames of a cut (0.1 s without fps) | 0.6 | onset |
+| music | `audio.tick()`: 30 ms of noise, named `tick` on the sheet | half a beat after every beat | 0.25 | onset |
+| music | `audio.tone(f, beat, 0.01, 0.35)`: a sine one beat long, 10 ms attack, 0.35 s decay | every beat; f is 220, 261.63, 196, then 246.94 Hz, one per bar | 0.3 | onset |
+| sfx | `audio.whoosh(0.4)`: noise through a low-pass that opens | apex `WHOOSH_LEAD` (0.08 s) before each cut | 0.5 | peak, `offset=-0.08` |
+| sfx | `audio.hit()`: a 70 Hz thump with a noise burst, 0.5 s | on each cut, with the cut's CUES label | 0.4 | onset |
+
+The kick is left out near a cut because the hit carries that beat. `voice_spans` multiplies the music bus by 10 ** (-8 / 20) inside each span and leaves the SFX bus alone; `render_audio` passes none. `audio.music(...)` returns the same score as one buffer, with no frame cues and no labels. `audio.place` is `synth.place` under another name. Both files are written at one scale: 0.85 over the larger of the mix's peak and the SFX bus's peak.
+
+`audio.py` keeps its own small instruments, and their names clash with `synth.py`'s: `audio.kick`, `audio.whoosh` and `audio.tick` are other sounds than the `synth` ones. `audio.noise(d, seed=1)` takes seconds and draws standard normal noise from a fixed seed; `synth.noise(name, n, *args)` takes a sample count and draws uniform noise seeded from the name.
+
+### The instruments and their peaks
+
+"Lands by" is the default alignment for that `sound=` name (`synth.ALIGN`), "Heavy" the cue sheet flag Q804 counts (`synth.HEAVY`), "Peak" the buffer's own sample peak before any gain, measured on `engine/synth.py` on 2026-11-12.
+
+| Call | Length | Sound | Lands by | Heavy | Peak |
+|---|---|---|---|---|---|
+| `kick(g=1.0, seed=0)` | 0.4 s | sine sweeping 178 down to 48 Hz plus a 2.5 kHz click, driven into tanh | onset | yes | -0.48 dBFS |
+| `snare(g=1.0, seed=0)` | 0.25 s | noise over 1.5 kHz on a 190 Hz body | onset | no | +0.53 dBFS |
+| `hat(op=False, seed=0)` | 50 ms; 200 ms open | noise over 7 kHz | onset | no | -13.22 dBFS, open -12.68 |
+| `clap(seed=0)` | 0.3 s | three noise bursts between 900 Hz and 5.2 kHz at 0, 11 and 23 ms, the last ringing on | onset | no | -7.52 dBFS |
+| `bass(m, dur)` | dur | MIDI note m: saw plus sine, low-passed at 420 Hz into tanh, 5 ms attack | onset | no | -11.22 dBFS (m 45, 1 s) |
+| `pad(notes, dur, fc=1400, att=0.25)` | dur | chord of MIDI notes, three detuned saws a note, low-passed at fc, linear rise over att, 0.3 s fall | pad | no | -5.29 dBFS ([57, 61, 64], 1.5 s) |
+| `pluck(m, dur=0.4)` | dur | a saw and its octave, low-passed at 3.5 kHz, 2 ms attack | onset | no | -2.15 dBFS (m 69) |
+| `riser(dur, seed=0)` | dur | a noise band that opens and climbs, loudest at its last sample | end | no | +6.70 dBFS (2 s) |
+| `boom(dur=1.2)` | dur | sine gliding 98 down to 38 Hz, driven into tanh | onset | yes | -1.24 dBFS |
+| `whoosh(dur=0.5, seed=0)` | dur | noise band sweeping up, swelling to its middle | peak | no | +4.66 dBFS (0.5 s) |
+| `tick(f=4200, seed=0)` | 20 ms | noise high-passed at 0.8 f | onset | no | -10.35 dBFS |
+
+The peaks span about 20 dB, and a riser or a whoosh starts above full scale before its gain: write gains for these buffers, not for a normalised sound. `synth.ALIGN` also lists names with no generator in `synth.py`: `hit` and `tone` (the template's), `swell` and `reverse` (by end) and `chord` (by pad); a sound of your own given one of those names lands that way. `impact` and `drop` are heavy names with no generator.
+
+Parts to build more from: `tt(n)` (time of each sample), `ex(n, tau)` (exponential decay), `hz(m)` (MIDI to Hz, 69 is 440 Hz), `saw(f, n, det=0.0)`, `lp`, `hp`, `noise(name, n, *args)`, `rng_for(name, *args)`. Two effects:
+
+- `reverb(x, wet=0.2, taps=...)` adds five early echoes from 29 to 131 ms, each heard again at twice its delay with its gain squared. It returns an array as long as x, so pad a sound with silence first to keep its tail.
+- `duck(bus, times, depth_db=6, rel=0.12, dur=0.3)` dips a bus by depth_db at each time and lets it back with time constant rel; where two dips overlap the deeper one holds. Keep it on the music bus: Q902 looks for each cue sound's own buffer on `sfx.wav`, and a dip reshapes what it finds.
+
+The seed of a noisy generator is `rng_for(name, *args)`: the name and arguments joined by `|` (numbers as `%.9g`), hashed with crc32 into a numpy Generator, so `hat(seed=3)` is the same array on every call and `hat(seed=4)` another. Draw randomness of your own the same way (`rng_for("shaker", bar, beat)`). A seeded score writes the same bytes every run, and review relies on it: approval hashes `mix_raw.wav` in 100 ms blocks, Q1301 reads an audio-only change as a NOTE and `qa.py diff` names every changed block (Q1303). Q1202 reads `scenes.py` and the local modules it imports; a score file that only `run_all.py` imports is not read, so its seeds are up to you.

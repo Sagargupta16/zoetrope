@@ -47,3 +47,52 @@ Verify with ebur128 (look at `I:` and `Peak:` in the Summary), or `qa.loud(path)
 ffmpeg -nostdin -hide_banner -i out.mp4 -af ebur128=peak=true -f null - 2>&1 | grep -A16 Summary
 ```
 Report I and true peak in the delivery line (the DELIVERED line carries both); LRA is in `qa.loud` and on `review/audio.png`.
+
+### Levels, stacks and the master in detail
+
+- **Levels.** The master brings the mix to -14 LUFS whatever its level, so a bus's absolute gain does not decide loudness: it decides the balance and how hard the limiter must work on the peaks, which Q805 judges. The template's gains are in `music.md`; each style card gives its own. A whoosh at 0.4 instead of 0.2 over a quiet bed failed Q805 on the clean-room template (2026-11-01): the limiter took 0.90 LU, at most 2.8 dB, at the second whoosh's apex. Q805's fix names the moment to lower.
+- **One sound per moment (Q804, `qa_stack.stack_rows`, a NOTE).** It counts the SFX-bus rows of the cue sheet and the music-bus rows that carry a label; unlabelled bed rows and rows at a gain of 0 or less are left out. It notes two heavy sounds (the sheet's `heavy` flag) within 3 frames; two or more sounds on a `payoff=True` cue (those within 3 frames of it, and a lead-in still sounding 0.1 s before it); and more than 2 sounds in any 100 ms (a taste rule). A lead-in (a name that holds riser, swell, suck, reverse or whoosh) whose landmark or end falls within 3 frames or 100 ms, whichever is longer, of a heavy sound is one gesture with it and is not counted. A designed stack goes in `ALLOW["Q804"]`.
+- **When the peak is over (Q802).** A FIX names every sheet sound sounding within 50 ms of the loudest moment, the bed and SFX levels there, and the order to cut the designed sounds: impact (impact, hit, boom, kick, slam, thud, crash), then chime or bell, then press or drop (`qa_stack.CUT_ORDER`, a house heuristic).
+- **Pumping.** `synth.duck(bus, times, ...)` dips a whole bus under a list of times; `synth.build` ducks its music 3 dB under each kick. Keep it on the music bus.
+- **Under narration.** `voice.duck_mix(bed, voice, sr=SR, depth_db=8)` pads both to the longer one, sets the bed to -18 dBFS RMS over the whole bed, pulls it down depth_db while the voice speaks and lays the voice on top at a peak of 0.89, times 1.26. The voice peaks above 1.0 afterwards, so the sum goes through a shared `write_wav` scale like any mix (2026-11-01 probe: voice peak 1.121, sum 1.196). `audio.bed(..., voice_spans=[(a, b), ...])` steps the template's music bus down 8 dB (times 0.398) inside each span with no ramp and leaves the SFX bus alone. The voice goes into `mix_raw.wav`, never into `sfx.wav`: Q902 searches `sfx.wav` for each cue's own sound, and speech there would bury it.
+- **Master return and edge cases.** `audio.master(src, dst, ff="ffmpeg", I=-14, TP=CEILING, passes=6, tol=0.05)` returns `I`, `LRA`, `tp` (measured on `dst`), `gain_db`, `passes`, `ceiling`, `limit_db` (deepest gain reduction), `limit_t`, `limited_s` (seconds under more than 1 dB of it), `cost_db`, `input` (the source measured) and `rows` (its one Q805 row). A mix under -60 LUFS is written out as it is, with a Q805 FIX that calls it silent. `audio.tp_limit(mix, ceiling_db, sr=SR_MASTER, look=0.003, release=0.1)` is the same limiter for a buffer of your own; it returns the limited mix and the gain per sample.
+- **After the encode.** `run_all.master_and_mux` re-masters while the muxed file's true peak is over -1.3 dBTP (`TP_MAX` -1.0 less `TP_TOL` 0.3), at most `RETRIES` (3) times, and stops early when the peak does not follow the ceiling (a slope under 0.1). The slope is held between 0.25 and 1. It then keeps the clean try (Q805 clean and the file inside -1 dBTP) with the lowest peak, else the try with the lowest peak, and masters and muxes again if that was not the last. If the peak is still over -1 it prints `true peak still over -1 dBTP after N re-masters: lower the hits Q802 names`.
+
+The gates on the finished file, besides Q805 (which comes from the build's master; `qa.py check` alone does not make it):
+
+| Code | Checks |
+|---|---|
+| Q801 | integrated loudness within -14 +/- 1 LUFS (`qa.loud`) |
+| Q802 | true peak at or under -1 dBTP, read channel by channel |
+| Q903 | audio and video streams start together; the decoded audio lines up with `mix.wav` and `mix_raw.wav` within 1 ms |
+
+`python qa.py calib` sends one white frame and a one-frame 1 kHz blip through `audio.master` and the mux and reads both back (Q906); the blip must land +0.00 ms from the white frame.
+
+To make and master the sound without drawing a frame (the builder does this at the proof, so the reviewer can read the sound), run from the working folder with `--size` matching the build:
+
+```
+python -c "import run_all, audio, contract as C; audio.render_audio(run_all.scenes); m = audio.master(C.MIX_RAW, C.MIX); print(C.line(m['rows'][0]))" --size 1920x1080
+```
+
+With a score of your own, call it in place of `audio.render_audio`. For a change to the sound alone, `python run_all.py audio --size WxH` makes, masters and checks the sound again on the same `video.mp4`.
+
+### What no gate hears
+
+The gates measure loudness, peaks, the limiter's work, the timing of the sheet's cue sounds, stacks and the mux. Nobody listens, and none of this is checked:
+
+- whether the music is good: key and harmony, notes that clash with a pluck or a chord, a grating timbre, a sound that does not suit its picture;
+- the balance of bed, effects and voice beyond what the limiter reports, and whether narration stays clear over the bed (Q806 and Q807 check the words, not the balance);
+- a gap shorter than a second, since Q803 averages whole seconds: a mix can fall to -111 dBFS RMS for 180 ms (clean-room scratch score, 2026-11-01) while its quietest whole second reads -26 dBFS and Q803 passes;
+- the timing of anything not in CUES, and the bed's own beats against the picture: Q901 holds the cuts to the grid, not the sounds;
+- stereo: every mix is the same mono in both channels (`audio.write_wav`);
+- whether the last sound ends with the film: the mux cuts the longer stream to the shorter (`-shortest`).
+
+The reviewer cannot hear either. `python qa.py audiostrip mix.wav --scenes .` (at the proof) or `python qa.py audiostrip out.mp4 --scenes .` (after the render) draws the sound on one time axis into `review/audio.png`, 1600 px wide: the scenes, a log-frequency spectrogram, one tick per cue coloured by its measured offset, momentary and short-term loudness with the integrated level, the true peak per 100 ms with every frame over -1 dBTP in red, and the numbered cells of the key sheet. A gap shows as a dark column no row names. It exits 2 on a file with no audio stream, and 0 when the piece declares `SILENT`.
+
+### Silent pieces
+
+A piece with no sound on purpose says `SILENT = True` in `scenes.py` (or `--silent` on `qa.py check`). `run_all.deliver` then makes no score and no master and muxes the picture alone (`contract.mux_cmd` with no mix). Q706, Q801, Q803, Q805 and Q903 give no rows, Q802 and Q804 pass with `no audio by design (SILENT)`, Q902 measures only the picture side of each cue, and a size budget counts no audio bitrate (`run_all.caps`). Declare it only when the storyboard has no sound; it is not a way to quiet a fault.
+
+### Narrated pieces
+
+A voiced piece runs `voice.synthesize` once before the proof and takes each scene's length from its line's slot (`voice.md`). `render_audio` takes no voice, so a voiced piece has a `score.py` of its own: it decodes `narration/narration.wav` with `voice.dec`, ducks the bed under it, adds it into `mix_raw.wav` and keeps it out of `sfx.wav` (`engine.md`). `audio.write_wav(path, mono, voice=v, scale=...)` adds the voice as it writes and keeps the mix's length, so a longer voice is cut at the end of the mix. A sound on a spoken word goes on the frame of `C.snap(voice.word_cue(N, word), FPS)`, as a frame cue that carries the word's CUES label.

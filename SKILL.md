@@ -2,7 +2,7 @@
 name: zoetrope
 description: >-
   Plan, script, design, animate, score and render short videos (MP4, WebM,
-  GIF) end to end with Python, Pillow, numpy and ffmpeg. 34 tested styles:
+  GIF) end to end with Python, Pillow, numpy and ffmpeg. 40 style cards:
   product ads and launches, logo stings and intros, beat-synced kinetic
   pieces, explainers, history and journey stories, characters (one in real
   3D) and game parodies, trailers, recipes and sketchbook looks. Use when someone asks to
@@ -38,29 +38,16 @@ Never:
 | 3D | A 3D card renders its picture in Blender as a plate (`references/plates.md`): run `python engine/plate3d.py fetch` here once (324 MB); the builder cannot download. |
 | Viewer | Open the contact sheet or video in the OS default app. |
 | Fact checks | The agent's web search and fetch. |
-| Fonts | The 14 free families 21 cards name (SIL OFL) are cached by `engine/fonts.py` and drawn by name: `bold="Nunito:800"` in any text helper (`python fonts.py list`; `fetch` once on a new machine, 6.8 MB). For a Mac system font a card names, pick the closest installed one (on Windows `C:/Windows/Fonts`), put its path first in engine.py's font lists, and say which. |
+| Fonts | The 14 free families 24 cards name (SIL OFL) are cached by `engine/fonts.py` and drawn by name: `bold="Nunito:800"` in any text helper (`python fonts.py list`; `fetch` once on a new machine, 6.8 MB). For a Mac system font a card names, pick the closest installed one (on Windows `C:/Windows/Fonts`), put its path first in engine.py's font lists, and say which. |
 
 Save outputs to `outputs/<slug>/` inside this skill's folder (`~/.claude/skills/zoetrope/outputs/<slug>/`; gitignored, never committed) unless the user names a folder. A batch of videos gets one folder, `outputs/<batch>/`, with `videos/` for the finished files, `builds/<nn-slug>/` for each working folder, and its scenarios and build notes.
 
 ## Files
 
-- `setup.sh`: first-use check of uv, ffmpeg with libx264, the pinned Pillow and numpy, and the default font; safe to rerun.
-- `engine/`: the Python engine as real files and `requirements.txt` (pinned, hashed); copy the folder into the working folder for each video. Drawing: engine, scenes (the template), transitions, grain, and plate3d with stage3d for 3D plates. Sound: audio, synth, sampler (recorded CC0 instruments), voice, voice_samples (`requirements-voice.in` holds the pins of the narration and speech check environments). Build: render, run_all (the `proof`, `full` and `audio` stages), proof (the review sheets). Checks: qa (the CLI) with its gate modules qa_scan, qa_stack, qa_sync, qa_speech, qa_registry, qa_approve, qa_purity, qa_lint, qa_audiostrip and qa_selftest (fixtures in `qa_fixtures/`); contract is what they all share; kit_index lists every helper in the engine and the kits; cards builds the router below. `references/engine.md` says what each file does.
+- `setup.sh`: first-use check of uv, ffmpeg with libx264, the Python pin, Pillow and numpy against their pins, and the default font; safe to rerun. `scripts/check.py`: the repo gate (dashes, secrets, links, line ends), run before a commit.
+- `engine/`: the Python engine as real files, `requirements.txt` (pinned, hashed) and `.python-version` (3.15); copy it with `cp -r engine/. <working folder>/` for each video, so the hidden pin and `qa_fixtures/` come along. Drawing, sound (audio, synth, sampler, voice), build (render, run_all, proof) and checks (qa and its gate modules, contract, cards for the router below): `references/engine.md` says what each file does.
 - `agents/zoetrope-builder.md`: builds, renders and runs the measured gates. `agents/zoetrope-reviewer.md`: fresh-eyes review that returns REVIEW PASS or REVIEW FIX with findings ranked P0, P1 and P2.
-- `references/playbook.md`: workflow, timing math, composition, motion, directing
-- `references/engine.md`: the engine contract, file map, tool map, encode ladder
-- `references/formats.md`: sizes, fps, layout per aspect, file naming
-- `references/voice.md`: audio intake, text-to-speech voice, measuring voice files, writing for the ear
-- `references/music.md`: numpy synth notes, song builder on a BPM grid, mood presets
-- `references/instruments.md`: recorded instruments (`engine/sampler.py`, CC0) and their credits line
-- `references/plates.md`: 3D plates, from the stage script to the delivered file
-- `references/mixing.md`: voice placement, duck and mix, loudness
-- `references/beat-sync.md`: one grid, cuts on beats, SFX by measured peak, sync checks
-- `references/house-rules.md`: the house rules
-- `references/qa-gates.md`: the QA gates and their Q codes (functions in `engine/qa.py` and its gate modules)
-- `references/pitfalls.md`: problems seen in past builds and their fixes
-- `references/delivery-report.md`: the delivery message template
-- `references/troubleshooting.md`: what to do when a tool or step fails
+- `references/playbook.md` (workflow, timing math, composition, motion, directing), `references/engine.md` (contract, file map, encode ladder), `references/formats.md` (sizes, fps, layout, file names), `references/voice.md` (intake, text-to-speech, writing for the ear), `references/music.md` (numpy synth, songs on a BPM grid), `references/instruments.md` (recorded CC0 instruments and their credits line), `references/plates.md` (3D plates), `references/mixing.md` (voice placement, duck, loudness), `references/beat-sync.md` (one grid, cuts on beats, SFX by landmark), `references/house-rules.md`, `references/qa-gates.md` (the Q codes), `references/pitfalls.md` (past problems, their fixes), `references/delivery-report.md` (the delivery message), `references/troubleshooting.md` (when a step fails)
 - `references/styles/`: one file per style card, plus `families.md` with what each family shares
 - `kits/`: working code from finished builds for six cards (g04, g11, g17, g29, bonus-rectangle, toy-studio-3d); a builder starts from a card's kit
 
@@ -86,7 +73,7 @@ This session reads the router below, the chosen card and its family intro for th
 
 Encode ladder: local ffmpeg H.264 MP4 first; if ffmpeg lacks libx264, AV1 MP4 or VP9 WebM; last resort GIF. Say which rung and why.
 
-`qa.py selftest [--quick] [--only CODE[,CODE]] [--keep]` checks the gates themselves, not a video: after any edit to the engine or a qa module, run it from a folder made with `cp -r engine/. <folder>/` (it needs `qa_fixtures/`). It must end `SELFTEST: PASS (<n> fixtures, <k> of <k> codes covered, 0 expected gaps)`; exit 1 means a fixture missed or misread its planted fault, 2 a code with no fixture or a fixture missing. It takes under a minute; `--quick` skips the template's full renders (about 28 s).
+`qa.py selftest` checks the gates themselves, not a video: after any edit to the engine or a qa module, run it from a fresh `cp -r engine/. <folder>/` copy. It must end `SELFTEST: PASS` with every code covered and 0 expected gaps, in under a minute (flags and exit codes: `references/qa-gates.md`).
 
 ## Defaults
 
@@ -119,19 +106,24 @@ Match the brief, offer the best 2 or 3, then read that card's file in full plus 
 | [S-g10-showreel-spec](references/styles/g10-showreel-spec.md) | launch and promo | spec-sheet resume reel; resume reel, hook in the first second |
 | [S-g23-brand-future-55s](references/styles/g23-brand-future-55s.md) | launch and promo | brand vision film with archive and 3D; brand vision film, explain our coined word |
 | [S-mobiles-deals](references/styles/mobiles-deals.md) | launch and promo | 9:16 narrated deals roundup; deals video, top offers roundup |
+| [S-signal](references/styles/signal.md) | launch and promo | product or feature launch on interface panels; launch video, feature launch |
 | [S-g01-intro-masterpiece](references/styles/g01-intro-masterpiece.md) | logo and titles | brand intro, a loud day, then a quiet nook; intro for our product, show what it does |
 | [S-g05-logo-animation](references/styles/g05-logo-animation.md) | logo and titles | elastic logo sting with shape morphing; logo animation, logo sting |
 | [S-g11-movie-credits](references/styles/g11-movie-credits.md) | logo and titles | film-style opening credits; opening credits, film title sequence |
 | [S-g30-structured-self-intro](references/styles/g30-structured-self-intro.md) | logo and titles | structured 15-second self-introduction reel; 15-second self intro, resume reel |
+| [S-marquee](references/styles/marquee.md) | logo and titles | logo sting or title card from flat parts; title card, short logo sting |
 | [S-g06-go-crazy-30s](references/styles/g06-go-crazy-30s.md) | music-driven | sound-as-picture motion showcase; go crazy, show off motion and sound design |
 | [S-g12-beat-sync-spec](references/styles/g12-beat-sync-spec.md) | music-driven | minimal beat-locked product spot; beat-synced product ad, high-end minimal promo |
 | [S-g13-steam-news-60s](references/styles/g13-steam-news-60s.md) | music-driven | music-led news roundup; new releases news video, 60-second roundup |
 | [S-g27-mosaic-film](references/styles/g27-mosaic-film.md) | music-driven | glass and gold-leaf mosaic film; abstract art film, mosaic or tile animation |
+| [S-pulse](references/styles/pulse.md) | music-driven | beat-locked kinetic type reel; kinetic type reel, words on the beat |
 | [S-g07-research-40s](references/styles/g07-research-40s.md) | explainer | product showreel with technique HUD; research the brand and make a 40-second motion graphics video, showreel for our product |
 | [S-g14-what-is-git](references/styles/g14-what-is-git.md) | explainer | warm-paper beginner explainer with narration; explain topic to someone with zero background, what is X in simple terms |
 | [S-g15-recursion-styles](references/styles/g15-recursion-styles.md) | explainer | self-referential Droste dive through nine styles; explain concept where every explanation has a different video style, self-referential |
 | [S-g17-manim-derivative](references/styles/g17-manim-derivative.md) | explainer | dark-ink math explainer with think pauses; teach math concept with graphs, Manim-style explainer |
 | [S-bonus-rectangle](references/styles/bonus-rectangle.md) | explainer | fun-fact vertical film with an honest counter; fun fact film for Reels or Shorts, everything is a shape/idea |
+| [S-blueprint](references/styles/blueprint.md) | explainer | technical explainer, a diagram that draws itself; how it works, architecture explainer |
+| [S-ledger](references/styles/ledger.md) | explainer | sourced data story, counters and charts on the beat; data story, numbers video |
 | [S-g16-dinosaurs-to-jomon](references/styles/g16-dinosaurs-to-jomon.md) | story and journey | deep-time globe and map explainer; educational motion graphics, how the Earth changed over millions of years |
 | [S-g24-new-york-5min](references/styles/g24-new-york-5min.md) | story and journey | narrated city tour over footage; travel promo, introduce a city or destination |
 | [S-g25-sand-us-history](references/styles/g25-sand-us-history.md) | story and journey | sand animation across 250 years; sand animation, history of country in 2 minutes |
@@ -141,6 +133,7 @@ Match the brief, offer the best 2 or 3, then read that card's file in full plus 
 | [S-g29-nes-rpg-battle](references/styles/g29-nes-rpg-battle.md) | character and game | retro console RPG battle theme; 8-bit game, NES or Famicom style |
 | [S-g31-alien-planet-trailer](references/styles/g31-alien-planet-trailer.md) | character and game | cinematic series trailer; cinematic trailer, teaser for a series |
 | [S-toy-studio-3d](references/styles/toy-studio-3d.md) | character and game | toy-studio 3D character short; 3D animated character short, Pixar-like cute 3D look |
+| [S-cartridge](references/styles/cartridge.md) | character and game | retro 8-bit side-scroller parody with chip music; 8-bit video, retro game parody |
 | [S-g18-cocktail-recipe](references/styles/g18-cocktail-recipe.md) | handmade | recipe explainer with live measurements; recipe video, step by step how-to |
 | [S-g20-overthinking](references/styles/g20-overthinking.md) | handmade | abstract motion-design showreel; motion graphics showreel, show off motion design |
 | [S-g22-photo-to-3d](references/styles/g22-photo-to-3d.md) | handmade | photo to cel-shaded 3D scene; turn this photo into a cartoon 3D scene, cel-shaded |

@@ -41,3 +41,104 @@
 | `<name> is not cached` from `sampler.py` | The score plays a recorded instrument that is not downloaded: `python sampler.py fetch <name>` in the parent session (the builder cannot download), or score that part with the synth kit and say so |
 | Session tab does not show the video | Share the file path, and show the poster PNG and the proof sheets instead. |
 | Time is running out | Deliver what is verified (a shorter cut or the GIF preview), and list what is still open in "Known weak spots". |
+
+## By the printed line, in detail
+
+The table above is the quick answer. This part goes line by line through what the engine prints, from runs on 2026-11-01 of the engine template, each with one fault planted in a scratch copy (Windows 11, uv 0.13.6, Python 3.15.2, Pillow 13.0.0, numpy 2.5.4, ffmpeg 9.0.2), re-checked against this engine's code on 2026-11-12. In commands, `python` means `uv run --no-project --with-requirements requirements.txt python`, run from the working folder. Every row prints its status, its code and its message, then `[worst <t> s]` when it names a moment, `[<n> checked]`, and `-> <fix>` when it did not pass (`contract.line`). The `->` text is the first thing to try. Exit codes follow `contract.exit_code`: 0 when no row is FIX or NOT CHECKED, 1 on any FIX, 2 when some row is NOT CHECKED and none is FIX.
+
+### Setup and the working folder
+
+- **`setup.sh` FIX lines.** Do what each says, open a new shell so a changed PATH takes effect, and run it again until `SETUP: PASS`. It finds ffmpeg the way `contract.find_ffmpeg` does (PATH, then `/opt/homebrew/bin`, then `/usr/local/bin`) with ffprobe beside it, reads the Python pin from `engine/.python-version`, holds Pillow and numpy against their `requirements.in` pins, and asks `engine.font` for its default face.
+- **`uv: command not found`** (exit 127, the shell's own line). Every engine command runs through uv.
+- **An ffmpeg without libx264.** The render pipes every frame into a libx264 encode (`render.encode_cmd`), so `full` stops at the first frame with `RuntimeError: ffmpeg stopped after 1 of <n> frames (exit <code>): ...`; a scratch copy with the encoder name changed printed `Unknown encoder` and `Encoder not found`. `ffmpeg -hide_banner -encoders` lists what the build has. On rung b `qa.py check` gives Q705, Q707 and Q708 as NOT CHECKED on a file that is not H.264, and the delivery report lists them (`delivery-report.md`). Every rung still needs ffmpeg, for the master and for the encode, so with none at all the builder stops and asks.
+- **`FileNotFoundError: no font found in [...]`.** `engine.font` takes the first file in `FONT_BOLD` (or `FONT_REG`) that exists and opens: Arial on Windows, Arial or Helvetica on macOS, then Liberation Sans and DejaVu Sans in the usual Linux folders. The message says what to install. A font change moves pixels: make it before the proof, never between an approval and delivery (Q1304).
+- **The Python version.** uv takes the interpreter from `.python-version` in the folder it runs in; the engine's says `3.15`. Keep it in the working folder and run every stage from there, so the proof and its render run on one Python. An approval records Python's major.minor, so a change that moves a key frame is Q1304 NOT CHECKED.
+- **The engine copy.** Copy it with `cp -r engine/. <working folder>/`. A glob (`engine/*`) skips the hidden `.python-version`, and nothing says so: the pin is just gone. Copying only the `.py` files loses `qa_fixtures/`, and `qa.py selftest` prints `MISSING qa_fixtures/__init__.py: ModuleNotFoundError ...`, an `UNCOVERED` line per code and `SELFTEST: FAIL`. `cp -r engine <folder>` into a folder that exists lands it one level down. Copy again with `/.`.
+
+### Tracebacks before any row
+
+- **A `ValueError` from `compile_schedule`.** The `TIMELINE` does not compile, so `scenes.py` does not import and no stage starts (seen with a Transition put first: `ValueError: Transition(kind='crossfade', dur=0.2, split=0.5) must sit between two scenes`). Every message it raises is in `engine.md`, under compile_schedule.
+- **A traceback that ends in your own error.** Save the output to a file and run `python qa.py owner --traceback <file>`: it names the function to edit from the innermost `scenes.py` frame (`owner: scenes.py:<n> is module-level code (runs at import)`, or `... is inside <fn> (scenes.py:<a>-<b>), a shared helper: ...` with the functions to re-read). `owner: give --t SECONDS or --traceback FILE` (exit 2) means exactly one of the two.
+- **An exception inside `draw(t)` or `text_items(t)` at the proof.** The proof's text gates call both on sampled frames before any row is printed, so the proof stops with the traceback and no `PROOF:` line. `python qa.py purity` turns it into a row: `NOT CHECKED Q1201 draw(t) raised in this process at <n> sampled frames, ...`.
+- **`note: scenes.py sets 640x360 at 30 fps, SS 1 itself, which wins over --size, --fps and --ss`.** `scenes.py` assigns `engine.W`, `H`, `FPS` or `SS` before `from engine import *`, so the build runs at that size and `build.json` records it. When that is not the storyboard's size, take the assignment out and pass `--size`.
+
+### Proof rows
+
+`run_all.py proof` ends `PROOF: PASS`, `PROOF: FIX (<n>) (...)` (exit 1) or `PROOF: NOT CHECKED (<n>) (...)` (exit 2, only with no FIX). From a row to its fix: read its `->` text; look the code up in `qa-gates.md` (the digits give the family: Q100 a gate module that raised, Q2xx text placement, Q3xx contrast, Q4xx reading holds, Q5xx frame 0 and the end card, Q6xx flashes, Q7xx what ffprobe reports, Q8xx loudness, master and speech, Q9xx sync, Q10xx size, Q11xx the frame scans, Q12xx purity and lint, Q13xx approval); for a row with `[worst <t> s]`, `python qa.py owner --t <t>` names the scene function; fix it there and run the proof again with the same flags. Declare `NO_TEXT`, `NO_CUES`, `SILENT` or an `ALLOW` entry only when the storyboard means it, never to quiet a row; `ALLOW` clears NOTE rows only.
+
+| Row | What is wrong | Fix |
+|---|---|---|
+| `FIX  Q1201 draw(t) not pure: <n> of <n> frames differ; ...; drawn twice in one cold process the second draw differs: draw writes state it reads back; ...` | `draw` changed a module-level list on each call and read it back | Each frame from t alone: no counter, list or cache written inside `draw`, and a cache keyed by everything it depends on |
+| `NOTE Q1203 module state written inside functions: ...` | the same state write, found by the lint | Compute it from t. A memo you mean takes `# zoetrope: state-ok` on that line |
+| `FIX  Q1202 unseeded randomness, clock reads or str hashes: ... random.random() in draw; ... hash("dust") in draw` | the shared `random` stream, and `hash()` of a string, whose seed changes per process | `engine.rng(scene, element, frame_of(t, FPS))`, and `zlib.crc32(s.encode())` for a string. Q1201 can still pass on the sampled frames; the lint row stays FIX |
+| `NOT CHECKED Q200 scenes.py has no text_items(t), so gates 2 to 4 did not run`, with `FIX Q204 scenes.py has no text_items(t): <n> drawn strings are unreported` | no text registry | Add `text_items(t)` fed by the same layout function `draw` uses (`layout` in the template). `NO_TEXT = True` only for a piece with no text |
+| `FIX  Q204 drawn text not in text_items(t): '<s>' (...)` | `draw` paints a string the registry never reports | Report it, with its `engine.text_box` box, over the same span |
+| `FIX  Q205 registry box of '<s>' is <d> px off the drawn glyph box (...)` | the registry box drifted from the drawn text | Build the box with `engine.text_box` from the string, xy, size and anchor the draw uses, from one shared layout function |
+| `NOTE Q209 text_items(t) reports '<s>' at alpha >= 0.5, but nothing drawn matches (...)` | the registry reports text the frame does not show | Report alpha 0, or leave it out, while it is not drawn |
+| `FIX  Q206 '<s>' is covered: 0.00 of its <n> ink px show at <t> s (needs 0.7)` | a later layer is painted over a registered text | Draw the text after what covers it, or move one of the two |
+| `NOT CHECKED Q401 HOLD_PROFILE 'fast' is not one of display, caption, slow (or a dict of cps, pad, floor)` | an unknown reading profile | `display`, `caption`, `slow`, or a dict of `cps`, `pad` and `floor` |
+
+### Rejected and unchecked files
+
+- **`REJECTED <name>.rejected.mp4: <code> <status>, ...`.** Exit 1 on a FIX, 2 when every bad row is NOT CHECKED (seen: `REJECTED out.rejected.mp4: Q902 NOT CHECKED` with `CUES = []`). The key sheets are drawn again with those rows, so `proof_keys.png` shows each named moment. Fix, then run the stage that covers the change with the same flags (`audio` when every frame stays as it was: the score, `CUES`, `text_items`; `full` when the picture changes), then `qa.py check ... --json qa.json` again so `qa.json` is never older than the file. The next `full` or `audio` deletes a `.rejected.mp4` (`run_all.clean`).
+- **`UNCHECKED <name>.unchecked.mp4`.** An exception stopped the run after the mux and before the verdict; the traceback follows (seen with `text_items` raising for t over 7.5 s: `KeyError` inside the text gates). An error before the mux leaves no file at all. A gate module that raises inside `qa.check` does not stop the run: it becomes a Q100 row, and so does a crash of the `thumbs.npy` scans (`run_all.guarded`).
+- **Approval rows.** Q1301 to Q1304 never reject a file (`run_all.is_approval`). They print as `approval <state>: <code> <message>` and set the APPROVAL line (seen: `APPROVAL: stale: Q1301 end -> re-review the changed scenes, then qa.py approve`, then a DELIVERED line). The new file cannot pass `qa.py verify` until it is approved.
+
+### Sound rows and the true-peak loop
+
+| Row | What it means | Fix |
+|---|---|---|
+| `FIX  Q902 <label> at <t> s: hit (onset) lands +66.7 ms late (FIX past +33.3 ms at 30 fps) on sfx.wav, match 1.00` | the cue's sound sits 2 frames late | Place it by its landmark on the cue's frame: `synth.place(sfx, sound, frame=frame_of(t, fps), fps=fps, ...)`. Late by more than one frame (capped at 60 ms) or early by more than 40 ms is a FIX |
+| `FIX  Q902 <label> at <t> s: no sound found (cuesheet.json has no sound labelled '<label>' and none within 100 ms)` | no placed sound serves the cue | Place one with that `CUES` label, or give the cue kind `"picture"`. Any unlabelled sound within 100 ms is matched to it |
+| `NOT CHECKED Q902 CUES is empty, so cue sync did not run` | no cues | List every shared moment in `CUES`, or `NO_CUES = True` |
+| `FIX  Q802 true peak -0.8 dBTP (want <= -1) at <t> s; ...; sounding there: ...` | the decoded file peaks over -1 dBTP | Lower or cut the sounds it names, in its order, then `run_all.py audio` |
+| `NOTE Q804 stacked sounds at <t> s: hit '<label>' + kick: 2 heavy 0 frame(s) apart (want more than 3)` | two heavy sounds on one moment | Keep the heaviest and move the other 4 or more frames off, or list a stack you mean in `ALLOW['Q804']` |
+
+The master aims for a decoded file at or under -1.3 dBTP and masters again, at most 3 times, while it is over. Each try prints one line (seen with the first ceiling raised to -0.6: `master: ceiling -0.60 dBTP, mix.wav -14.0 LUFS at -0.72 dBTP (Q805 PASS) -> out.mp4 -14.0 LUFS at -0.80 dBTP`, then `re-master 1 of 3: ceiling -1.42 dBTP, ... -> out.mp4 -14.0 LUFS at -1.40 dBTP`). The lines that close the loop: `kept the cleanest master` or `kept the least limited master` (nothing to do); `note: <peak> dBTP is inside gate 8 but within the 0.3 dB meter tolerance of it` (it passes, close to the limit); `the file's peak did not follow the ceiling (...): no lower ceiling will help` (lower the loud sounds themselves); `true peak still over -1 dBTP after <n> re-masters` (a Q802 FIX follows).
+
+### Render failures and stage refusals
+
+- A failed render kills ffmpeg, deletes the partial `video.mp4` and raises, so `full` leaves no `out.mp4`. ffmpeg writes to `video.mp4.log`, which stays after a failure and is deleted after a good encode. The encode runs with `-v error`, so any text left in the log fails it (`ffmpeg exited 0 but logged errors`). `write to ffmpeg failed while it was running (frame <k> of <n>, 40 retries)` means ffmpeg was alive but refused a 256 KiB slice 40 times running (about 41 s of pauses): run fewer builds or fewer render processes. Any other worker exception belongs to the frame: route it with `qa.py owner --traceback`.
+- **Every refusal comes first** (2.5.0). No ffmpeg, no `video.mp4` for `audio`, a picture that no longer matches (`video.mp4 was rendered at ...` or `video.mp4 predates scenes.py: ...`), and for `full` a budget that leaves no video bitrate (`a 0.3 MB budget leaves no video bitrate for 8 s with 320 kb/s of audio`) are all refused before the clean-up and before `build.json` is written, so the last build is left byte for byte as it was. Before 2.5.0 a refused `audio` run had already deleted `out.mp4` and the mixes and rewritten `build.json`.
+- **`--keep-frames` and `--redraw`.** `--redraw needs --keep-frames` (exit 2); `frames/ lacks <n> of the frames to reuse (...)` means no earlier `--keep-frames` run left the PNGs. Frames read back from `frames/` are checked for size only: a PNG from an older `scenes.py` goes into the film unseen until `qa.py approve`, `diff` or `run_all.py audio` draws key frames again, so redraw every passage a change touches.
+
+### Checking a file by hand
+
+- **`not checked here: safe area, overlap, contrast, reading holds and cue sync (pass --scenes . ...)`.** Without `--scenes` the text gates, the recorder, Q901, Q902 and the cut scan make no row: missing, not passed. Run from the working folder with `--scenes .`, the build's `--size` and `--fps`, and `--bpm` for a music piece.
+- **`FIX Q1105 decoded file against the drawn frames: worst <n> levels mean ...` on a file that is not broken.** Without `--scenes`, `qa.py check` takes the file's own folder as the build folder and compares it with the `thumbs.npy` there (seen when a file from another build was copied in). Check each file in its own working folder, after the render that made it; the same goes for a ladder file beside an older render's `frames.hash` and `thumbs.npy`.
+- **`NOT CHECKED Q502 the last frame did not decode (...), so it was not measured`** (Q501 says the same of the first frame; 2.5.0, before it the check stopped on `ValueError: cannot reshape array of size 0`). Seen on a copy cut to 40 percent of its bytes, with `NOT CHECKED Q503 the decode failed (decoded 88 of the 240 frames ffprobe counts in ...)`, a Q100 row for `qa_scan`, and `QA: NOT CHECKED (3)`, exit 2. ffprobe still counts every frame (the moov box is in front), but ffmpeg cannot decode the end. The file is incomplete: a copy that had not finished, or a render stopped half way. Render it again; never check a partial copy.
+- **A short decode.** Every decode must hold each frame ffprobe counts, within 1. When it does not, it raises `decoded <k> of the <n> frames ffprobe counts in <file>`, the modules that asked give Q100 rows and Q503 reads NOT CHECKED, rather than a gate passing on part of the film.
+- **Characters outside ASCII.** Rows print ASCII only, so a title with an arrow prints the arrow as its Python escape (a backslash, `u` and four hex digits). The text on screen is right; read the escape back before comparing with the scenario.
+
+### Approval, diff and verify
+
+`qa.py approve --review <reply>` exits 0 with `APPROVED ...`, 1 when it refuses, 2 when it cannot approve; a refused or failed approve records nothing.
+
+| Line | Next step |
+|---|---|
+| `REFUSED: no reviewer verdict: pass --review <file holding the reviewer's reply>` | Save the final reviewer's reply verbatim in a file and pass it |
+| `REFUSED: the review says REVIEW FIX` or `... says no REVIEW PASS or REVIEW FIX line` | The review has not passed, or the file holds no reply: send the findings to the builder, or save the reply again verbatim |
+| `REFUSED: the review is a proof-stage review; approve after the final review`, or `... names no stage (want 'stage: final')` | Approve only after a final review, with its `stage:` line kept |
+| `REFUSED: the review is of proof.png, not out.mp4`, or `... names no file (want 'file: <name> (written <time>)' ...)` | The reply must name the file under approval as `qa.py check` printed it |
+| `REFUSED: the review saw a file written <time>; out.mp4 was written <time>` | The file was rendered again after the review (or the time was typed by hand): run a fresh final review |
+| `REFUSED: qa.json has FIX rows: ...`, `... NOT CHECKED rows: ...`, `qa.json is older than <file>` | Fix and render again, or run `qa.py check ... --json qa.json` on the current file. On the ladder, the expected Q705, Q707, Q708 rows need `--override "<why>"` |
+| `CANNOT APPROVE: no out.mp4: render it first`, `no frames.hash and thumbs.npy: ...` | Render with `full` |
+| `CANNOT APPROVE: frames.hash does not match draw(t) at <k> of <n> key frames (...)` | `scenes.py` changed after the reviewed render: render, review, approve |
+| `CANNOT APPROVE (PermissionError: [WinError 32] ... 'approved' -> 'approved.old')` | Windows will not rename a folder that a program has as its cwd or holds a file open in (`qa_approve._swap`). Close every terminal, editor and viewer inside `approved/`, `approved.new/` or `approved.old/`, then approve again; the rerun clears `approved.new/` |
+
+`--override "<why>"` approves in spite of a refusal and keeps the reason in `approval.json`; `qa.py check` shows a Q1301 NOTE until a clean review is approved. Use it only for a decision someone made, never to pass a FIX.
+
+- **A stale approval (Q1301).** After a change: `FIX Q1301 STALE APPROVAL: scenes end changed since the approval of <time> (key frames differ at ... in end; source changed: scenes.py); the file is still the approved one`; its fix names the windows to review (`qa.py diff --expect 5-8`). Other forms: `only the audio changed since approval (decoded video streamhash matches)` (a NOTE: check the audio rows, approve again); `the file's picture is not the approved one ... though every key frame is; ... only the encode changed (CRF, preset, ffmpeg)` (look at the file with `qa.py look`, approve); `NOT CHECKED Q1301 approved/ does not match approval.json` (never edit `approved/` by hand).
+- **`qa.py diff --expect <t0-t1,...>`.** A window holds frames `frame_of(t0)` to `frame_of(t1) - 1`, so `--expect 2.5-5` does not hold the frame at 5.00 s. It reads `mix_raw.wav` as the last render wrote it. `DIFF: SAME as the approval` (0); `DIFF: CHANGED, every change declared with --expect` (0: read the triptychs in `review/`, then the file 0.5 s either side); `DIFF: FIX (1 undeclared change; 1 --expect window saw no change)` (1: a missed change, or a fix that did not land); `DIFF: NOT CHECKED (could not compare ...)` (2: review the whole film).
+- **`VERIFY: DIFFERS <file> is not the approved file (...)`** (exit 1): deliver the approved file, or review and approve the new one. Delivery needs `VERIFY: SAME`.
+
+### Slow builds and big files (template, 2026-11-01, 32 logical CPUs)
+
+| Lever | Measured |
+|---|---|
+| `run_all.py full <N>` render processes (default a quarter of the logical CPUs, 1 to 8) | At 1920x1080: 16.7 s with 1, 10.2 s with 2, 5.5 s with the default 8 |
+| Builds sharing a machine | Twelve 640x360 builds at once with 2 processes each: 7.2 to 8.7 s each, against 1.7 to 2.0 s alone. In a batch, give each builder fewer processes |
+| `--ss 2` | 17.0 s against 5.5 s at 1920x1080. Keep it for thin lines and small text, and pass the same `--ss` to every stage |
+| `STATIC` | Samples the span first; one moved sample and every frame of it is drawn (`warning: STATIC ... moves`). `--keep-frames` turns `STATIC` off |
+
+CRF: `run_all.py full` encodes with the `CRF` in the working copy of `run_all.py`; `render.CRF` is only the default for code that calls `render.render_to_ffmpeg` itself (in a scratch copy, `render.CRF = 40` left `video.mp4` the same size as at 18, while `CRF = 40` in `run_all.py` shrank it to 40 percent).

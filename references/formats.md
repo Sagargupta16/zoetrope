@@ -48,6 +48,44 @@ The five 2026-10-28 samples, 60 s each, H.264 with AAC at 192k (about 1.4 MB a m
 - **Before rendering a grainy style:** run `grain_test.py` (the 4 s slice, about a minute; it is one x264 GOP long, so it overstates static grain) and `grain_test.py 20 60` for the real per-minute figure (about 9 min for this film on 6 processes). Keep grain at std 1.6 or less and encode grainy styles at CRF 20 (`run_all.py` has `CRF`). `qa.py check` notes anything over 12 Mb/s (Q1002).
 - **Apply grain last:** `grain.grain(img, t)` after any whole-pixel weave shift, so the grain stays put while the picture weaves.
 
+### Safe boxes, flash windows and frame rates
+
+| Aspect | `--size` | 4 percent safe box (px, Q201) | 10 degree flash window (share of width x height) |
+|---|---|---|---|
+| 16:9 | `1920x1080` | x 76.8 to 1843.2, y 43.2 to 1036.8 | 0.33 x 0.44 |
+| 9:16 | `1080x1920` | x 43.2 to 1036.8, y 76.8 to 1843.2 | 0.79 x 0.33 |
+| 1:1 | `1080x1080` | x 43.2 to 1036.8, y 43.2 to 1036.8 | 0.44 x 0.33 |
+| 4:5 | `1080x1350` | x 43.2 to 1036.8, y 54.0 to 1296.0 | 0.56 x 0.33 |
+
+(Computed with `qa_scan._window` on the 192x108 decode and `qa.inside` on 2026-11-12.) The window is WCAG's 341 x 256 field on a 1024 x 768 view with the frame fitted into it. The short side is 1080 px in all four, and the text gates scale every size rule by `1080 / min(W, H)`: at 1280x720 a 24 px font counts as 36 px. `--ss 2` draws at twice the size and scales down in `finish()`: four times the pixels, for thin lines and small text. Vertical platforms draw their own buttons, captions and progress bars over the lower part and the right edge; their size changes, so no gate measures them: keep key text, faces and the logo clear of the bottom and right of a 9:16 frame and check the platform's current guide when the brief names one.
+
+`--fps` takes any whole number; one frame lasts `1 / fps` (33.3 ms at 30, 41.7 at 24, 16.7 at 60). Tempos whose beat is a whole number of frames (`contract.whole_frame_beat`, 60 to 200 BPM, computed 2026-11-12), the list Q905's fix names:
+
+| fps | Whole-frame BPM |
+|---|---|
+| 24 | 60, 72, 80, 90, 96, 120, 144, 160, 180 |
+| 25 | 60, 75, 100, 125, 150 |
+| 30 | 60, 72, 75, 90, 100, 120, 150, 180, 200 |
+| 50 | 60, 75, 100, 120, 125, 150, 200 |
+| 60 | 60, 72, 75, 80, 90, 100, 120, 144, 150, 180, 200 |
+
+The rate also sets Q902's late limit (one frame, never over 60 ms) and grain is held for 2 frames at any rate (`grain.grain` steps at fps / 2).
+
+### The encode, exactly
+
+Rung a is `render.encode_cmd`: libx264, preset medium, CRF 18, yuv420p, converted to BT.709 limited range and tagged so (`contract.COLOR_VF`, `COLOR_FLAGS`). The CRF the full run uses is `CRF` in `run_all.py` (it passes it to the encode); `render.CRF` is only the default for code that calls `render.render_to_ffmpeg` itself. For a grain-heavy style set `CRF = 20` in the working copy of `run_all.py`. The mux (`contract.mux_cmd`) copies the picture, encodes AAC at 320 kb/s (`contract.AAC_ARGS`), cuts to the shorter stream and sets `+faststart`; a silent piece muxes the picture alone. The engine always encodes with libx264; hardware encoders (NVENC) are not wired in, and a GPU encoder would save file size, not time, next to drawing the frames. When a size cap is tight, AV1 buys the most room, at the price of players that cannot open it; say so when the file is AV1 or VP9 (older QuickTime and some company players fail). Rung b gates Q705, Q707 and Q708 read NOT CHECKED by design. Rung c is a GIF of at most 15 s, at most 960 px wide, at 15 fps, with no sound.
+
+### Hand-over by destination
+
+| Destination | Hand over |
+|---|---|
+| Slack or another chat app | The MP4, and the GIF preview (rung c) beside it |
+| Email | The MP4 only when it is small; otherwise a link, with a 720p cut and a poster PNG on offer |
+| A site, an intranet, a wiki | H.264 MP4 (rung a) |
+| Reels, Shorts, TikTok | 9:16 at 1080x1920, H.264 MP4 |
+
+Ask where the file goes and what its limit is; do not quote a platform limit that was not checked.
+
 ### A size budget
 
 Set `BUDGET_MB` in scenes.py, or pass `--budget-mb N`, and `run_all.py full` caps the picture encode:
@@ -55,3 +93,16 @@ Set `BUDGET_MB` in scenes.py, or pass `--budget-mb N`, and `run_all.py full` cap
 - maxrate (kb/s) = 0.95 x budget x 8000 / duration - the audio's kb/s (from `contract.AAC_ARGS`); bufsize = maxrate for a film under 30 s, else twice it. A budget that leaves no video bitrate is refused before any frame is drawn.
 - It is a cap, not a guarantee: x264's VBV can pass the total by up to about 0.9 x bufsize. `qa.py check` gets the budget as `max_mb`, and Q1001 fails a file over it.
 - Measured: the lighthouse film with a 20 MB budget came to 11.5 MB of picture (uncapped: 34.8 MB), so about 13.9 MB with the audio at its nominal 320k. Under the cap, CRF 20 spent about 70 percent of the 16.6 MB the picture was allowed, so a tight budget on heavy grain costs more quality than it has to; less grain is the better fix.
+
+Caps from `run_all.caps` (computed 2026-11-12; the audio term is 320 kb/s, 0 for a `SILENT` piece):
+
+| Budget | Length | maxrate / bufsize (kb/s) | Silent |
+|---|---|---|---|
+| 4 MB | 15 s | 1707 / 1707 | 2027 / 2027 |
+| 8 MB | 30 s | 1707 / 3413 | 2027 / 4053 |
+| 10 MB | 60 s | 947 / 1893 | 1267 / 2533 |
+| 25 MB | 60 s | 2847 / 5693 | 3167 / 6333 |
+
+A budget too small for the audio alone stops the build before any frame is drawn (`a 0.05 MB budget leaves no video bitrate for 7.5 s with 320 kb/s of audio`). Q1001 checks the finished file against the budget (or `qa.py check --max-mb`); Q1002 notes any bitrate over 12 Mb/s (flat graphics land at 1 to 5). To shrink a file, in order: lower the grain's std or drop it and the vignette, raise CRF to 20, drop to 720p (`--size 1280x720`), drop to 24 fps, shorten the cut.
+
+File names: a file that failed a gate becomes `<name>.rejected.mp4`, one from a run that broke before its verdict `<name>.unchecked.mp4`; neither is ever delivered, and the next `run_all.py full` or `audio` deletes both before it starts. The by-hand rungs write `out_av1.mp4`, `out.webm` and `preview.gif` (commands in `engine.md`); rename them to the same pattern before delivery. The build's own files (`video.mp4`, `mix.wav`, `frames.hash` and the rest) keep the names `contract.py` gives them: the gates find them by those names. Write the aspect with an `x` (`launch_9x16_15s_v2.mp4`): Windows does not allow `:` in a file name.

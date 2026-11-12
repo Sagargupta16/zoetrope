@@ -18,13 +18,31 @@ FONT_BOLD = [
     "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
     "/System/Library/Fonts/Helvetica.ttc",
     "/Library/Fonts/Arial Bold.ttf",
+    # Linux: Liberation Sans (metric-compatible with Arial), then DejaVu Sans, in the usual Debian, Fedora, Arch folders
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/liberation-sans/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
 ]
 FONT_REG = [
     "C:/Windows/Fonts/arial.ttf",
     "/System/Library/Fonts/Supplemental/Arial.ttf",
     "/System/Library/Fonts/Helvetica.ttc",
     "/Library/Fonts/Arial.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/liberation-sans/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf",
+    "/usr/share/fonts/TTF/DejaVuSans.ttf",
 ]
+_FONT_HELP = (
+    "install Arial (Windows and macOS ship it) or, on Linux, Liberation Sans or DejaVu Sans (Debian and Ubuntu: "
+    "apt install fonts-liberation fonts-dejavu-core; Fedora: dnf install liberation-sans-fonts dejavu-sans-fonts), "
+    "or put the path of an installed .ttf first"
+)
 
 
 def clamp(x, a=0.0, b=1.0):
@@ -125,7 +143,8 @@ def font(size, bold=True):
                     pass
         else:
             raise FileNotFoundError(
-                f"no font found in {FONT_BOLD if bold else FONT_REG}; put an installed font path first"
+                f"no font found in {FONT_BOLD if bold else FONT_REG}; {_FONT_HELP} in "
+                f"engine.{'FONT_BOLD' if bold else 'FONT_REG'}"
             )
     return _fc[key]
 

@@ -12,44 +12,96 @@ else
   fail=1
 fi
 
-if command -v ffmpeg >/dev/null 2>&1; then
-  if ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx264; then
-    echo "ok   ffmpeg $(ffmpeg -hide_banner -version | head -1 | cut -d' ' -f3) with libx264"
+# the same search as contract.find_ffmpeg: PATH, then Homebrew on Apple silicon, then /usr/local; ffprobe beside it
+ff=$(type -P ffmpeg)
+if [ -z "$ff" ]; then
+  for p in /opt/homebrew/bin/ffmpeg /usr/local/bin/ffmpeg; do
+    if [ -e "$p" ]; then ff="$p"; break; fi
+  done
+fi
+if [ -n "$ff" ]; then
+  if "$ff" -hide_banner -encoders 2>/dev/null | grep -Eq '^[[:space:]]*[A-Z.]{6}[[:space:]]+libx264[[:space:]]'; then
+    echo "ok   ffmpeg $("$ff" -hide_banner -version | head -1 | cut -d' ' -f3) with libx264 at $ff"
   else
-    echo "FIX  ffmpeg has no libx264 (videos fall back to AV1, VP9 or GIF) -> winget install Gyan.FFmpeg"
+    echo "FIX  the ffmpeg at $ff has no libx264 (videos fall back to AV1, VP9 or GIF) -> winget install Gyan.FFmpeg"
+    fail=1
+  fi
+  probe="${ff%/*}/$(basename "$ff" | sed 's/ffmpeg/ffprobe/')"
+  if "$probe" -version >/dev/null 2>&1; then
+    echo "ok   ffprobe at $probe"
+  else
+    echo "FIX  ffprobe missing or would not run at $probe, beside the ffmpeg -> it ships with ffmpeg; reinstall Gyan.FFmpeg"
     fail=1
   fi
 else
-  echo "FIX  ffmpeg missing -> winget install Gyan.FFmpeg, then open a new shell"
+  echo "FIX  ffmpeg not on PATH, in /opt/homebrew/bin or in /usr/local/bin -> winget install Gyan.FFmpeg, then open a new shell"
   fail=1
 fi
 
-if command -v ffprobe >/dev/null 2>&1; then
-  echo "ok   ffprobe"
-else
-  echo "FIX  ffprobe missing -> it ships with ffmpeg; reinstall Gyan.FFmpeg"
+# the engine pins its Python in engine/.python-version, so a proof and its render run on one interpreter (Q1304
+# compares major.minor); no file means no pin, and this script does not guess one
+pyver=""
+if [ -f "$here/engine/.python-version" ]; then
+  pyver=$(tr -d '[:space:]' < "$here/engine/.python-version")
+fi
+if [ -z "$pyver" ]; then
+  echo "FIX  engine/.python-version is missing or empty -> git restore engine/.python-version"
   fail=1
 fi
+
+# the engine's own interpreter, run as every build runs it: from the engine folder, on the pin, on requirements.txt
+engine_python() {
+  (cd "$here/engine" && printf '%s\n' "$1" | PYTHONDONTWRITEBYTECODE=1 uv run --no-project --python "$pyver" \
+    --with-requirements requirements.txt python -)
+}
 
 if [ "$fail" -eq 0 ]; then
-  # first run downloads the pinned wheels into the uv cache; later runs are instant
-  if uv run --no-project --with-requirements "$here/engine/requirements.txt" python -c "import PIL, numpy; print('ok   pillow', PIL.__version__, '| numpy', numpy.__version__)"; then
-    :
+  # first run downloads the pinned wheels into the uv cache; later runs are instant. Each requirements.in pin is
+  # held against what requirements.txt really installs, so the two files cannot drift apart unseen
+  pkg_out=$(engine_python 'import sys
+from importlib import metadata
+import numpy, PIL
+print("py", sys.version.split()[0])
+for line in open("requirements.in", encoding="utf-8"):
+    pin = line.split("#")[0].strip()
+    if "==" in pin:
+        name, want = (p.strip() for p in pin.split("==", 1))
+        print("pkg", name.lower(), want, metadata.version(name))' 2>&1 | tr -d '\r')
+  if printf '%s\n' "$pkg_out" | grep -q "^py "; then
+    echo "ok   python $(printf '%s\n' "$pkg_out" | sed -n 's/^py //p') (engine/.python-version says $pyver)"
+    while read -r name want have; do
+      [ -n "$name" ] || continue
+      if [ "$have" = "$want" ]; then
+        echo "ok   $name $have, equal to its requirements.in pin"
+      else
+        echo "FIX  $name $have installs from requirements.txt but requirements.in pins $want -> uv pip compile --generate-hashes requirements.in -o requirements.txt (in engine/)"
+        fail=1
+      fi
+    done <<< "$(printf '%s\n' "$pkg_out" | sed -n 's/^pkg //p')"
   else
-    echo "FIX  pinned Pillow and numpy did not install -> check network once, then rerun setup.sh"
+    echo "FIX  pinned Pillow and numpy did not install on Python $pyver ($(printf '%s\n' "$pkg_out" | tail -1)) -> check network once, or uv python install $pyver, then rerun setup.sh"
     fail=1
   fi
 fi
 
-found=""
-for f in "C:/Windows/Fonts/arialbd.ttf" "/System/Library/Fonts/Supplemental/Arial Bold.ttf" "/Library/Fonts/Arial Bold.ttf"; do
-  if [ -f "$f" ]; then found="$f"; break; fi
-done
-if [ -n "$found" ]; then
-  echo "ok   default font $found"
-else
-  echo "FIX  none of engine.py's default fonts exist -> put an installed .ttf path first in FONT_BOLD and FONT_REG"
-  fail=1
+# the default font, asked of the engine itself (engine.font tries FONT_BOLD in order)
+if [ "$fail" -eq 0 ]; then
+  font_out=$(engine_python 'import os, sys
+sys.path.insert(0, os.getcwd())
+import engine
+try:
+    print("font", getattr(engine.font(32), "path", "(path not reported)"))
+except FileNotFoundError:
+    print("font-missing")' 2>&1 | tr -d '\r')
+  if printf '%s\n' "$font_out" | grep -q "^font "; then
+    echo "ok   default font $(printf '%s\n' "$font_out" | sed -n 's/^font //p')"
+  elif printf '%s\n' "$font_out" | grep -q "^font-missing"; then
+    echo "FIX  none of engine.py's default fonts exist -> install Arial, or on Linux fonts-liberation / fonts-dejavu-core, or put an installed .ttf path first in FONT_BOLD and FONT_REG"
+    fail=1
+  else
+    echo "FIX  importing the engine failed ($(printf '%s\n' "$font_out" | tail -1)) -> run python -c \"import engine\" in engine/ to see the traceback"
+    fail=1
+  fi
 fi
 
 # the free fonts the cards name (engine/fonts.py): a note, not a failure, since a card that names one says so itself

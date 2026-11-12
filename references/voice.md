@@ -117,3 +117,12 @@ Voice lists do not rank voices by tone, so pick by audition, not by assumption: 
 - Brand and product names: write as {brand}, {product} in plans; when the voice says one wrong, respell it in `lexicon=` (the script keeps the real spelling) and run Q806 again.
 - Put commas and full stops where a breath is wanted, and `[pause 400ms]` where a beat of silence is; avoid long parentheses.
 - Budget by the measured pace of the chosen voice, not by word count rules of thumb. Generate, measure, then size the scenes.
+- One idea per line, and read it aloud once: if you run out of breath or trip, rewrite it. The slot grows with the speech, so long sentences make long scenes.
+- Put the word that carries the moment (the number, the name, "now") where the voice can land on it, best after a short pause, so `word_cue` has a clean onset to hit. A word that must hit a beat exactly: cue a word the voice says on its own after a pause, and look for its onset in the spectrogram of `review/audio.png`.
+- Never put an ellipsis on a line by itself: SAPI wrote silence for "..." (a finding of the public clean-room reference, not re-run on this engine), which fails the trim check. Use `[pause 400ms]` for a beat of silence.
+- Keep the caption and the spoken line the same words when both appear, so the reading hold and the voice agree; a caption is on screen before its first word is heard.
+- Leave the bed room: the music ducks 8 dB under speech, so a busy bed under a dense line still competes with it.
+
+### Voice helpers
+
+`voice.dec(path)` decodes any file to float32 mono at 44.1 kHz through ffmpeg run with `-nostdin`; `voice.span(y)` returns the speech start and end (10 ms RMS windows within 40 dB of the loudest); `voice.trim(y)` the trim bounds in samples; `voice.slot(line, rule, last, profile)` one slot. `voice.word_cue(narration, word, n=1, est=False)` finds the n-th time the word is spoken in line order. `voice.section_beats(speech_len, bpm, hold=0.5, lead=0.06, tempo=1.04, min_beats=2)` sizes a voiced section on the beat grid for a piece led by music: lead, plus `speech_len / tempo`, plus hold, rounded up to a whole number of beat pairs and at least `min_beats` (at 120 BPM: 6 beats for 2.3 s of speech, 2 beats for 0.4 s, from the clean-room page). `voice.synthesize` is run once, from the working folder, before the proof; scenes.py only reads `narration.json`. Q902 measures sound effects, not words: a word cue is only as good as the engine's word clock (above).

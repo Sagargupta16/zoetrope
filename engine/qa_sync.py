@@ -769,7 +769,7 @@ def measure_entry(e, st, cue_t, fps, a48):
     }
     tol = e.get(
         "landmark_tol"
-    )  # synth.place: 0.04 s for a measured pad point, 0 when the generator gave its own
+    )  # synth.place: PAD_TOL (0.65) x a measured pad point, 0 when the generator gave its own
     if isinstance(tol, (int, float)) and tol > 0:
         r["landmark_tol_ms"] = ms_round(tol * 1000, 0)
     if attack is not None:

@@ -75,11 +75,12 @@ def _near_cut(t, cuts, fps):
 
 
 def bed(dur, bpm, cuts=(), voice_spans=(), fps=None, labels=()):
-    """The template score as two mono buses (music, sfx) at SR. Music: kick on beats 1 and 3, an offbeat hat, a bass
-    and pad line. SFX, per cut: a whoosh whose apex leads the cut by WHOOSH_LEAD and a hit whose onset is on it (frame
-    cues when fps is given; labels[i] is the CUES label cut i serves). A kick within 3 frames of a cut is left out:
-    the hit carries that beat, and two heavy sounds never stack (Z07). Gains: kick 0.6, hit 0.4, bass and pad line 0.3,
-    so the master's limiter only catches peaks (under 1 dB on this bed). Only the music ducks, about 8 dB, under voice."""
+    """The template score as two mono buses (music, sfx) at SR. Music: kick on beats 1 and 3, a tick on every
+    off-beat, and one sine tone a beat whose pitch changes each bar. SFX, per cut: a whoosh whose apex leads the cut by
+    WHOOSH_LEAD and a hit whose onset is on it (frame cues when fps is given; labels[i] is the CUES label cut i serves).
+    A kick within 3 frames of a cut is left out: the hit carries that beat, and two heavy sounds never stack (Z07).
+    Gains: kick 0.6, tick 0.25, tone 0.3, whoosh 0.5, hit 0.4, so the master's limiter only catches peaks. Only the
+    music ducks, about 8 dB, under voice."""
     beat = 60 / bpm
     music, sfx = np.zeros(C.sample_of(dur, SR)), np.zeros(C.sample_of(dur, SR))
     for i in range(math.floor(dur / beat + 1e-6)):  # 11.2 / 0.8 is 13.999999999999998

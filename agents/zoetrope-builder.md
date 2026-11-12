@@ -203,8 +203,11 @@ Only on a plain go from the parent, after an approved sheet.
    after that line. A FIX or NOT CHECKED row moves the file to
    `<name>.rejected.mp4` and prints `REJECTED <path>: <rows>`; a run that broke
    before its verdict leaves `<name>.unchecked.mp4` and its traceback. Neither
-   is ever delivered. `NO_FFMPEG` means rung a is out: use rung b or c
-   (`engine.md`, encode ladder) and say why.
+   is ever delivered. `NO_FFMPEG` means there is no ffmpeg at all, and every
+   rung of the encode ladder needs one: stop and report it (the parent offers
+   to install it). An ffmpeg without libx264 is rung b or c (`engine.md`,
+   encode ladder): say why. A refused run (no ffmpeg, a stale picture, a size
+   budget that leaves no bitrate) leaves the last build as it was.
 3. Run `python qa.py check <video> --scenes . --size WxH --fps N --json qa.json`
    (add `--bpm` for a music-led piece, and `--baseline approved/qa.json` once
    an approval exists). Its first line, `qa check: <file> (written <time>,

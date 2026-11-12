@@ -40,3 +40,39 @@ Known weak spots: {honest list, for example "small labels on a phone", "mix chec
 
 Want changes? Tell us the scene and the time (for example "scene 3, 0:12") and we will rebuild only what changes.
 ```
+
+## Before the report
+
+Every value in the message is copied from a tool's output in this session, never retyped from memory or taken from an agent's summary; anything that was not run is listed as not checked.
+
+1. The run ended with an `APPROVAL` line and one `DELIVERED` line. A `REJECTED` or `UNCHECKED` line means there is nothing to deliver: a `<name>.rejected.mp4` or `<name>.unchecked.mp4` is never sent, shown as finished or described as a result.
+2. The final reviewer replied REVIEW PASS, and `qa.py approve --review <reply file>` recorded it.
+3. `python qa.py verify <file>` printed `VERIFY: SAME`: the file is byte for byte the approved one.
+4. One ffprobe run and one ebur128 run on the file give the numbers; they agree with the `DELIVERED` line to its rounding (I and Peak from the ebur128 Summary):
+   ```
+   ffprobe -v error -show_entries format=duration,size:stream=codec_name,width,height,r_frame_rate -of default=nw=1 <file>
+   ffmpeg -nostdin -hide_banner -i <file> -af ebur128=peak=true -f null -
+   ```
+
+## Filling the fields
+
+| Field | Where it comes from |
+|---|---|
+| File name | `<slug>_<aspect>_<length>s_v<n>.mp4` (`formats.md`) |
+| Length, size, resolution, fps, codec | The `DELIVERED` line and ffprobe's `duration`, `size`, `width`, `height`, `r_frame_rate`, `codec_name` (rung a is h264 with aac) |
+| Loudness | The `DELIVERED` line and the ebur128 Summary. A silent piece says `silent` there and in the report |
+| Encode rung | Which rung of the ladder made the file and why, every time, even rung a: rung a needs only "libx264 present"; rung b names the missing libx264 and the encoder used; rung c says the GIF is a preview |
+| QA run | The `PROOF:` and `QA:` summary lines as printed; every reviewer id with its verdict (for example proof-1 REVIEW PASS, final-1 REVIEW FIX, final-2 REVIEW PASS) |
+| Not checked | Always two lines: how it looks and sounds to a person (no script listens or watches; the reviewer read the sheets and frames) and photosensitivity (the flash gates measure WCAG 2.2 limits, but no tool certifies compliance). Then every `NOT CHECKED` row (on rung b, Q705, Q707 and Q708 by design) and anything skipped, such as a platform's own overlay zones or a voice engine's word clock on a voice nobody measured |
+| Known weak spots | Every NOTE row in the final check and why it stays (an `ALLOW` entry says it was designed), every reviewer P1 or P2 left open with its time, anything close to a limit, and a true peak inside -1 dBTP but within the meter tolerance (run_all prints a `note:` line for that) |
+| Facts used | The scenario's Facts table: each claim on screen, its source and the date it was read. A claim with no source is not on screen |
+| Media and credits | The font files `engine.font()` used; the music (made in code by `audio.py` or `synth.py`, recorded instruments with the `sampler.credits` lines, or the user's own track and its licence); the voice engine, voice and weights licence (`voice.md`); every image, logo or clip the user supplied, with its source |
+| Next options | Two or three concrete follow-ups that fit the brief: a 9:16 cut (`--size 1080x1920`), a GIF preview (rung c), a shorter cut, a 720p cut for email, a poster PNG of the strongest frame, another voice from `voice_samples.py` |
+
+## Rules
+
+- Quote the lines exactly as the tools printed them; never round or retype a number.
+- Never claim a check, a render or a review that did not run. A check that could not run is listed under Not checked with its reason, not left out.
+- Never deliver past a size limit the user gave: the file must pass Q1001 against that limit (`--budget-mb` or `BUDGET_MB`, `formats.md`).
+- When time runs out, deliver what is verified (a shorter cut, or the GIF preview made from a verified file) and list everything still open under Known weak spots.
+- A change after the approval reopens review: `qa.py diff --expect <windows>`, a fresh final reviewer, a new approval, then a new report.

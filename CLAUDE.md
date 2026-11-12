@@ -35,7 +35,7 @@ This folder is the `zoetrope` skill itself, not a copy: `~/.claude/skills/zoetro
 ## Engine gotchas (hit on 2026-10-28 and 2026-10-29)
 
 - **Windows workers.** `run_all.py` work sits under `if __name__ == "__main__":`, and `render.py` imports `scenes` inside its functions, because each worker must set `E.W`, `E.H` before `scenes` reads them. A top-level import rendered a 9:16 piece at 16:9 size.
-- **Fonts.** The cards name Mac fonts. `engine.py` lists Windows Arial first and raises on a missing font; before that, Pillow silently fell back to its 10 px default and every headline came out tiny. The 14 OFL families 21 cards name are cached by `fonts.py` (2.2.4) and drawn by name. A variable file is always set to the weight asked for, because their default instances differ: Nunito's is 200, Cormorant's 300, Fraunces' 900.
+- **Fonts.** The cards name Mac fonts. `engine.py` lists Windows Arial first and raises on a missing font; before that, Pillow silently fell back to its 10 px default and every headline came out tiny. The 14 OFL families 24 cards name are cached by `fonts.py` (2.2.4) and drawn by name. A variable file is always set to the weight asked for, because their default instances differ: Nunito's is 200, Cormorant's 300, Fraunces' 900.
 - **OpenBLAS threads.** `contract.py` sets `OPENBLAS_NUM_THREADS=1` before numpy loads. Unset, one process that loaded numpy and ran a matrix product held 27 threads and 793 MB private, against 4 threads and 54 MB at 1; seven reel builds of eight workers ran out of memory on 2026-10-30.
 - **Sleep.** The app holds the PC awake only while a session works, and on battery only with Keep awake on battery power on (turned on 2026-10-31). On 2026-10-29 the laptop went on battery at 07:19, idle-slept at 07:29 during the final review and woke only when plugged in at 13:59: 6.5 of the build's 8.4 hours. A closed lid sleeps whatever the setting.
 - **9:16 text.** Size titles with `fit_size` against the short side (`min(W, H)`), or they overflow the safe area (Q201).
@@ -49,6 +49,14 @@ This folder is the `zoetrope` skill itself, not a copy: `~/.claude/skills/zoetro
 - **str hash.** `hash("text")` changes in every process (PYTHONHASHSEED). A seed made from it gave each render worker different lightning in the g29 kit; seed from `zlib.crc32` or `engine.rng`.
 - **Durations as quotients.** `5/30` is not exactly 5 frames as a float; `compile_schedule` reads floats as fractions with a denominator up to 10**6.
 - **Windows locks.** A folder that is a process cwd or a watched folder cannot be moved or deleted. Move its contents instead, and keep shells out of `outputs/` subfolders.
+
+## Lessons absorbed on 2026-11-12 (from the clean-room public version, written from this engine on 2026-11-01)
+
+- **Refuse before you clean.** A stage that refuses (no ffmpeg, a stale picture for `audio`, a size budget with no video bitrate) must do it before `clean()` and before `build.json` is written. `audio` used to check `picture_is_current` after deleting `out.mp4` and the mixes, so a refused run with the wrong `--size` destroyed the last good build and rewrote `build.json`.
+- **A cut file gets a verdict, not a traceback.** A copy cut to 35 to 50 percent of its bytes still has every frame counted by ffprobe (the moov box is in front), but its last frame does not decode: Q502 stopped `qa.py check` with `ValueError: cannot reshape array of size 0`. Q501 and Q502 now read NOT CHECKED there, like Q503, and `files.cut` plants it.
+- **No ffmpeg means stop.** Every rung of the encode ladder needs ffmpeg (the master measures loudness with it too); only a build without libx264 drops to rung b or c.
+- **`cp -r engine/*` drops the Python pin.** A glob skips the hidden `.python-version`, silently; copy with `engine/.`. Without the pin a proof and its render can land on different interpreters, and Q1304 sees the change.
+- **Docs drift from code.** Rewriting the references from the code found docs that disagreed with the engine, among them the template bed's docstring (no bass or pad line: a tick and a tone), `render.CRF` (only `run_all.CRF` changes the build), a `qa_sync` comment (PAD_TOL, not 0.04 s), and a lint pointer to a table that did not exist. Every number in a reference names its constant or is dated to a run.
 
 ## 3D plates and recorded instruments (hit on 2026-11-10)
 
@@ -93,13 +101,14 @@ A 3D card (one 16.5 s build at 24 fps, 2026-11-10, RTX 4070 Laptop): stills unde
 
 - `bash setup.sh` ends `SETUP: PASS`, with the lines that the 14 free font families, the speech model and the 14 recorded instruments are cached and Blender is fetched (`python engine/fonts.py fetch`, `qa_speech.py fetch`, `sampler.py fetch`, `plate3d.py fetch` when they are not).
 - Smoke render: copy the engine with `cp -r engine/. outputs/smoke/` (so `qa_fixtures/` comes along), then at `--size 1920x1080` and again at `--size 1080x1920`: `run_all.py proof` ends `PROOF: PASS`, `run_all.py full` ends with its `APPROVAL` line and one `DELIVERED` line, and `qa.py check out.mp4 --scenes . --size WxH --fps 30 --bpm 120` ends `QA: PASS` with 0 FIX and 0 NOT CHECKED.
-- `qa.py selftest` (from the same folder) ends `SELFTEST: PASS (158 fixtures, 60 of 60 codes covered, 0 expected gaps)`: every Q code fires on its planted fault with the right item, time and value, and the template passes `run_all.py proof` and `full` at 1920x1080 and 1080x1920 (45 s on 2026-11-03; `--quick` skips the two full renders, about 28 s). The count is one per expected result, not per case: 84 cases.
+- `qa.py selftest` (from the same folder) ends `SELFTEST: PASS (161 fixtures, 60 of 60 codes covered, 0 expected gaps)`: every Q code fires on its planted fault with the right item, time and value, and the template passes `run_all.py proof` and `full` at 1920x1080 and 1080x1920 (45.9 s on 2026-11-12; `--quick` skips the two full renders, about 28 s). The count is one per expected result, not per case: 85 cases.
 - A change to `voice.py` or `qa_speech.py`: narrate a few lines and run `qa.py speech` on them (Q806 must read what the voice said), and run one narrated build to `DELIVERED` so Q807 finds the stem in the file. The calibration narrations are in `outputs/voice-samples-2026-11-03/` and `outputs/voice-samples-2026-10-29/`.
 - A change to `plate3d.py` or `stage3d.py`: copy the engine and `kits/toy-studio-3d/` into a scratch folder, render stills (`plate3d.py render stage.py --quality proof --stills 0,4.25,10.875`) and look at them, then the proof plate and `run_all.py proof --fps 24` to `PROOF: PASS`. `plate3d.py check` must name a missing frame, a `render.lock`, and a plate made stale by a touched `beats.py`. A change that could move pixels needs one final plate and `run_all.py full` to `DELIVERED` (about 20 minutes on the GPU).
 - A change to `sampler.py`: `python engine/sampler.py demo outputs/scratch/demo.wav` twice gives the same bytes; the pitch, onset and seam scripts are in `outputs/scratch/sampler/` and `outputs/scratch/refute/` (gitignored: they go when that folder is cleaned).
-- `python engine/cards.py check` ends `CARDS: OK (34 cards ...)` after any change to a card, the router or a kit.
+- `python engine/cards.py check` ends `CARDS: OK (40 cards ...)` after any change to a card, the router or a kit.
+- `python scripts/check.py` ends `<n> files checked, 0 problems` (dashes, secret-shaped strings, the SKILL.md frontmatter, broken Markdown links, JSON, CR bytes).
 - `uvx ruff format --check engine` is clean. `uvx ruff check engine kits` is not (184 findings on 2026-10-29: the template's `from engine import *` by design, plus lint debt in the kits), so compare its count before and after a change instead of expecting zero.
-- `node C:\Code\GitHub\community\skillcheck\dist\cli.js lint C:\Users\sg852\.claude\skills\zoetrope` is clean (through the junction: linted as `.`, the folder name `kinograph` is an SC014 error against the skill name).
+- `node C:\Code\GitHub\community\skillcheck\dist\cli.js lint C:\Users\sg852\.claude\skills\zoetrope` is clean (through the junction: linted as `.`, a folder whose name is not `zoetrope` is an SC014 error against the skill name).
 
 ## Open
 
