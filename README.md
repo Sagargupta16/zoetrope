@@ -23,7 +23,7 @@ Start a new session after installing, so the skill and the two agents (`zoetrope
 ## Requirements
 
 - [uv](https://docs.astral.sh/uv/): every engine script runs as `uv run --no-project --with-requirements requirements.txt python ...`, with Pillow and numpy pinned and hashed and Python pinned in `engine/.python-version`. Nothing is installed globally.
-- [ffmpeg](https://ffmpeg.org/) with libx264, and ffprobe beside it (Windows: `winget install Gyan.FFmpeg`; macOS: `brew install ffmpeg`; Debian or Ubuntu: `apt install ffmpeg`).
+- [ffmpeg](https://ffmpeg.org/) with libx264, and ffprobe beside it (Windows: `winget install Gyan.FFmpeg`; macOS: `brew install ffmpeg`; Linux: a static build of ffmpeg 9.0 or newer, since older distro packages such as Ubuntu 24.04's 6.1 overshoot the true peak in the AAC encode enough to fail the template's loudness gate).
 - A default font: Arial on Windows and macOS, Liberation Sans or DejaVu Sans on Linux (`fonts-liberation`, `fonts-dejavu-core`).
 - Git Bash on Windows for `setup.sh` and the copy commands.
 
