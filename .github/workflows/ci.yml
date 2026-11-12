@@ -45,3 +45,8 @@ jobs:
           cp -r skills/zoetrope/engine/. "$RUNNER_TEMP/selftest/"
           cd "$RUNNER_TEMP/selftest"
           uv run --no-project --with-requirements requirements.txt python qa.py selftest
+
+      - name: Show the template QA findings on failure
+        if: failure()
+        run: |
+          for f in /tmp/zoetrope_selftest_*/template_*/full.log; do echo "== $f"; grep -E "FIX|NOTE|NOT CHECKED|QA:" "$f" | tail -20; done
