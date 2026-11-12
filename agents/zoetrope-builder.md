@@ -23,7 +23,7 @@ the parent relays it, so every number in it must come from a command you ran.
 
 ## Read first
 
-All under `~/.claude/skills/zoetrope/`:
+All under the skill folder the brief names (`<skill>` below: the zoetrope skill's base directory, `skills/zoetrope/` in the plugin):
 
 - `SKILL.md`: defaults, rules, the style router.
 - `references/engine.md`: the contract and what each file in `engine/` does.
@@ -44,8 +44,10 @@ Do not page through the engine or a kit to find a helper: read the index
 ## Inputs (from the brief)
 
 - **Mode**: proof, render or resume.
-- **Working folder**: default `~/.claude/skills/zoetrope/outputs/<slug>/`
-  (gitignored; never commit anything from `outputs/`).
+- **Skill folder** (`<skill>`): the zoetrope skill folder as an absolute path.
+- **Working folder**: default `outputs/<slug>/` under the parent session's
+  current folder, never inside `<skill>` (never commit anything from
+  `outputs/`).
 - **Storyboard**: the approved table, style id, size, length, fps.
 - **Audio plan**: music only (BPM, mood), or `narration/narration.json` and
   `narration/narration.wav` made in the parent session, which has already
@@ -59,22 +61,22 @@ voice-led piece with no narration files), and say so under `blocked`.
 
 ## Proof mode
 
-1. Check the tools once: `bash ~/.claude/skills/zoetrope/setup.sh`
+1. Check the tools once: `bash <skill>/setup.sh`
    must end in `SETUP: PASS` (it checks uv, ffmpeg with libx264, ffprobe,
    the pinned Pillow and numpy, and the default font). From the working
    folder run every Python step as
    `uv run --no-project --with-requirements requirements.txt python <script>`;
    never pip install anything.
 2. Copy the whole `engine/` folder into the working folder
-   (`cp -r ~/.claude/skills/zoetrope/engine/. <working folder>/`, so
-   `qa_fixtures/` comes along). If the card has a kit (`kits/<card-id>/`,
+   (`cp -r <skill>/engine/. <working folder>/`, so
+   `qa_fixtures/` comes along). If the card has a kit (`<skill>/kits/<card-id>/`,
    the router and the card say so), read its README and copy the modules it
    lists: they are working code from an approved build of that style;
    replace the content, keep the machinery. A kit's scenes.py predates the
    registry: add `text_items(t)`, `CUES` (that name) and `KEY_TIMES`, or the
    proof fails (Q204 FIX for text no registry reports, Q200 NOT CHECKED).
 3. Before writing a helper, read the index:
-   `python ~/.claude/skills/zoetrope/engine/kit_index.py` lists every public
+   `python <skill>/engine/kit_index.py` lists every public
    function and class in the engine and the kits with its signature, first
    docstring line and file:line, and `kit_index.py show <name>` prints one
    (`show g04:text` picks a file). Run the skill's copy: the one in the

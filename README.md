@@ -1,17 +1,43 @@
 # Zoetrope
 
-A Claude Code skill that plans, scripts, animates, scores and renders short
+A Claude Code plugin that plans, scripts, animates, scores and renders short
 videos end to end with Python, Pillow, numpy and ffmpeg (invoke as
 `/zoetrope`): 40 style cards, a builder and a fresh-eyes reviewer agent, and
-measured QA gates. Renamed from video-producer on 2026-10-28.
-
-**Private.** Adapted 2026-10-28 from a video-producer agent package that is
-not ours to publish. This repo stays private: never make it public, and never
-copy it into claude-home, a public marketplace, plugin, portfolio or post.
+measured QA gates.
 
 [![The 15 s zoetrope promo: five jobs, one prompt, 58 checks, a delivered file](docs/zoetrope-promo.gif)](docs/zoetrope-promo.mp4)
 
 The promo above was made with the skill itself, through the same storyboard, proof, two fresh-eyes reviews and gates as any other video. The GIF is a silent 960 px preview; it links to [the MP4](docs/zoetrope-promo.mp4) with sound (15 s, 1920x1080, -14.1 LUFS, 5.1 MB).
+
+## Install
+
+In Claude Code:
+
+```text
+/plugin marketplace add Sagargupta16/zoetrope
+/plugin install zoetrope@zoetrope
+```
+
+Start a new session after installing, so the skill and the two agents (`zoetrope:zoetrope-builder`, `zoetrope:zoetrope-reviewer`) load. Then check the toolchain once: the skill runs `bash <skill>/setup.sh` on first use, which ends `SETUP: PASS` or prints one FIX line per gap.
+
+## Requirements
+
+- [uv](https://docs.astral.sh/uv/): every engine script runs as `uv run --no-project --with-requirements requirements.txt python ...`, with Pillow and numpy pinned and hashed and Python pinned in `engine/.python-version`. Nothing is installed globally.
+- [ffmpeg](https://ffmpeg.org/) with libx264, and ffprobe beside it (Windows: `winget install Gyan.FFmpeg`; macOS: `brew install ffmpeg`; Debian or Ubuntu: `apt install ffmpeg`).
+- A default font: Arial on Windows and macOS, Liberation Sans or DejaVu Sans on Linux (`fonts-liberation`, `fonts-dejavu-core`).
+- Git Bash on Windows for `setup.sh` and the copy commands.
+
+Optional, each fetched on demand into `~/.cache/zoetrope/`, pinned to one commit and checked by sha256 (each folder can be moved with its environment variable):
+
+| What | Fetch | Size, license | Needed for |
+| --- | --- | --- | --- |
+| 14 free font families 24 cards name (Inter, Nunito, IBM Plex Mono and 11 more) | `python engine/fonts.py fetch` | 6.8 MB, SIL OFL | drawing those cards in their own type |
+| Narration: Kokoro-82M (timestamped ONNX export) and its voices, in a side Python 3.13 environment | see `references/voice.md` | 325.5 MB plus 0.5 MB a voice, Apache-2.0 | a narrated video |
+| Speech check: faster-whisper `base.en`, on the CPU in a side Python 3.14 environment | `python engine/qa_speech.py fetch` | 147.8 MB, MIT | checking what the narration says (Q806, Q807) |
+| 14 recorded instruments from VSCO 2 CE and VCSL | `python engine/sampler.py fetch <names>` | 232.8 MB for all 14, CC0 1.0 | scores that play them |
+| Blender 5.2.3 LTS as a Python module (`bpy`), into the uv cache, in a side Python 3.13 environment | `python engine/plate3d.py fetch` | 324 MB, GPL-3.0-or-later | 3D cards only; renders with Cycles, on the GPU when there is one |
+
+The `fetch` paths are relative to the skill folder, `skills/zoetrope/`.
 
 ## How a video gets made
 
@@ -24,13 +50,13 @@ The promo above was made with the skill itself, through the same storyboard, pro
 5. **Render.** `run_all.py full` pipes every frame into one H.264 encode, synthesizes and masters the sound, muxes, and runs every gate on the file. A clean file ends with an `APPROVAL:` line and one `DELIVERED` line; a failing one becomes `<name>.rejected.mp4`.
 6. **Final review and approval.** A fresh reviewer checks the encoded file. `qa.py approve` binds that review to the file's content hashes, and `qa.py verify` must say `SAME` before delivery. Any later change reopens review by itself: `qa.py diff --expect` names exactly the frames and sound that changed.
 
-The diagram's source is `docs/zoetrope-flow.workflow.json` (an archify workflow with source line references at commit `88153b5`).
+The diagram's source is `docs/zoetrope-flow.workflow.json` (an archify workflow with source line references at commit `88153b5`, before the files moved under `skills/zoetrope/`).
 
 ## What is in it
 
 | Part | What it does |
 | --- | --- |
-| Style cards | 40 style cards in `references/styles/`, from 15 s product ads and logo stings to explainers, history films, game parodies, sketchbooks and one 3D character short. 34 were proven by a build; six (signal, ledger, blueprint, marquee, pulse, cartridge) were designed from the engine and pass `qa.py holds`. Six come with working code in `kits/`. |
+| Style cards | 40 style cards in `skills/zoetrope/references/styles/`, from 15 s product ads and logo stings to explainers, history films, game parodies, sketchbooks and one 3D character short. 34 were proven by a build; six (signal, ledger, blueprint, marquee, pulse, cartridge) were designed from the engine and pass `qa.py holds`. Six come with working code in `skills/zoetrope/kits/`. |
 | Builder agent | Builds, renders and checks one video in its own context, so the engine and the logs stay out of the main chat (`agents/zoetrope-builder.md`). |
 | Reviewer agent | Fresh eyes on the sheets and the file, never the builder's report; findings ranked P0, P1, P2 (`agents/zoetrope-reviewer.md`). |
 | Drawing | `engine.py` helpers with one integer frame clock, `compile_schedule` for scenes, transitions and cues, nine pure transitions, seeded randomness. |
@@ -40,13 +66,13 @@ The diagram's source is `docs/zoetrope-flow.workflow.json` (an archify workflow 
 | QA gates | 60 coded checks (`qa.py check`): safe area, overlap, contrast, reading holds, WCAG 2.2 flashes, pops and freezes, true peak, what the narration says, cue sync on the stems, the mux, colour tags, size. |
 | Approval | `approved/` keeps the hashes of what the reviewer passed; stale approval, regressions and changed frames are found mechanically. |
 | Selftest | `qa.py selftest` plants a fault for every one of the 60 codes (161 fixtures) and proves each gate still catches it. |
-| Narration | Offline narration in Kokoro's `af_heart` voice, one cached file per part with word times for cues (`voice.py`): respellings for names (`lexicon=`), exact pauses inside a line (`[pause 300ms]`), and lines held to their storyboard time (`fit=`). A speech model checks what it says (Q806 on the stem, Q807 in the file). See Requirements for the model files. |
+| Narration | Offline narration in Kokoro's `af_heart` voice, one cached file per part with word times for cues (`voice.py`): respellings for names (`lexicon=`), exact pauses inside a line (`[pause 300ms]`), and lines held to their storyboard time (`fit=`). A speech model checks what it says (Q806 on the stem, Q807 in the file). |
 
 ## Run it
 
-In a Claude Code session, ask for a video: `/zoetrope a 30 second launch video for <product>`. The skill does the rest and stops at the storyboard and proof for your approval.
+In a Claude Code session, ask for a video: `/zoetrope a 30 second launch video for <product>`. The skill does the rest and stops at the storyboard and proof for your approval. Videos land in `outputs/<slug>/` under your current folder unless you name another.
 
-By hand, from a working folder that holds a copy of the engine (`cp -r engine/. <folder>/`), each command run as `uv run --no-project --with-requirements requirements.txt python <command>`:
+By hand, from a working folder that holds a copy of the engine (`cp -r skills/zoetrope/engine/. <folder>/`), each command run as `uv run --no-project --with-requirements requirements.txt python <command>`:
 
 | Command | Result |
 | --- | --- |
@@ -59,49 +85,34 @@ By hand, from a working folder that holds a copy of the engine (`cp -r engine/. 
 | `qa.py approve --review <reply>`, `qa.py diff --expect 2.5-5`, `qa.py verify` | Bind a review to the file, name what changed since, re-hash before delivery. |
 | `qa.py selftest` | Every gate against its planted fault: `SELFTEST: PASS (161 fixtures, 60 of 60 codes covered, 0 expected gaps)`. |
 | `plate3d.py render stage.py [--quality proof]`, `plate3d.py check --final` | Render a 3D plate for a build (half size for the proof, full for delivery), and ask whether every plate is current and final. |
-| `python engine/cards.py check` | The style router in SKILL.md, its kit list and every card count against the cards' `**Spec:**` lines: `CARDS: OK (40 cards ...)`. |
-| `python scripts/check.py` | The repo gate: en or em dashes, secret-shaped strings, the SKILL.md frontmatter, broken relative links in Markdown, JSON that does not parse and CR line ends, over every tracked text file: `155 files checked, 0 problems`. |
+| `python skills/zoetrope/engine/cards.py check` | The style router in SKILL.md, its kit list and every card count against the cards' `**Spec:**` lines: `CARDS: OK (40 cards ...)`. |
+| `python scripts/check.py` | The repo gate: en or em dashes, secret-shaped strings, absolute home paths, the SKILL.md frontmatter, broken relative links in Markdown, JSON that does not parse, plugin manifest versions against the CHANGELOG head, and CR line ends. |
 
-Each gate code, what it measures and its status on failure are in [references/qa-gates.md](references/qa-gates.md); the engine's files and stages are in [references/engine.md](references/engine.md).
+Each gate code, what it measures and its status on failure are in [qa-gates.md](skills/zoetrope/references/qa-gates.md); the engine's files and stages are in [engine.md](skills/zoetrope/references/engine.md).
 
 ## Layout
 
-This folder is the skill: the junction `~/.claude/skills/zoetrope` points here.
-
 | Path | What |
 | --- | --- |
-| `SKILL.md` | The skill: brief, style pick, storyboard and proof approvals, delivery, and the style router linking every card. |
-| `setup.sh` | First-use check of uv, ffmpeg with libx264 (found as the engine finds it) and ffprobe beside it, the Python pin in `engine/.python-version`, Pillow and numpy against their `requirements.in` pins, and the default font as the engine loads it. Safe to run again. |
-| `scripts/check.py` | The repo gate (ZC001, ZC002, ZC003, ZC005, ZC006, ZC008), no LLM: run it before every commit. |
-| `engine/` | The Python engine as real files. Drawing: `engine.py` (helpers, frame clock, `compile_schedule`), `scenes.py` (the per-video template), `transitions.py`, `grain.py`, `fonts.py` (the free fonts the cards name, by family), `plate3d.py` and `stage3d.py` (3D plates rendered by Blender). Sound: `audio.py` (template bed, cue sheet and stems, the true-peak master), `synth.py` (instruments, landmark placement), `sampler.py` (recorded CC0 instruments, fetched on demand), `voice.py` and `voice_samples.py` (offline narration). Build: `render.py` (frames piped into ffmpeg through shared memory), `run_all.py` (`proof`, `full`, `audio` stages), `proof.py` (review sheets). Checks: `qa.py` (the gate CLI: `check`, `look`, `holds`, `purity`, `lint`, `owner`, `approve`, `diff`, `verify`, `calib`, `speech`, `audiostrip`, `selftest`) with its gate modules `qa_scan.py`, `qa_stack.py`, `qa_sync.py`, `qa_speech.py`, `qa_registry.py`, `qa_approve.py`, `qa_purity.py`, `qa_lint.py`, `qa_audiostrip.py`, `qa_selftest.py` and `qa_fixtures/`. `cards.py` reads the style cards' spec lines and checks the router against them. `contract.py` is what they all share (frame clock, the QA row, file formats, the Q code table). `kit_index.py` lists every helper. `requirements.txt` pins Pillow and numpy with hashes and `.python-version` pins Python 3.15 for every build folder; `requirements-voice.in` lists the pins of the narration and speech check environments. The builder copies the folder into each video's working folder. |
-| `references/` | Small topic files (playbook, engine, formats, voice, music, instruments, plates, mixing, beat sync, house rules, QA gates, pitfalls, delivery report, troubleshooting). |
-| `references/styles/` | One file per style card (40) plus `families.md`, the intro each family shares. |
-| `kits/` | Working code from finished builds for six cards, one folder each with a README of what to reuse. |
+| `.claude-plugin/` | `plugin.json` and `marketplace.json` (one plugin, `source: "./"`). |
+| `skills/zoetrope/SKILL.md` | The skill: brief, style pick, storyboard and proof approvals, delivery, and the style router linking every card. |
+| `skills/zoetrope/setup.sh` | First-use check of uv, ffmpeg with libx264 (found as the engine finds it) and ffprobe beside it, the Python pin in `engine/.python-version`, Pillow and numpy against their `requirements.in` pins, and the default font as the engine loads it. Safe to run again. |
+| `skills/zoetrope/engine/` | The Python engine as real files. Drawing: `engine.py` (helpers, frame clock, `compile_schedule`), `scenes.py` (the per-video template), `transitions.py`, `grain.py`, `fonts.py` (the free fonts the cards name, by family), `plate3d.py` and `stage3d.py` (3D plates rendered by Blender). Sound: `audio.py` (template bed, cue sheet and stems, the true-peak master), `synth.py` (instruments, landmark placement), `sampler.py` (recorded CC0 instruments, fetched on demand), `voice.py` and `voice_samples.py` (offline narration). Build: `render.py` (frames piped into ffmpeg through shared memory), `run_all.py` (`proof`, `full`, `audio` stages), `proof.py` (review sheets). Checks: `qa.py` (the gate CLI: `check`, `look`, `holds`, `purity`, `lint`, `owner`, `approve`, `diff`, `verify`, `calib`, `speech`, `audiostrip`, `selftest`) with its gate modules `qa_scan.py`, `qa_stack.py`, `qa_sync.py`, `qa_speech.py`, `qa_registry.py`, `qa_approve.py`, `qa_purity.py`, `qa_lint.py`, `qa_audiostrip.py`, `qa_selftest.py` and `qa_fixtures/`. `cards.py` reads the style cards' spec lines and checks the router against them. `contract.py` is what they all share (frame clock, the QA row, file formats, the Q code table). `kit_index.py` lists every helper. `requirements.txt` pins Pillow and numpy with hashes and `.python-version` pins Python 3.15 for every build folder; `requirements-voice.in` lists the pins of the narration and speech check environments. The builder copies the folder into each video's working folder. |
+| `skills/zoetrope/references/` | Small topic files (playbook, engine, formats, voice, music, instruments, plates, mixing, beat sync, house rules, QA gates, pitfalls, delivery report, troubleshooting). |
+| `skills/zoetrope/references/styles/` | One file per style card (40) plus `families.md`, the intro each family shares. |
+| `skills/zoetrope/kits/` | Working code from finished builds for six cards, one folder each with a README of what to reuse. |
 | `agents/zoetrope-builder.md` | The agent the skill launches for build, proof sheet, render and the measured QA gates. |
 | `agents/zoetrope-reviewer.md` | The fresh-eyes reviewer the skill launches after the proof and after the render: REVIEW PASS or REVIEW FIX with coded findings. |
+| `scripts/check.py` | The repo gate (ZC001 to ZC008), no LLM: run it before every commit; CI runs it too. |
 | `docs/` | The flow diagram (`zoetrope-flow.svg`) and its archify source, and the 15 s promo made with the skill (`zoetrope-promo.mp4`) with its GIF preview. These two are the only media committed: `.gitignore` lets `docs/*.mp4` and `docs/*.gif` through. |
-| `CHANGELOG.md` | Every change made to the package, with the reason. |
-| `LICENSE` | All rights reserved; see License below. |
-| `outputs/` | Every video made with the skill, gitignored (the promo in `docs/` is the one exception). One folder per batch: `videos/` (the finished files), `builds/<nn-slug>/` (each working folder: scenes.py, scripts, proof.png), the scenarios and the build notes. |
+| `.github/workflows/ci.yml` | The repo gate, and the engine self test on a fresh copy of the engine on Ubuntu. |
+| `CHANGELOG.md` | Every change, with the reason. |
+| `outputs/` | Videos made in this folder, gitignored (the promo in `docs/` is the one exception). |
 
-Both agents load through their own junction, `~/.claude/agents/zoetrope`, which points at `agents/`: Claude Code reads agents only from `~/.claude/agents/` (recursively), and pointing that junction at this whole folder would make it try every `.md` here as an agent. claude-home ignores both junctions (`~/.claude/.gitignore`, `/skills/zoetrope` and `/agents/zoetrope`).
-
-This folder is the private GitHub repo `Sagargupta16/zoetrope`. No copy of the original package is kept (deleted 2026-10-28); `CHANGELOG.md` is the record of what changed from it. Build lessons and repo rules for Claude are in `CLAUDE.md`.
-
-## Requirements on this PC
-
-- Python with the pinned Pillow and numpy: run scripts from a video's working folder with `uv run --no-project --with-requirements requirements.txt python ...`, nothing installed globally. Check the whole toolchain from Git Bash with `bash setup.sh` (from PowerShell: `& "C:\Program Files\Git\bin\bash.exe" C:/Code/GitHub/tools/zoetrope/setup.sh`).
-- ffmpeg 9.0.2 (Gyan full build, winget `Gyan.FFmpeg`, installed 2026-10-28): libx264, libaom-av1, libsvtav1, libvpx-vp9, libopus, ebur128 and loudnorm all present. On PATH for shells opened after the install; a Claude session started earlier needs a restart to see it.
-- Fonts: the 14 free families 24 style cards name (Inter, Nunito, IBM Plex Mono and 11 more, SIL OFL) were downloaded on 2026-10-31 to `%USERPROFILE%\.cache\zoetrope\fonts`, outside the repo: 23 files, 6.8 MB, pinned to one google/fonts commit and checked by sha256. On a new machine, `python engine/fonts.py fetch` gets them again; `setup.sh` says when any is missing.
-- Voice: the narrator is Kokoro-82M's `af_heart`, which Sagar picked from `voice_samples.py` on 2026-10-29. The model (the timestamped ONNX export, fp32, 325.5 MB) and four voices (0.5 MB each) were downloaded that day to `%USERPROFILE%\.cache\zoetrope\voices`, outside the repo, with their sha256 checked. Its engine runs in a side Python 3.13 environment that uv sets up on first use. On 2026-11-03 every English male voice (nine American, four British) and the four Hindi ones followed, 16 files of 0.5 MB from the same commit, each checked against the size and sha256 Hugging Face lists; their samples wait in `outputs/voice-samples-2026-11-03/` for a second voice to be picked. The built-in Windows voices stay as a robotic timing fallback. The sherpa-onnx Kokoro build and Piper were removed in 2.3.0: neither held a job the others did not, and neither was ever run.
-- Speech check: faster-whisper's `base.en` model (147.8 MB, MIT), downloaded on 2026-11-03 to `%USERPROFILE%\.cache\zoetrope\asr`, pinned to one commit and checked by sha256; it runs on the CPU in a side Python 3.14 environment. On a new machine, `python engine/qa_speech.py fetch` gets it again; `setup.sh` says when it is missing.
-- Recorded instruments: 14 instruments from Versilian Studios' VSCO 2 CE and VCSL (CC0 1.0), downloaded on 2026-11-10 to `%USERPROFILE%\.cache\zoetrope\instruments`, outside the repo: 210 files, 232.8 MB, pinned to one commit per library and checked by sha256, each decoded once beside its original (199 MiB). On a new machine, `python engine/sampler.py fetch <names>` gets what a score plays; `setup.sh` says when any is missing.
-- 3D plates: Blender 5.2.3 LTS as a Python module (the `bpy` wheel, 324 MB, GPL-3.0-or-later), fetched on 2026-11-10 into the uv cache with `python engine/plate3d.py fetch`; it runs in a side Python 3.13 environment and renders with Cycles on the RTX 4070 Laptop GPU through OptiX (0.42 s a frame at proof quality, about 3 s at final, 1920x1080). Only a 3D card needs it. `stage3d.py` and every stage script call Blender's API, so they could only ever be shared under GPL-compatible terms; this repo is private, so nothing changes.
+Build lessons and repo rules for Claude are in `CLAUDE.md`; how to contribute is in [CONTRIBUTING.md](CONTRIBUTING.md), and how to report a vulnerability in [SECURITY.md](SECURITY.md).
 
 ## License
 
-All rights reserved; see [LICENSE](LICENSE). No permission is granted to copy, publish or redistribute any part of this repo. It is adapted from a third-party package whose rights are not ours, so it carries no open-source license.
+MIT, see [LICENSE](LICENSE). `stage3d.py` and every stage script call Blender's API (GPL-3.0-or-later); MIT is GPL-compatible. Fonts, models and recorded instruments keep their own licenses, listed in the references.
 
-Every change made to the package, with its reason, is in [CHANGELOG.md](CHANGELOG.md).
-
-Ideas parked for later: 13 of the 40 style cards name only Mac system fonts (the agent maps each to an installed font per build); the series spec and `render.py` from `brand/linkedin` as a LinkedIn 4:5 style; `motion` and `social-post` descriptions do not yet point back here.
+Every change, with its reason, is in [CHANGELOG.md](CHANGELOG.md).

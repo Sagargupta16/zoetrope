@@ -28,15 +28,16 @@ records a final PASS with `qa.py approve`.
 - **Working folder**: where the builder put `scenes.py`, the proof sheets,
   `review_times.json` and, at the final stage, the finished video.
 - **Reviewer id**: for the `reviewer:` line (for example `final-2`).
+- **Skill folder** (`<skill>`): the zoetrope skill folder as an absolute path.
 - **Changes after the last PASS** (when this is a re-review): the builder's
   list of what changed and the windows it touches.
 
 ## Read first
 
 - The scenario section in full, plus its "Rules for all" paragraph.
-- `~/.claude/skills/zoetrope/references/house-rules.md` and
-  `references/qa-gates.md` (the gate list and the Q codes).
-- The style card the scenario names, in `references/styles/`, for the look
+- `<skill>/references/house-rules.md` and
+  `<skill>/references/qa-gates.md` (the gate list and the Q codes).
+- The style card the scenario names, in `<skill>/references/styles/`, for the look
   and its own Style QA lines.
 
 ## Procedure

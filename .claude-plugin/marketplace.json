@@ -1,0 +1,20 @@
+{
+  "name": "zoetrope",
+  "owner": {
+    "name": "Sagar Gupta",
+    "url": "https://github.com/Sagargupta16"
+  },
+  "metadata": {
+    "description": "Short videos made from code: storyboard, proof, render and measured QA, with a builder agent and a fresh-eyes reviewer."
+  },
+  "plugins": [
+    {
+      "name": "zoetrope",
+      "source": "./",
+      "description": "The zoetrope skill: 40 style cards, a builder and a reviewer agent, a Python engine that draws every frame as a pure function of time, numpy and recorded CC0 instruments mastered to -14 LUFS, optional Blender 3D plates, and 60 coded QA checks.",
+      "version": "2.6.0",
+      "license": "MIT",
+      "category": "design"
+    }
+  ]
+}

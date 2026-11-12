@@ -14,20 +14,20 @@ Guidance for Claude Code when working in this repository. What each file does is
 
 ## What this is
 
-This folder is the `zoetrope` skill itself, not a copy: `~/.claude/skills/zoetrope` is a junction to it and `~/.claude/agents/zoetrope` is a junction to `agents/`. An edit here is live in the next session that loads the skill.
+This repo is the public `zoetrope` Claude Code plugin (`/plugin marketplace add Sagargupta16/zoetrope`, then `/plugin install zoetrope@zoetrope`). The skill lives in `skills/zoetrope/` (SKILL.md, `engine/`, `references/`, `kits/`, `setup.sh`), the agents in `agents/`, the manifests in `.claude-plugin/`. Locally, `~/.claude/skills/zoetrope` is a junction to `skills/zoetrope/` and `~/.claude/agents/zoetrope` a junction to `agents/`, so an edit here is live in the next session that loads the skill.
 
 ## Repo rules
 
-- **Private, always.** It is adapted from a package that is not ours to publish. Never change the visibility, and never copy its files into claude-home, svg-forge, orrery, sagar-dev-skills, the portfolio or a post.
+- **One name, one repo.** The skill, the plugin, the marketplace, the folder and the repo are all `zoetrope`; never a copy under another name. Skill text names no user's home folder: `<skill>` (the skill folder as an absolute path, the base directory shown when the skill loads) or `~/.cache/zoetrope` instead, and `scripts/check.py` fails on a home path (ZC004).
 - **Keep the scrub clean.** The original platform's tool names, portal link, team, author and chat channel were rewritten out on 2026-10-28 and the history was squashed. Do not add them back. Before every push, run the identifier grep kept in `~/.claude/projects/c--Code-GitHub/memory/zoetrope-internal-skill.md`; the only hits allowed are the English word "quick".
-- Every change gets a CHANGELOG line under a concrete version, and README wherever it describes the changed part.
+- Every change gets a CHANGELOG line under a concrete version, and README wherever it describes the changed part. A release bumps `version` in `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` to the CHANGELOG head (ZC007).
 - **The README diagram** `docs/zoetrope-flow.svg` is exported from `docs/zoetrope-flow.workflow.json` with the archify skill. When the flow changes, edit the JSON and set `meta.repository.revision` to the new commit, run archify `finalize workflow` with `--repo-root .`, open the HTML in a Chrome DevTools page (the browser pane cannot open `file://`), run `Archify.exportMenu.run('svg')` while catching the blob from `URL.createObjectURL`, replace its two non-ASCII separators (U+203A, U+00B7) with `&gt;` and `|`, and look at it at 880 px in both themes.
 - Files are LF (`.gitattributes` sets `eol=lf`), unlike most Windows repos in this workspace. Check the bytes before assuming either way.
 - Everything a build makes goes in `outputs/` (gitignored): videos, working folders, scratch scripts, history bundles. The one exception is the README's promo in `docs/` (`.gitignore` lets `docs/*.mp4` and `docs/*.gif` through).
 
 ## Loading and agents
 
-- Claude Code reads agents from `~/.claude/agents/` recursively. The agents junction points at `agents/` only; pointed at the whole folder, every `.md` here would load as an agent.
+- Installed as a plugin, the agents are `zoetrope:zoetrope-builder` and `zoetrope:zoetrope-reviewer`. Through the local junctions they load as `zoetrope-builder` and `zoetrope-reviewer`: Claude Code reads agents from `~/.claude/agents/` recursively, and the agents junction points at `agents/` only; pointed at the whole folder, every `.md` here would load as an agent.
 - A new or renamed agent type does not appear in a session that was already running. There, launch a general-purpose agent and tell it to follow `agents/zoetrope-builder.md` or `agents/zoetrope-reviewer.md`.
 - To prove a fresh load, run this in the Terminal panel (a Bash child cannot use the Desktop-managed Bedrock login):
   `claude -p "Without running any tools, answer two lines only. Line 1: the first 12 words of the description of the skill named zoetrope, or NOT FOUND. Line 2: the names of your custom subagent types, comma separated."`
@@ -99,16 +99,17 @@ A 3D card (one 16.5 s build at 24 fps, 2026-11-10, RTX 4070 Laptop): stills unde
 
 ## Verify before a commit
 
-- `bash setup.sh` ends `SETUP: PASS`, with the lines that the 14 free font families, the speech model and the 14 recorded instruments are cached and Blender is fetched (`python engine/fonts.py fetch`, `qa_speech.py fetch`, `sampler.py fetch`, `plate3d.py fetch` when they are not).
-- Smoke render: copy the engine with `cp -r engine/. outputs/smoke/` (so `qa_fixtures/` comes along), then at `--size 1920x1080` and again at `--size 1080x1920`: `run_all.py proof` ends `PROOF: PASS`, `run_all.py full` ends with its `APPROVAL` line and one `DELIVERED` line, and `qa.py check out.mp4 --scenes . --size WxH --fps 30 --bpm 120` ends `QA: PASS` with 0 FIX and 0 NOT CHECKED.
+- `bash skills/zoetrope/setup.sh` ends `SETUP: PASS`, with the lines that the 14 free font families, the speech model and the 14 recorded instruments are cached and Blender is fetched (`python skills/zoetrope/engine/fonts.py fetch`, `qa_speech.py fetch`, `sampler.py fetch`, `plate3d.py fetch` when they are not).
+- Smoke render: copy the engine with `cp -r skills/zoetrope/engine/. outputs/smoke/` (so `qa_fixtures/` comes along), then at `--size 1920x1080` and again at `--size 1080x1920`: `run_all.py proof` ends `PROOF: PASS`, `run_all.py full` ends with its `APPROVAL` line and one `DELIVERED` line, and `qa.py check out.mp4 --scenes . --size WxH --fps 30 --bpm 120` ends `QA: PASS` with 0 FIX and 0 NOT CHECKED.
 - `qa.py selftest` (from the same folder) ends `SELFTEST: PASS (161 fixtures, 60 of 60 codes covered, 0 expected gaps)`: every Q code fires on its planted fault with the right item, time and value, and the template passes `run_all.py proof` and `full` at 1920x1080 and 1080x1920 (45.9 s on 2026-11-12; `--quick` skips the two full renders, about 28 s). The count is one per expected result, not per case: 85 cases.
 - A change to `voice.py` or `qa_speech.py`: narrate a few lines and run `qa.py speech` on them (Q806 must read what the voice said), and run one narrated build to `DELIVERED` so Q807 finds the stem in the file. The calibration narrations are in `outputs/voice-samples-2026-11-03/` and `outputs/voice-samples-2026-10-29/`.
-- A change to `plate3d.py` or `stage3d.py`: copy the engine and `kits/toy-studio-3d/` into a scratch folder, render stills (`plate3d.py render stage.py --quality proof --stills 0,4.25,10.875`) and look at them, then the proof plate and `run_all.py proof --fps 24` to `PROOF: PASS`. `plate3d.py check` must name a missing frame, a `render.lock`, and a plate made stale by a touched `beats.py`. A change that could move pixels needs one final plate and `run_all.py full` to `DELIVERED` (about 20 minutes on the GPU).
-- A change to `sampler.py`: `python engine/sampler.py demo outputs/scratch/demo.wav` twice gives the same bytes; the pitch, onset and seam scripts are in `outputs/scratch/sampler/` and `outputs/scratch/refute/` (gitignored: they go when that folder is cleaned).
-- `python engine/cards.py check` ends `CARDS: OK (40 cards ...)` after any change to a card, the router or a kit.
-- `python scripts/check.py` ends `<n> files checked, 0 problems` (dashes, secret-shaped strings, the SKILL.md frontmatter, broken Markdown links, JSON, CR bytes).
-- `uvx ruff format --check engine` is clean. `uvx ruff check engine kits` is not (184 findings on 2026-10-29: the template's `from engine import *` by design, plus lint debt in the kits), so compare its count before and after a change instead of expecting zero.
-- `node C:\Code\GitHub\community\skillcheck\dist\cli.js lint C:\Users\sg852\.claude\skills\zoetrope` is clean (through the junction: linted as `.`, a folder whose name is not `zoetrope` is an SC014 error against the skill name).
+- A change to `plate3d.py` or `stage3d.py`: copy the engine and `skills/zoetrope/kits/toy-studio-3d/` into a scratch folder, render stills (`plate3d.py render stage.py --quality proof --stills 0,4.25,10.875`) and look at them, then the proof plate and `run_all.py proof --fps 24` to `PROOF: PASS`. `plate3d.py check` must name a missing frame, a `render.lock`, and a plate made stale by a touched `beats.py`. A change that could move pixels needs one final plate and `run_all.py full` to `DELIVERED` (about 20 minutes on the GPU).
+- A change to `sampler.py`: `python skills/zoetrope/engine/sampler.py demo outputs/scratch/demo.wav` twice gives the same bytes; the pitch, onset and seam scripts are in `outputs/scratch/sampler/` and `outputs/scratch/refute/` (gitignored: they go when that folder is cleaned).
+- `python skills/zoetrope/engine/cards.py check` ends `CARDS: OK (40 cards ...)` after any change to a card, the router or a kit.
+- `python scripts/check.py` ends `<n> files checked, 0 problems` (dashes, secret-shaped strings, home paths, the SKILL.md frontmatter, broken Markdown links, JSON, manifest versions, CR bytes). CI runs it and the selftest on a fresh engine copy (`.github/workflows/ci.yml`).
+- `claude plugin validate .` passes.
+- `uvx ruff format --check skills/zoetrope/engine` is clean. `uvx ruff check skills/zoetrope/engine skills/zoetrope/kits` is not (184 findings on 2026-10-29: the template's `from engine import *` by design, plus lint debt in the kits), so compare its count before and after a change instead of expecting zero.
+- `node ../../community/skillcheck/dist/cli.js lint skills/zoetrope` is clean (lint the folder by its own name: linted as `.`, a folder whose name is not `zoetrope` is an SC014 error against the skill name).
 
 ## Open
 

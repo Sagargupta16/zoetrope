@@ -1,4 +1,3 @@
-# Private repo: never make it public.
 __pycache__/
 *.pyc
 .ruff_cache/

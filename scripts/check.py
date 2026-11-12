@@ -3,10 +3,8 @@
 
 ZC001 en or em dash             ZC005 broken relative link in Markdown
 ZC002 secret-shaped string      ZC006 JSON file does not parse
-ZC003 skill frontmatter         ZC008 CR line end (every text file is LF)
-
-No home-path check: this private skill names its Windows cache folders on purpose. No manifest check: it has no
-plugin manifests, its version lives in CHANGELOG.md only.
+ZC003 skill frontmatter         ZC007 plugin manifests disagree with the CHANGELOG head
+ZC004 absolute home path        ZC008 CR line end (every text file is LF)
 """
 
 from __future__ import annotations
@@ -44,6 +42,12 @@ SECRETS = [
     ("private key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
     ("bearer token", re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{24,}")),
 ]
+# a real user's home folder; placeholders such as C:/Users/... or /home/<name>/ do not match
+HOME_PATH = re.compile(
+    r"\b[A-Za-z]:[\\/]+Users[\\/]+(?!\.\.\.)[\w.-]+|/c/Users/(?!\.\.\.)[\w.-]+"
+    r"|/home/(?!runner\b)[a-z][\w.-]*/|/Users/(?!Shared\b)[A-Z][\w.-]+/"
+)
+CHANGELOG_HEAD = re.compile(r"^## (\d+\.\d+\.\d+)\b", re.MULTILINE)
 MD_LINK = re.compile(r"\]\((?!https?:|mailto:|#|\{\{)([^)\s]+)\)")
 INLINE_CODE = re.compile(r"`[^`]*`")
 HTML_REF = re.compile(r"\b(?:src|srcset|href)=\"(?!https?:|mailto:|#|data:)([^\"]+)\"")
@@ -120,9 +124,51 @@ def check_links(p: Path, rel: str, n: int, line: str) -> list[str]:
     return problems
 
 
+def check_manifests() -> list[str]:
+    """plugin.json and every marketplace.json plugin entry: name zoetrope, version = the CHANGELOG head."""
+    head = CHANGELOG_HEAD.search((ROOT / "CHANGELOG.md").read_text(encoding="utf-8"))
+    if not head:
+        return ["CHANGELOG.md:1 ZC007 no '## X.Y.Z' version heading"]
+    want = head.group(1)
+    problems = []
+    found: list[tuple[str, dict]] = []
+    for name in ("plugin.json", "marketplace.json"):
+        p = ROOT / ".claude-plugin" / name
+        rel = f".claude-plugin/{name}"
+        if not p.is_file():
+            problems.append(f"{rel}:1 ZC007 missing")
+            continue
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue  # ZC006 reports it
+        if name == "plugin.json":
+            found.append((rel, data))
+        else:
+            if data.get("name") != SKILL_NAME:
+                problems.append(
+                    f"{rel}:1 ZC007 marketplace name {data.get('name')!r} must be {SKILL_NAME!r}"
+                )
+            found += [
+                (f"{rel} plugins[{i}]", e)
+                for i, e in enumerate(data.get("plugins", []))
+            ]
+    for rel, entry in found:
+        if entry.get("name") != SKILL_NAME:
+            problems.append(
+                f"{rel} ZC007 name {entry.get('name')!r} must be {SKILL_NAME!r}"
+            )
+        if entry.get("version") != want:
+            problems.append(
+                f"{rel} ZC007 version {entry.get('version')!r}, CHANGELOG head is {want}"
+            )
+    return problems
+
+
 def main() -> int:
     problems: list[str] = []
     checked = files()
+    me = Path(__file__).resolve()
     for p in checked:
         rel = p.relative_to(ROOT).as_posix()
         raw = p.read_bytes()
@@ -141,6 +187,9 @@ def main() -> int:
             for label, rx in SECRETS:
                 if rx.search(line):
                     problems.append(f"{rel}:{n} ZC002 looks like a {label}")
+            home = HOME_PATH.search(line) if p.resolve() != me else None
+            if home:
+                problems.append(f"{rel}:{n} ZC004 absolute home path {home.group(0)!r}")
         if p.suffix == ".json":
             try:
                 json.loads(text)
@@ -148,6 +197,7 @@ def main() -> int:
                 problems.append(f"{rel}:{exc.lineno} ZC006 invalid JSON: {exc.msg}")
         if p.name == "SKILL.md":
             problems += check_skill(p, rel, text)
+    problems += check_manifests()
     for line in problems:
         print(line)
     print(f"{len(checked)} files checked, {len(problems)} problems")

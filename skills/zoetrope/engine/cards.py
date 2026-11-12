@@ -12,8 +12,10 @@ import sys
 import unicodedata
 from pathlib import Path
 
-# the cards: beside this file in the skill, or through the skill junction from a build folder's copy of the engine
+# the cards: beside this file in the skill, or (from a build folder's copy of the engine) the skill named by
+# ZOETROPE_SKILL, a user-level install, or the newest installed copy of the plugin
 _HERE = Path(__file__).resolve().parent
+_CLAUDE = Path.home() / ".claude"
 ROOT = next(
     (
         p
@@ -22,7 +24,12 @@ ROOT = next(
             if os.environ.get("ZOETROPE_SKILL")
             else None,
             _HERE.parent,
-            Path.home() / ".claude" / "skills" / "zoetrope",
+            _CLAUDE / "skills" / "zoetrope",
+            *sorted(
+                (_CLAUDE / "plugins" / "cache").glob("*/zoetrope/*/skills/zoetrope"),
+                key=lambda d: d.stat().st_mtime,
+                reverse=True,
+            ),
         )
         if p is not None and (p / "references" / "styles").is_dir()
     ),
@@ -208,8 +215,14 @@ def check():
             out.append(
                 f"kits: the cards name {sorted(named)}, {what} has {sorted(got)}"
             )
-    for doc in ("README.md", "SKILL.md"):
-        body = (ROOT / doc).read_text(encoding="utf-8")
+    # SKILL.md beside the cards, and the plugin's README two folders up when this is the plugin layout
+    repo = ROOT.parent.parent
+    docs = [ROOT / "SKILL.md"]
+    if (repo / ".claude-plugin" / "plugin.json").is_file():
+        docs.append(repo / "README.md")
+    for path in (d for d in docs if d.is_file()):
+        doc = path.name
+        body = path.read_text(encoding="utf-8")
         # a count of all the cards follows "the ", ": ", "| " or ". " ("20 style cards name a font" is a part)
         for m in re.finditer(
             r"(?:\bthe |: |\| |\. )(\d+)(?= (?:style cards|tested styles|tested looks)\b)",

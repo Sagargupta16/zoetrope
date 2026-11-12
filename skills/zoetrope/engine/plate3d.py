@@ -30,7 +30,7 @@ import engine as E
 
 # Blender as a Python module, in its own uv environment like the voice engines: bpy 5.2.3 has wheels for Python
 # 3.13 only. GPL-3.0-or-later: stage3d.py and every stage.py call its API, so they could only ever be shared under
-# GPL-compatible terms (this repo is private, so nothing changes).
+# GPL-compatible terms (this repo is MIT, which is).
 PYTHON = "3.13"
 PACKAGES = ("bpy==5.2.3",)
 BLENDER_DIR = Path(
