@@ -2,6 +2,11 @@
 
 Every change to this copy of the video-producer package it was adapted from. The version numbers are this copy's own; the package as received is 1.0.0. File and section names in 1.0.0 and 1.1.0 refer to the package's original layout (`references/01-producer-playbook.md` to `10-qa-and-house-rules.md`).
 
+## 2.7.0 - 2026-11-13
+
+- Image plates: `references/image-plates.md`, the faster route for photo-like videos. The parent session makes the pictures with an image model (a local FLUX.1 schnell through ComfyUI and Comfy's `comfy-mcp`, or a hosted Hugging Face Space) and lists them in the brief. The engine animates them and draws every word and number on top. It covers the rules each plate must pass (no text, checked at full size, honest scale, the picture matches the fact, sized for the visible area, licence in the report), resume-safe model downloads with a hash check, and where AI video clips fit (B-roll only). The numbers come from a 30 s space-facts Reel built this way on 2026-11-13: six plates in about 80 s on an RTX 4070 Laptop.
+- SKILL.md names the route in Tools and Files; README lists it.
+
 ## 2.6.1 - 2026-11-12
 
 - Plugin icon: `.claude-plugin/icon.png` (1024 px), a slotted drum with a ball bouncing through its frames, drawn with Pillow; `claude plugin validate` no longer warns about it.
