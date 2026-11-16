@@ -134,18 +134,20 @@ def font(size, bold=True):
     if key not in _fc and isinstance(bold, str):
         _fc[key] = fonts.load(bold, int(size), SS)
     if key not in _fc:
+        bad = None  # the last file that exists but would not load, and why
         for p in FONT_BOLD if bold else FONT_REG:
             if os.path.exists(p):
                 try:
                     _fc[key] = ImageFont.truetype(p, int(size))
                     break
-                except Exception:
-                    pass
+                except OSError as e:
+                    bad = (p, e)
         else:
+            why = f" ({bad[0]} exists but would not load: {bad[1]})" if bad else ""
             raise FileNotFoundError(
-                f"no font found in {FONT_BOLD if bold else FONT_REG}; {_FONT_HELP} in "
+                f"no font found in {FONT_BOLD if bold else FONT_REG}{why}; {_FONT_HELP} in "
                 f"engine.{'FONT_BOLD' if bold else 'FONT_REG'}"
-            )
+            ) from (bad[1] if bad else None)
     return _fc[key]
 
 
@@ -182,15 +184,91 @@ def canvas(color="#000000"):
 
 
 def gradient(c1, c2, vertical=True):
+    # a copy: callers draw on it, and the cached one must stay as built
+    return _gradient(c1, c2, vertical, W, H, SS).copy()
+
+
+@lru_cache(
+    maxsize=2
+)  # a full frame each (33 MB at 1080x1920, SS 2): a crossfade's two, no more per worker
+def _gradient(c1, c2, vertical, w, h, ss):
+    """gradient()'s picture for one set of arguments and frame size, built once (about 12 ms at 1920x1080)."""
     a, b = np.array(hexrgb(c1)[:3], float), np.array(hexrgb(c2)[:3], float)
-    n = H * SS if vertical else W * SS
+    n = h * ss if vertical else w * ss
     ramp = (a + (b - a) * np.linspace(0, 1, n)[:, None]).astype(np.uint8)
     arr = (
-        np.repeat(ramp[:, None, :], W * SS, 1)
+        np.repeat(ramp[:, None, :], w * ss, 1)
         if vertical
-        else np.repeat(ramp[None, :, :], H * SS, 0)
+        else np.repeat(ramp[None, :, :], h * ss, 0)
     )
     return Image.fromarray(arr, "RGB").convert("RGBA")
+
+
+# Each element is drawn into a layer and composited. Outside its own box (plus a blur's reach) that layer holds only
+# (0, 0, 0, 0), which alpha_composite leaves as it was, so only that box is blurred and composited and the frame comes
+# out the same pixel for pixel. Text goes into a layer the size of its box. A rounded rectangle is still drawn at its
+# own coordinates, on a frame-sized one-byte mask: Pillow works its corners out in floats from the box and radius, and
+# a radius such as 54.00000000000001 (1080 * 0.05) puts some corner pixels elsewhere once the box is moved (8 of 268
+# fuzz cases, 2026-11-16).
+_MARGIN = 4  # px around a box: what ImageDraw may draw past it (round(), int(), a text mask's fractional start)
+# text boxes and advances, measured as on a layer (an RGBA Draw: the same font mode)
+_MEASURE = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+
+
+def _blur_reach(radius):
+    """How far GaussianBlur(radius) can move a value: three box blurs (Pillow), each at most ceil(radius) px."""
+    return 3 * math.ceil(radius)
+
+
+def _layer_box(img, l, t, r, b, pad):
+    """(x0, y0, x1, y1): the part of img that an element drawn inside (l, t, r, b) and spread pad px can touch,
+    clipped to img and never empty. Each edge is a frame edge or a row or column the element never reaches, and x0
+    and y0 are at most l and t when those are not negative: text moved into a layer of this box keeps the whole and
+    the fractional part of its position, so ImageDraw.text puts the same mask on the same pixels."""
+    x0 = min(max(0, math.floor(l) - pad), img.width - 1)
+    y0 = min(max(0, math.floor(t) - pad), img.height - 1)
+    x1 = max(min(img.width, math.ceil(r) + 1 + pad), x0 + 1)
+    y1 = max(min(img.height, math.ceil(b) + 1 + pad), y0 + 1)
+    return x0, y0, x1, y1
+
+
+def _layer(box):
+    x0, y0, x1, y1 = box
+    return Image.new("RGBA", (x1 - x0, y1 - y0), (0, 0, 0, 0))
+
+
+def _rounded_layer(img, box, r, ink, pad):
+    """(layer, its box): the rounded rectangle rounded_rectangle(box, r, fill=ink) draws on a frame-sized RGBA layer,
+    cut to _layer_box(pad). Drawn on a frame-sized mask at its own coordinates, then ink filled in through it: the
+    mask is 255 or 0, so every pixel is ink or (0, 0, 0, 0), as on the RGBA layer."""
+    m = Image.new("L", img.size, 0)
+    ImageDraw.Draw(m).rounded_rectangle(box, r, fill=255)
+    bx = _layer_box(img, *box, pad)
+    lay = _layer(bx)
+    lay.paste(ink, None, m.crop(bx))
+    return lay, bx
+
+
+def _text_layer_box(img, xy, runs, f, stroke, pad):
+    """_layer_box for text drawn from xy (frame px) as runs [(x, s, anchor)] at height xy[1], with stroke_width
+    stroke and spread pad px: every run's textbbox, and xy and every run's own (x, y), which the layer must not start
+    after. Multiline text starts its layer at the frame's origin: Pillow steps each line down from y in floats."""
+    y = xy[1]
+    boxes = [
+        _MEASURE.textbbox((x, y), s, font=f, anchor=a, stroke_width=stroke)
+        for x, s, a in runs
+    ]
+    boxes += [(x, y, x, y) for x in (xy[0], *(r[0] for r in runs))]
+    if any(("\n" if isinstance(s, str) else b"\n") in s for _, s, _ in runs):
+        boxes.append((0, 0, 0, 0))
+    return _layer_box(
+        img,
+        min(b[0] for b in boxes),
+        min(b[1] for b in boxes),
+        max(b[2] for b in boxes),
+        max(b[3] for b in boxes),
+        pad,
+    )
 
 
 def rrect(img, box, r, fill, alpha=1.0):
@@ -198,21 +276,23 @@ def rrect(img, box, r, fill, alpha=1.0):
     if alpha <= 0:
         return
     x0, y0, x1, y1 = [v * SS for v in box]
-    lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     c = hexrgb(fill) if isinstance(fill, str) else fill
-    ImageDraw.Draw(lay).rounded_rectangle(
-        (x0, y0, x1, y1), r * SS, fill=c[:3] + (int(c[3] * alpha),)
+    lay, bx = _rounded_layer(
+        img, (x0, y0, x1, y1), r * SS, c[:3] + (int(c[3] * alpha),), _MARGIN
     )
-    img.alpha_composite(lay)
+    img.alpha_composite(lay, bx[:2])
 
 
 def shadow(img, box, r, blur=24, dy=12, alpha=0.35):
     x0, y0, x1, y1 = [v * SS for v in box]
-    lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    ImageDraw.Draw(lay).rounded_rectangle(
-        (x0, y0 + dy * SS, x1, y1 + dy * SS), r * SS, fill=(0, 0, 0, int(255 * alpha))
+    lay, bx = _rounded_layer(
+        img,
+        (x0, y0 + dy * SS, x1, y1 + dy * SS),
+        r * SS,
+        (0, 0, 0, int(255 * alpha)),
+        _blur_reach(blur * SS) + _MARGIN,
     )
-    img.alpha_composite(lay.filter(ImageFilter.GaussianBlur(blur * SS)))
+    img.alpha_composite(lay.filter(ImageFilter.GaussianBlur(blur * SS)), bx[:2])
 
 
 def text(
@@ -231,29 +311,26 @@ def text(
     if alpha <= 0:
         return
     f = font(size * scale * SS, bold)
-    lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     c = hexrgb(fill) if isinstance(fill, str) else fill
-    d = ImageDraw.Draw(lay)
+    x, y = xy[0] * SS, xy[1] * SS
+    runs = [(x, s, anchor)]
     if tracking:  # manual letter-spacing, left anchored
-        x = xy[0] * SS
+        runs = []
         for ch in s:
-            d.text(
-                (x, xy[1] * SS),
-                ch,
-                font=f,
-                fill=c[:3] + (int(255 * alpha),),
-                anchor="ls" if anchor[1] == "s" else "la",
-            )
-            x += d.textlength(ch, font=f) + tracking * SS
-    else:
+            runs.append((x, ch, "ls" if anchor[1] == "s" else "la"))
+            x += _MEASURE.textlength(ch, font=f) + tracking * SS
+    bx = _text_layer_box(img, (xy[0] * SS, y), runs, f, 0, _MARGIN)
+    lay = _layer(bx)
+    d = ImageDraw.Draw(lay)
+    for x, part, a in runs:
         d.text(
-            (xy[0] * SS, xy[1] * SS),
-            s,
+            (x - bx[0], y - bx[1]),
+            part,
             font=f,
             fill=c[:3] + (int(255 * alpha),),
-            anchor=anchor,
+            anchor=a,
         )
-    img.alpha_composite(lay)
+    img.alpha_composite(lay, bx[:2])
 
 
 def text_w(s, size, bold=True):
@@ -286,7 +363,7 @@ def text_box(s, xy, size, anchor="la", bold=True, tracking=0):
 def fit_size(s, size, maxw, bold=True, floor=36):
     """Largest size up to `size` at which s fits in maxw px; never below `floor` (cut copy instead of shrinking)."""
     while size > floor and text_w(s, size, bold) > maxw:
-        size -= 2
+        size = max(floor, size - 2)  # the last step stops on floor, never past it
     return size
 
 
@@ -305,18 +382,20 @@ def text_outline(
     """Text with a solid outline (PIL stroke): for game, anime and caption styles over busy pictures."""
     if alpha <= 0:
         return
-    lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     c, o = (hexrgb(v) if isinstance(v, str) else v for v in (fill, outline))
+    x, y, f, sw = xy[0] * SS, xy[1] * SS, font(size * SS, bold), int(width * SS)
+    bx = _text_layer_box(img, (x, y), [(x, s, anchor)], f, sw, _MARGIN)
+    lay = _layer(bx)
     ImageDraw.Draw(lay).text(
-        (xy[0] * SS, xy[1] * SS),
+        (x - bx[0], y - bx[1]),
         s,
-        font=font(size * SS, bold),
+        font=f,
         anchor=anchor,
         fill=c[:3] + (int(255 * alpha),),
-        stroke_width=int(width * SS),
+        stroke_width=sw,
         stroke_fill=o[:3] + (int(255 * alpha),),
     )
-    img.alpha_composite(lay)
+    img.alpha_composite(lay, bx[:2])
 
 
 def text_halo(
@@ -335,18 +414,21 @@ def text_halo(
     """Text over a soft dark halo (blurred thick stroke) so it reads over imagery without a hard box."""
     if alpha <= 0:
         return
-    lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     h = hexrgb(halo) if isinstance(halo, str) else halo
+    x, y, f, sw = xy[0] * SS, xy[1] * SS, font(size * SS, bold), int(radius * SS)
+    pad = _blur_reach(radius * SS * 0.8) + _MARGIN
+    bx = _text_layer_box(img, (x, y), [(x, s, anchor)], f, sw, pad)
+    lay = _layer(bx)
     ImageDraw.Draw(lay).text(
-        (xy[0] * SS, xy[1] * SS),
+        (x - bx[0], y - bx[1]),
         s,
-        font=font(size * SS, bold),
+        font=f,
         anchor=anchor,
         fill=h[:3] + (int(255 * strength * alpha),),
-        stroke_width=int(radius * SS),
+        stroke_width=sw,
         stroke_fill=h[:3] + (int(255 * strength * alpha),),
     )
-    img.alpha_composite(lay.filter(ImageFilter.GaussianBlur(radius * SS * 0.8)))
+    img.alpha_composite(lay.filter(ImageFilter.GaussianBlur(radius * SS * 0.8)), bx[:2])
     text(img, s, xy, size, fill, anchor, alpha, bold)
 
 

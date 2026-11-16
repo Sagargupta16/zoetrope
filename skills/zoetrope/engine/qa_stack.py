@@ -78,18 +78,12 @@ def peak_moment(a, sr, block=0.01, cand=None, near_db=6.0, span=None):
 def read_wav(path):
     """(mono float32, sr) of a RIFF WAV (PCM 16, 24 or 32 bit, or float), channels averaged like Ctx.audio's mono:
     level-true for the engine's dual-mono stems."""
-    b = Path(path).read_bytes()
-    if b[:4] != b"RIFF" or b[8:12] != b"WAVE":
+    with open(path, "rb") as f:
+        head = f.read(12)
+    if head[:4] != b"RIFF" or head[8:12] != b"WAVE":
         raise ValueError(f"{path}: not a RIFF WAVE file")
-    i, fmt, data = 12, None, None
-    while i + 8 <= len(b):
-        cid, size = b[i : i + 4], struct.unpack_from("<I", b, i + 4)[0]
-        if cid == b"fmt ":
-            fmt = b[i + 8 : i + 8 + size]
-        elif cid == b"data":
-            data = b[i + 8 : i + 8 + size]
-        i += 8 + size + (size & 1)
-    if fmt is None or data is None:
+    fmt, data = C.read_wav_chunks(path)
+    if data is None:
         raise ValueError(f"{path}: no fmt or data chunk")
     tag, ch, sr, _, _, bits = struct.unpack_from("<HHIIHH", fmt)
     # WAVE_FORMAT_EXTENSIBLE: the real format is the subformat's first two bytes
@@ -249,23 +243,29 @@ def peak_rows(ctx):
         return [C.row(True, "Q802", "no audio by design (SILENT): true peak n/a", "")]
     L = ctx.loudness
     if L is None:
-        why = (
-            "no audio stream"
+        why, fix = (
+            ("no audio stream", "mux mix.wav into the encode (Q706), or declare SILENT")
             if not ctx.probe.get("acodec")
-            else "loudness not measured"
+            else (
+                "loudness not measured",
+                "check the audio track plays (Q801 says why the loudness run failed)",
+            )
         )
+        return [C.not_checked("Q802", f"true peak not measured: {why}", fix)]
+    tp = float(L["peak"])
+    t, over, frames = moment(ctx, ctx.audio(48000, mono=False))
+    # ebur128 printed a peak, but the decode holds no sample to find its moment in
+    if t is None:
         return [
             C.not_checked(
                 "Q802",
-                f"true peak not measured: {why}",
-                "mux mix.wav into the encode (Q706), or declare SILENT",
+                f"true peak {tp:.1f} dBTP read, but the audio decoded to no samples, so its moment is unknown",
+                "check the audio track plays (ffmpeg -i <file>); render it again if it does not",
             )
         ]
-    tp = float(L["peak"])
-    t, over, frames = moment(ctx, ctx.audio(48000, mono=False))
-    t = round(t, 3) if t is not None else None
-    at = f"{t:.3f} s" if t is not None else "unknown (empty decode)"
-    if tp <= TP_MAX or t is None:
+    t = round(t, 3)
+    at = f"{t:.3f} s"
+    if tp <= TP_MAX:
         return [
             C.row(
                 tp <= TP_MAX,

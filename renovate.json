@@ -1,1 +1,21 @@
-{"$schema":"https://docs.renovatebot.com/renovate-schema.json","extends":["github>Sagargupta16/shared-workflows"]}
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["github>Sagargupta16/shared-workflows"],
+  "minimumReleaseAge": "7 days",
+  "vulnerabilityAlerts": {
+    "minimumReleaseAge": null
+  },
+  "pip-compile": {
+    "managerFilePatterns": ["/(^|/)skills/zoetrope/engine/requirements(-[a-z]+)?\\.txt$/"]
+  },
+  "pip_requirements": {
+    "enabled": false
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["pip-compile"],
+      "groupName": "engine python environments",
+      "groupSlug": "engine-python"
+    }
+  ]
+}

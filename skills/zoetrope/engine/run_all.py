@@ -9,6 +9,7 @@
 # <name>.rejected.mp4 when a row is FIX or NOT CHECKED, <name>.unchecked.mp4 when the run broke before a verdict.
 import argparse
 import ast
+import math
 import os
 import shutil
 import subprocess
@@ -136,8 +137,28 @@ def caps(budget_mb, duration, silent):
     return maxrate, (maxrate if duration < 30 else 2 * maxrate)
 
 
-def picture(ff, a, budget):
-    """Every frame drawn and piped into video.mp4, the silent picture (capped when a size budget is set)."""
+def redraw_spans(arg):
+    """--redraw T0-T1[,T0-T1] as [(t0, t1), ...] in seconds; ValueError names the first span that is not two
+    finite numbers with T0 under T1."""
+    spans = []
+    for s in arg.split(","):
+        try:
+            t0, t1 = (float(v) for v in s.split("-"))
+        except ValueError:
+            raise ValueError(
+                f"--redraw: {s!r} is not T0-T1 in seconds (for example 1.5-3)"
+            ) from None
+        if not (math.isfinite(t0) and math.isfinite(t1) and t0 < t1):
+            raise ValueError(
+                f"--redraw: {s!r} must be two finite times in seconds with T0 under T1"
+            )
+        spans.append((t0, t1))
+    return spans
+
+
+def picture(ff, a, budget, redraw):
+    """Every frame drawn and piped into video.mp4, the silent picture (capped when a size budget is set); redraw: the
+    parsed --redraw spans, or None."""
     maxrate = bufsize = None
     if budget:
         maxrate, bufsize = caps(budget, scenes.DURATION, C.declared(scenes, "SILENT"))
@@ -145,11 +166,6 @@ def picture(ff, a, budget):
             f"size budget {budget:g} MB for {scenes.DURATION:g} s: maxrate {maxrate:.0f} kb/s, "
             f"bufsize {bufsize:.0f} kb/s (a cap, not a guarantee: Q1001 checks the file)"
         )
-    redraw = (
-        [tuple(float(v) for v in s.split("-")) for s in a.redraw.split(",")]
-        if a.redraw
-        else None
-    )
     t0 = time.perf_counter()
     n = render.render_to_ffmpeg(
         C.VIDEO, a.procs, CRF, maxrate, bufsize, a.keep_frames, redraw, ff
@@ -445,6 +461,13 @@ def main():
         ap.error(
             "--redraw needs --keep-frames (and frames/ from an earlier --keep-frames run)"
         )
+    # parsed here once, so a bad span stops the run before anything is cleaned
+    redraw = None
+    if a.redraw and a.stage == "full":
+        try:
+            redraw = redraw_spans(a.redraw)
+        except ValueError as e:
+            ap.error(str(e))
     asked = (a.size and a.size.lower() != f"{E.W}x{E.H}") or (a.fps and a.fps != E.FPS)
     if asked or (a.ss and a.ss != E.SS):
         print(
@@ -467,6 +490,11 @@ def main():
             return 1
         if a.stage == "full" and budget:
             caps(budget, scenes.DURATION, C.declared(scenes, "SILENT"))
+        if redraw:
+            _, why = render.reuse_check(render.frame_count(scenes), E.FPS, redraw)
+            if why:
+                print(f"--redraw: {why}")
+                return 1
     # the size this build really uses (after scenes.py), for qa.py purity, lint, diff, approve and proof.py keys;
     # here and not at the top, which every render worker runs again
     C.write_build(E.W, E.H, E.FPS, E.SS)
@@ -478,7 +506,7 @@ def main():
     clean(*built)
     C.write_state(a.stage, "running")
     if a.stage == "full":
-        picture(ff, a, budget)
+        picture(ff, a, budget, redraw)
     return deliver(ff, budget, a.stage)
 
 

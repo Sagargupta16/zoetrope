@@ -1,0 +1,18 @@
+# requirements-speech.in : the speech check's environment (qa_speech.py, Q806 and Q807: faster-whisper base.en on the
+# CPU), a side Python 3.14 uv environment, so engine/requirements.txt stays Pillow and numpy only. These lines are the
+# one place the pins live; qa_speech.py runs the compiled lock. After a change, compile the lock again from this folder:
+#   uv pip compile --universal --generate-hashes --python-version 3.14 requirements-speech.in -o requirements-speech.txt
+# qa_speech.py hashes requirements-speech.txt into every transcript's cache key, so a new lock transcribes again. uv run
+# does not check the --hash lines of a --with-requirements file (uv 0.13.8, 2026-11-16): the exact pin of every package
+# in the lock is what holds the set still. NOT installed by setup.sh. The model is a separate download
+# (python qa_speech.py fetch), never fetched without the user's yes.
+# Every package that changes the words is pinned here. Clips go in as raw float32, so faster-whisper never opens a file
+# itself; av stays below 19 anyway (its file path fails with av 19, SYSTRAN/faster-whisper#1589, fixed on main, not in
+# the 1.2.1 release). Versions read from PyPI on 2026-10-28, 2026-11-03 and 2026-11-16 (ctranslate2 4.9.0, onnxruntime
+# 1.32.0, numpy 2.5.5).
+faster-whisper==1.2.1
+ctranslate2==4.9.0
+av==18.1.0
+onnxruntime==1.32.0
+tokenizers==0.23.3
+numpy==2.5.5

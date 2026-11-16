@@ -1,0 +1,17 @@
+# requirements-kokoro.in : the narrator's environment (voice.py engine kokoro-ts), a side Python 3.13 uv environment,
+# because kokoro-onnx 0.6.1 declares requires-python <3.14; engine/requirements.txt stays Pillow and numpy only. These
+# lines are the one place the pins live; voice.py runs the compiled lock. After a change, compile the lock again from
+# this folder:
+#   uv pip compile --universal --generate-hashes --python-version 3.13 requirements-kokoro.in -o requirements-kokoro.txt
+# voice.py hashes requirements-kokoro.txt into every part's cache key, so a new lock synthesizes again. uv run does not
+# check the --hash lines of a --with-requirements file (uv 0.13.8, 2026-11-16): the exact pin of every package in the
+# lock is what holds the set still. NOT installed by setup.sh. Model and voice files are separate downloads (sizes,
+# hashes and licences in voice.py KOKORO_FILES and references/voice.md), never fetched without the user's yes.
+# Every package that changes the phonemes or the sound is pinned here (espeak-ng comes in espeakng-loader). Licences:
+# kokoro-onnx MIT, onnxruntime MIT, phonemizer GPL-3.0, espeakng-loader bundles espeak-ng (GPL-3.0). Versions read from
+# PyPI on 2026-10-28, 2026-11-03 and 2026-11-16 (onnxruntime 1.32.0, phonemizer 3.6.0, numpy 2.5.5).
+kokoro-onnx==0.6.1
+onnxruntime==1.32.0
+phonemizer==3.6.0
+espeakng-loader==0.2.4
+numpy==2.5.5

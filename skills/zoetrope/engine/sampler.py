@@ -7,6 +7,7 @@
 #   python sampler.py missing           what is not cached yet (exit 1 when anything is)
 #   python sampler.py demo out.wav      an 8-bar phrase at 100 BPM on five instruments, mastered to -14 LUFS
 import hashlib
+import http.client
 import math
 import os
 import subprocess
@@ -472,7 +473,13 @@ def _download(i):
         return ""
     *_, lib, path, size, sha = FILES[i]
     url = f"https://raw.githubusercontent.com/{LIBS[lib]['repo']}/{LIBS[lib]['commit']}/{urllib.parse.quote(path)}"
-    data = urllib.request.urlopen(url, timeout=120).read()
+    try:
+        data = urllib.request.urlopen(url, timeout=120).read()
+    except (
+        OSError,
+        http.client.HTTPException,
+    ) as e:  # URLError, a timeout, a dropped connection: this file's failure
+        return f"{path}: download failed ({e})"
     got = hashlib.sha256(data).hexdigest()
     if len(data) != size or got != sha:
         return f"{path}: {len(data)} bytes, sha256 {got[:12]}; want {size}, {sha[:12]}"

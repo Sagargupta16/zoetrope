@@ -1178,14 +1178,12 @@ def _samples(scn, fps, regs, full):
 # ---- Q206: OVH's differential on the frames the registry gates judge ----
 
 
-def _shrink(b, k=1):
-    return (b[0] + k, b[1] + k, b[2] - k, b[3] - k)
-
-
 def _cover_tests(regs, full, fps):
     """{frame: {key}}: the middle frame of every rest span of every string (one of the frames Q301 measures its
     contrast at, by qa._mid's rule) and the first frame of each pair of registered texts whose boxes overlap (where
     Q202 and Q203 report it)."""
+    from qa import _shrink  # imported where it is used, as rows() imports qa
+
     n = len(regs)
     spans, opened = {}, {}
     for i, items in enumerate(regs):

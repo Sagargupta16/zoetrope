@@ -2,7 +2,6 @@
 # CLI: `python qa.py check out.mp4 --scenes . --size 1920x1080` prints coded findings and exits 1 on any FIX;
 #      `python qa.py look out.mp4` writes small frame copies plus review/look.jpg for a model to view.
 import importlib
-import json
 import math
 import re
 import subprocess
@@ -282,28 +281,17 @@ def flash_report_file(path, fps=30, ff="ffmpeg", rows=True):
 COLOR_KEYS = ("color_space", "color_primaries", "color_transfer", "color_range")
 # what contract.COLOR_VF and COLOR_FLAGS write (Q707)
 COLOR_WANT = ("bt709", "bt709", "bt709", "tv")
+# Q706: seconds the decoded audio may stop before the picture, Q701's duration tolerance. On 85 rendered MP4s with
+# sound (the 2026-10-28 samples, the 2026-11-10 and 2026-11-15 reels and their versions, the 3D pilot's six) it
+# stopped 0.000 s early on every one (2026-11-16).
+AUDIO_SHORT = 0.1
 
 
 def probe(path, ff="ffmpeg"):
     """Duration, size, resolution, fps, codecs, frame count, audio channels and colour tags from the ffprobe beside
     ff (gate 7; run_all passes the ffmpeg it found, never a bare name). A colour tag the file does not carry reads
     "unknown"."""
-    out = subprocess.run(
-        [
-            C.ffprobe_of(ff),
-            "-v",
-            "error",
-            "-show_format",
-            "-show_streams",
-            "-of",
-            "json",
-            str(path),
-        ],
-        capture_output=True,
-        stdin=subprocess.DEVNULL,
-        check=True,
-    ).stdout
-    j = json.loads(out)
+    j = C.ffprobe_json(path, "-show_format", "-show_streams", ffprobe=C.ffprobe_of(ff))
     v = next(s for s in j["streams"] if s["codec_type"] == "video")
     a = [s for s in j["streams"] if s["codec_type"] == "audio"]
     return dict(
@@ -418,14 +406,17 @@ def loud(path, ff="ffmpeg"):
     """Integrated loudness (LUFS), LRA (LU) and true peak (dBFS) from ebur128 (gate 8), plus "frames": every 100 ms
     line of the same run as {t, M, S, I, ftpk} (ftpk the frame's true peak, the max over channels), so Q802 can span
     every frame over -1 dBTP without a second pass. Silence reads -inf (ebur128 prints "Peak: -inf dBFS"), and an
-    all-gated loudness its "-70.0" floor."""
-    r = subprocess.run(
+    all-gated loudness its "-70.0" floor. RuntimeError when ffmpeg exits non-zero or prints no 100 ms line or no
+    summary: a run that read no audio still prints a "-70.0" summary, which is no measurement. Only the audio is
+    decoded (-vn), so the exit code is the audio's."""
+    p = subprocess.run(
         [
             ff,
             "-hide_banner",
             "-nostdin",
             "-i",
             str(path),
+            "-vn",
             "-af",
             "ebur128=peak=true",
             "-f",
@@ -438,7 +429,13 @@ def loud(path, ff="ffmpeg"):
         encoding="utf-8",
         errors="replace",
         check=False,
-    ).stderr
+    )
+    r = p.stderr
+    if p.returncode or not LOUD_FRAME.search(r) or "Summary:" not in r:
+        lines = r.strip().splitlines()
+        first = next((x for x in lines if "rror" in x), lines[-1] if lines else "")
+        why = f"exit {p.returncode}" if p.returncode else "no 100 ms line or no summary"
+        raise RuntimeError(f"ebur128 on {path}: {why} ({first.strip()[:200]})")
     s = r[r.rfind("Summary:") :]
     num = lambda pat: float(re.search(pat, s).group(1))  # noqa: E731
     v = r"(-?(?:inf|[\d.]+))"  # float() reads "-inf" too
@@ -525,6 +522,7 @@ def _is_bold(v):
 
 
 def _shrink(b, k=1):
+    """Box b moved k px in on every side (qa_registry imports it too)."""
     return (b[0] + k, b[1] + k, b[2] - k, b[3] - k)
 
 
@@ -816,11 +814,7 @@ def _contrast_rows(scenes, frames, spans, fps, scale, passing=()):
             continue
         for a, b in sp:
             fa, fb = C.frame_of(a, fps), C.frame_of(b, fps)
-            ks = (
-                range(fa, fb)
-                if fb - fa <= 3
-                else (fa + 1, C.mid_frame(a, b, fps), fb - 2)
-            )
+            ks = range(fa, fb) if fb - fa <= 3 else (fa, C.mid_frame(a, b, fps), fb - 1)
             for k in ks:
                 samples.setdefault(k, set()).add(s)
     measured = {}  # string -> [(t, ratio, minimum)]
@@ -899,7 +893,7 @@ def _hold_rows(scenes, frames, spans, fps, scale, passing=()):
     text under 36 px at 1080, each from the string's longest rest; worst_t is the middle of that rest. A ticker's
     values on the way (passing, see _ticker_passing) need no hold; the value it settles on does."""
     card = getattr(scenes, "HOLD_PROFILE", None)
-    short, small, tight, n_px, bad = [], [], None, 0, {}
+    short, small, tight, n_px, bad, nopx = [], [], None, 0, {}, []
     n_held = sum(s not in passing for s in spans)
     for s, sp in spans.items():
         a, b = max(sp, key=lambda x: x[1] - x[0])
@@ -911,6 +905,8 @@ def _hold_rows(scenes, frames, spans, fps, scale, passing=()):
             n_px += 1
             if px * scale < 36 and not C.allowed(scenes, "Q402", k / fps, 1 / fps):
                 small.append((s, px * scale, k, sp_in))
+        else:
+            nopx.append(s)
         if s in passing:
             continue
         # "profile": None means the card's profile, not display
@@ -969,7 +965,7 @@ def _hold_rows(scenes, frames, spans, fps, scale, passing=()):
             considered=n_held,
         )
     ]
-    rows += [
+    sizes = [
         _finding(
             "Q402",
             s,
@@ -983,7 +979,17 @@ def _hold_rows(scenes, frames, spans, fps, scale, passing=()):
             note=True,
         )
         for s, px, k, sp_in in small
-    ] or [
+    ]
+    if nopx:  # as Q301 says of a missing fg: a string with no size is not a string that passed
+        sizes.append(
+            C.not_checked(
+                "Q402",
+                f"text at rest with no px in the registry, size not measured: {len(nopx)} ({'; '.join(map(repr, nopx[:3]))})",
+                "give every text_items entry its px (the font size it is drawn at)",
+                item=nopx[0],
+            )
+        )
+    rows += sizes or [
         C.row(
             True,
             "Q402",
@@ -1310,7 +1316,10 @@ def check(
     def add(ok, code, msg, fix, note=False, **kw):
         rows.append(C.row(ok, code, msg, fix, note, **kw))
 
-    p = probe(path, ff)
+    try:
+        p = probe(path, ff)
+    except (subprocess.CalledProcessError, StopIteration, KeyError, ValueError) as e:
+        return [_unprobed(path, e)]
     n, d = (int(x) for x in p["fps"].split("/"))
     rate = n / d
     sched = scn = None
@@ -1369,6 +1378,14 @@ def check(
             metric=p["frames"],
             limit=want,
         )
+    else:  # a WebM carries no nb_frames: say the count went unchecked rather than leave Q704 out
+        rows.append(
+            C.not_checked(
+                "Q704",
+                f"{p['vcodec']} file: the container gives no frame count, so the frame count was not checked",
+                "deliver the H.264 MP4 (run_all.py full), or count the frames by hand (ffprobe -count_frames)",
+            )
+        )
     # the pixel format and the BT.709 chain are checked on the H.264 deliverable only
     if p["vcodec"] != "h264":
         rows += [
@@ -1418,13 +1435,6 @@ def check(
                 limit=8,
                 considered=len(SWATCHES),
             )
-    if not silent:
-        add(
-            p["acodec"] is not None,
-            "Q706",
-            f"audio stream {p['acodec']}",
-            "mux mix.wav into the encode, or pass --silent (or set SILENT in scenes.py) for a silent piece",
-        )
     ctx = C.Ctx(
         path,
         p,
@@ -1436,17 +1446,52 @@ def check(
         opts={"bpm": bpm, "max_mb": cap, "silent": silent, **opts},
         ff=ff,
     )
-    if p["acodec"] and not silent:
-        L = ctx.loudness = loud(path, ff)
+    # the picture's length: its frames, else (no frame count) the file's duration
+    pic = p["frames"] / rate if p["frames"] else p["duration"]
+    if not silent and not p["acodec"]:
         add(
-            abs(L["I"] + 14) <= 1,
-            "Q801",
-            f"loudness {L['I']} LUFS (want -14 +/- 1)",
-            "rerun audio.master on the raw mix, then re-encode",
-            metric=L["I"],
-            limit=-14.0,
+            False,
+            "Q706",
+            f"audio stream {p['acodec']}",
+            "mux mix.wav into the encode, or pass --silent (or set SILENT in scenes.py) for a silent piece",
         )
-        rows += _silence_rows(ctx.audio(8000), scn)
+    elif not silent:
+        # the stream's length as it decodes, the reading Q803 measures
+        heard = len(ctx.audio(8000)) / 8000
+        short = pic - heard > AUDIO_SHORT
+        stops = {"t0": round(heard, 3), "t1": round(pic, 3), "worst_t": round(heard, 3)}
+        add(
+            not short,
+            "Q706",
+            f"audio stream {p['acodec']}: {heard:.2f} s of sound against {pic:.2f} s of picture "
+            f"(want no more than {AUDIO_SHORT:g} s short)",
+            "the audio stops before the picture: mux the whole mix.wav again (run_all.py audio or full), with the "
+            "mix as long as DURATION",
+            metric=round(heard, 3),
+            limit=round(pic, 3),
+            **(stops if short else {}),
+        )
+    if p["acodec"] and not silent:
+        try:
+            L = ctx.loudness = loud(path, ff)
+        except RuntimeError as e:
+            rows.append(
+                C.not_checked(
+                    "Q801",
+                    f"loudness not measured: {e}",
+                    "check the audio track plays (ffmpeg -i <file>); render it again if it does not",
+                )
+            )
+        else:
+            add(
+                abs(L["I"] + 14) <= 1,
+                "Q801",
+                f"loudness {L['I']} LUFS (want -14 +/- 1)",
+                "rerun audio.master on the raw mix, then re-encode",
+                metric=L["I"],
+                limit=-14.0,
+            )
+        rows += _silence_rows(ctx.audio(8000), scn, pic)
 
     def grey(code, which, last=False):
         """The frame Q501 or Q502 measures, or None with a NOT CHECKED row when it does not decode (a damaged or
@@ -1473,8 +1518,9 @@ def check(
             metric=round(float(f0.mean()), 1),
             limit=25.0,
         )
+    # the last frame's time, which Q503 names too when Q502 could not decode it
+    last_t = round(((p["frames"] or round(p["duration"] * rate)) - 1) / rate, 3)
     if (f1 := grey("Q502", "last", last=True)) is not None:
-        last_t = round(((p["frames"] or round(p["duration"] * rate)) - 1) / rate, 3)
         add(
             f1.mean() > 25,
             "Q502",
@@ -1549,6 +1595,26 @@ def check(
     return rows
 
 
+def _unprobed(path, e):
+    """Q100 NOT CHECKED for a file probe() cannot read as a video (empty, cut inside its moov box, audio only),
+    naming the file and the reason: one row and exit 2, not a traceback."""
+    if isinstance(e, subprocess.CalledProcessError):
+        err = (e.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+        why = f"ffprobe exit {e.returncode}" + (f": {err[-1].strip()}" if err else "")
+    elif isinstance(e, StopIteration):
+        why = "no video stream"
+    elif isinstance(e, KeyError):
+        why = f"ffprobe gives no {e} for it"
+    else:
+        why = f"{type(e).__name__}: {e}"
+    return C.not_checked(
+        "Q100",
+        f"{path} did not probe as a video ({why[:200]}), so no gate ran",
+        "check the file plays (ffprobe <file>); render it again if it does not",
+        item="qa",
+    )
+
+
 def _module_row(m, e):
     """Q100 NOT CHECKED for gate module m that raised e, naming the error and the line it came from."""
     tb = traceback.extract_tb(e.__traceback__)
@@ -1564,10 +1630,11 @@ def _module_row(m, e):
     )
 
 
-def _silence_rows(a, scenes):
+def _silence_rows(a, scenes, dur=None):
     """Q803: a near-silent second (under -60 dBFS) inside the piece, one NOTE per run of seconds that ALLOW does not
     list. Seconds 1 to n - 2 are inside; a piece under 3 s has none, which is a PASS that says so. An audio stream
-    that decodes to nothing is NOT CHECKED."""
+    that decodes to nothing is NOT CHECKED. dur (the picture's length) sets n: audio that stops early is silence to
+    the end of the picture, and audio past it is not measured."""
     if not len(a):
         return [
             C.not_checked(
@@ -1576,6 +1643,9 @@ def _silence_rows(a, scenes):
                 "check the audio track (ffmpeg -i <file>)",
             )
         ]
+    if dur is not None:
+        k = round(dur * 8000)
+        a = np.pad(a[:k], (0, max(0, k - len(a))))
     secs = len(a) // 8000
     if secs < 3:
         return [
@@ -1840,8 +1910,8 @@ if __name__ == "__main__":
         ff=ff,
         **{k: v for k, v in vars(a).items() if k not in base},
     )
-    if a.json:
-        C.write_rows(rows, a.json)
+    if a.json:  # with the checked file's sha256, which qa.py approve matches to the file it approves
+        C.write_rows(rows, a.json, checked=a.video)
         found = review_entries(rows)
         if found and a.scenes:  # only into a build folder that was named (ctx.record)
             C.add_review_times(found, Path(a.scenes, C.REVIEW_TIMES))

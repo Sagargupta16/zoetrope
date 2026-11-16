@@ -200,15 +200,6 @@ def key_entries(fps=None):
     return out
 
 
-def key_times(fps=None):
-    """[(t, why)] sorted, one per frame, every reason at that frame joined with '; ' (the 2.1.0 shape; key_entries
-    keeps the kinds)."""
-    by = {}
-    for e in key_entries(fps):
-        by.setdefault(e["t"], []).append(e["why"])
-    return [(t, "; ".join(dict.fromkeys(w))) for t, w in sorted(by.items())]
-
-
 def finding_entries(rows):
     """A 'finding' entry for every FIX, NOT CHECKED and NOTE row that names a moment: its worst_t, else the middle
     of its longest span, else t0, with the row's status (the rows that name none go on the panel, see timeless).
