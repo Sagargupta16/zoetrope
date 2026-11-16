@@ -1,5 +1,6 @@
 # contract.py : what every engine module shares: the frame clock, the QA row, the files a build writes, and how
 # they are read. No module here imports scenes or engine, so anything can import this first.
+import ast
 import hashlib
 import json
 import math
@@ -159,15 +160,34 @@ def _plain(o):
     return o.tolist() if hasattr(o, "tolist") else str(o)
 
 
-def write_rows(rows, path):
+def write_rows(rows, path, checked=None):
+    """The rows as JSON at path: a list of row objects, or, given checked (the file the rows were measured on, as
+    qa.py check --json passes it), {"file": {"path", "sha256"}, "rows": [...]}, so qa.py approve can tell which file
+    they passed."""
+    data = [r.as_dict() for r in rows]
+    if checked is not None:
+        with open(checked, "rb") as f:
+            sha = hashlib.file_digest(f, "sha256").hexdigest()
+        data = {"file": {"path": str(checked), "sha256": sha}, "rows": data}
     Path(path).write_text(
-        json.dumps([r.as_dict() for r in rows], indent=1, default=_plain),
+        json.dumps(data, indent=1, default=_plain),
         encoding="utf-8",
     )
 
 
+def _rows_json(path):
+    """(file, row dicts) of a write_rows file; file is None for a plain list."""
+    j = json.loads(Path(path).read_text(encoding="utf-8"))
+    return (j.get("file"), j["rows"]) if isinstance(j, dict) else (None, j)
+
+
+def rows_file(path):
+    """{"path", "sha256"} of the file the rows at path were measured on, or None when write_rows was given none."""
+    return _rows_json(path)[0]
+
+
 def read_rows(path):
-    rows = [Row(**d) for d in json.loads(Path(path).read_text(encoding="utf-8"))]
+    rows = [Row(**d) for d in _rows_json(path)[1]]
     # JSON has no tuples; spans come back as the (t0, t1) pairs merge_spans makes
     for r in rows:
         r.spans = [tuple(s) for s in r.spans]
@@ -523,11 +543,13 @@ AAC_ARGS = ["-c:a", "aac", "-b:a", "320k"]
 
 def mux_cmd(ff, video, mix, out):
     """The one mux: picture stream copied, audio encoded once with AAC_ARGS, cut to the shorter stream, moov first.
-    mix=None muxes a silent piece. run_all.py and qa.py calib both run it, so the calibration cannot drift."""
+    mix=None muxes a silent piece. run_all.py and qa.py calib both run it, so the calibration cannot drift. stdin is
+    closed (-nostdin): with a "q" waiting on an inherited stdin, a 600 s mux exited 0 with 9.97 s (2026-11-16)."""
     sound = ["-i", mix, "-map", "0:v", "-map", "1:a"] if mix else ["-map", "0:v"]
     tail = [*AAC_ARGS, "-shortest"] if mix else []
     return [
         ff,
+        "-nostdin",
         "-y",
         "-v",
         "error",
@@ -625,7 +647,12 @@ CODES = {
     "Q703": ("qa", 7, "FIX", "resolution off"),
     "Q704": ("qa", 7, "FIX", "frame count off"),
     "Q705": ("qa", 7, "FIX", "not yuv420p"),
-    "Q706": ("qa", 7, "FIX", "no audio stream"),
+    "Q706": (
+        "qa",
+        7,
+        "FIX",
+        "no audio stream, or audio that stops more than 0.1 s before the picture",
+    ),
     "Q707": ("qa", 7, "FIX", "colour tags not bt709 / tv"),
     "Q708": ("qa", 7, "FIX", "colour round trip off by more than 8 levels"),
     "Q801": ("qa", 8, "FIX", "integrated loudness off -14 LUFS"),
@@ -759,6 +786,69 @@ def ffprobe_of(ff):
     return str(p.with_name(p.name.replace("ffmpeg", "ffprobe")))
 
 
+def ffprobe_json(path, *extra, ffprobe=None):
+    """ffprobe's JSON for path, with extra (-show_format, -show_entries ...) as the options. ffprobe defaults to the
+    one beside the ffmpeg found. Raises CalledProcessError (stderr kept as bytes) when ffprobe fails."""
+    out = subprocess.run(
+        [
+            ffprobe or ffprobe_of(find_ffmpeg() or "ffmpeg"),
+            "-v",
+            "error",
+            *extra,
+            "-of",
+            "json",
+            str(path),
+        ],
+        capture_output=True,
+        stdin=subprocess.DEVNULL,
+        check=True,
+    ).stdout
+    return json.loads(out)
+
+
+def read_wav_chunks(path):
+    """(fmt, data) chunk bytes of a RIFF WAV; data is None when the file has none. Raises ValueError naming the file
+    when it has no fmt chunk of 16 bytes or more (an empty or cut file)."""
+    b = Path(path).read_bytes()
+    i, fmt, data = 12, b"", None
+    while i + 8 <= len(b):
+        cid, size = b[i : i + 4], int.from_bytes(b[i + 4 : i + 8], "little")
+        if cid == b"fmt ":
+            fmt = b[i + 8 : i + 8 + size]
+        elif cid == b"data":
+            data = b[i + 8 : i + 8 + size]
+        i += 8 + size + (size & 1)
+    if len(fmt) < 16:
+        raise ValueError(f"{Path(path).name}: no fmt chunk")
+    return fmt, data
+
+
+def local_imports(start, skip=lambda m: False, tree=None):
+    """[Path] of start and every module file beside it that it imports, transitively, in discovery order. The imports
+    are read from the whole tree, so one inside a function counts. skip(module) drops a module (its imports too);
+    tree(path) parses a file (default ast.parse of its text, raising on a missing or bad file)."""
+    start = Path(start)
+    tree = tree or (lambda p: ast.parse(p.read_text(encoding="utf-8")))
+    out, todo = [], [start]
+    while todo:
+        p = todo.pop(0)
+        if p in out:
+            continue
+        out.append(p)
+        for n in ast.walk(tree(p) or ast.Module([], [])):
+            mods = []
+            if isinstance(n, ast.Import):
+                mods = [a.name.split(".")[0] for a in n.names]
+            elif isinstance(n, ast.ImportFrom) and n.module and not n.level:
+                mods = [n.module.split(".")[0]]
+            todo += [
+                q
+                for m in mods
+                if (q := start.parent / f"{m}.py").exists() and not skip(m)
+            ]
+    return out
+
+
 # ---- what a gate module gets from qa.py check ----
 
 
@@ -778,7 +868,7 @@ class Ctx:
         self.opts = opts or {}
         self.loudness = None  # qa.loud(path) summary {I, LRA, peak}, set by qa.check before the gate modules run
         self.rows = []  # every row qa.check made before the gate modules, then theirs as each returns (Q1302 reads it)
-        self._rgb = self._lin = self._grey = self._audio = None
+        self._rgb = self._lin = self._grey = self._audio = self._raw = None
 
     def _ff(self, args):
         """stdout of ffmpeg on the file. stdin is closed: an inherited stdin let a piped "q" stop the decode after
@@ -818,16 +908,19 @@ class Ctx:
 
     def lin(self):
         """float32 (n, 108, 192, 3) linear-light RGB of every encoded frame (DECODE_LINEAR, then an area average in
-        linear light), for the flash gate. About 0.45 GB for 60 s at 30 fps; cached like rgb()."""
+        linear light), for the flash gate. About 0.45 GB for 60 s at 30 fps; cached like rgb(). The planes are copied
+        from the decoded bytes into one array made for them, so the decode peaks at the bytes and that array: 0.90 GB
+        for 60 s, against 1.34 GB with two reordering copies (traced, 2026-11-16)."""
         if self._lin is None:
             w, h = THUMB_SIZE
             raw = self._ff(
                 ["-vf", f"{DECODE_LINEAR},scale={w}:{h}:flags=area", "-f", "rawvideo"]
             )
             g = np.frombuffer(raw, np.float32).reshape(-1, 3, h, w)  # planes G, B, R
-            self._lin = self._counted(
-                np.ascontiguousarray(g[:, [2, 0, 1]].transpose(0, 2, 3, 1))
-            )
+            lin = np.empty((len(g), h, w, 3), np.float32)
+            for c, plane in enumerate((2, 0, 1)):  # R, G, B
+                lin[..., c] = g[:, plane]
+            self._lin = self._counted(lin)
         return self._lin
 
     def grey(self):
@@ -844,35 +937,45 @@ class Ctx:
         return block64(self.grey())
 
     def audio(self, sr=48000, mono=True):
-        """float32 audio of the file at sr, cached per (sr, mono); empty when the file has no audio. mono=True is the
-        mean of the channels (ffmpeg's -ac 1 reads dual mono 3.01 dB hot); mono=False is (n, 2), which true-peak
-        work needs because the AAC encode makes the two channels of a dual-mono mix differ (up to 0.66 measured).
-        A mono file is read as mono and copied to both columns: -ac 2 upmixes it 3.01 dB down per channel."""
+        """float32 audio of the file at sr, cached per (sr, mono) from one decode per sr; empty when the file has no
+        audio. mono=True is the mean of the channels (ffmpeg's -ac 1 reads dual mono 3.01 dB hot); mono=False is
+        (n, 2), which true-peak work needs because the AAC encode makes the two channels of a dual-mono mix differ (up
+        to 0.66 measured). A mono file is read as mono and copied to both columns: -ac 2 upmixes it 3.01 dB down per
+        channel."""
         self._audio = self._audio or {}
         if (sr, mono) not in self._audio:
             if not self.probe.get("acodec"):
                 self._audio[sr, mono] = np.zeros((0,) if mono else (0, 2), np.float32)
             else:
-                ac = 1 if self.probe.get("channels") == 1 else 2
-                raw = self._ff(
-                    [
-                        "-vn",
-                        "-af",
-                        "aresample=first_pts=0",
-                        "-ac",
-                        str(ac),
-                        "-ar",
-                        str(sr),
-                        "-f",
-                        "f32le",
-                    ]
-                )
-                st = np.frombuffer(raw, np.float32).reshape(-1, ac)
+                st = self._pcm(sr)
+                ac = st.shape[1]
                 if mono:
                     self._audio[sr, mono] = st.mean(1, dtype=np.float32)
                 else:
                     self._audio[sr, mono] = np.repeat(st, 2 // ac, axis=1)
         return self._audio[sr, mono]
+
+    def _pcm(self, sr):
+        """float32 (n, channels) of the file's audio at sr as decoded, one or two channels; decoded once per sr, so
+        the mono and the stereo reading share one decode."""
+        self._raw = self._raw or {}
+        if sr not in self._raw:
+            ac = 1 if self.probe.get("channels") == 1 else 2
+            raw = self._ff(
+                [
+                    "-vn",
+                    "-af",
+                    "aresample=first_pts=0",
+                    "-ac",
+                    str(ac),
+                    "-ar",
+                    str(sr),
+                    "-f",
+                    "f32le",
+                ]
+            )
+            self._raw[sr] = np.frombuffer(raw, np.float32).reshape(-1, ac)
+        return self._raw[sr]
 
     def allowed(self, code, t, tol=None):
         return allowed(self.scenes, code, t, 1 / self.fps if tol is None else tol)

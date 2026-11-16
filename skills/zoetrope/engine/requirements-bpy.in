@@ -1,0 +1,10 @@
+# requirements-bpy.in : the Blender environment of plate3d.py (Blender as a Python module, GPL-3.0-or-later), a side
+# Python 3.13 uv environment, because bpy 5.2.x declares requires-python ==3.13.*. This line is the one place the pin
+# lives; plate3d.py runs the compiled lock and reads the version from it. After a change, compile the lock again from
+# this folder:
+#   uv pip compile --universal --generate-hashes --python-version 3.13 requirements-bpy.in -o requirements-bpy.txt
+# plate3d.py hashes requirements-bpy.txt into every plate's key, so a new lock makes each plate stale. uv run does not
+# check the --hash lines of a --with-requirements file (uv 0.13.8, 2026-11-16): the exact pin of every package in the
+# lock is what holds the set still. Version read from PyPI on 2026-11-16: 5.2.4 (2026-11-10) is the newest of the 5.2
+# LTS line; 5.3.0 is a new minor and was not taken.
+bpy==5.2.4

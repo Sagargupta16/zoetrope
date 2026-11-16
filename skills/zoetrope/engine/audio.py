@@ -114,7 +114,8 @@ def write_wav(path, mono, voice=None, scale=None):
         mix[: len(voice)] += voice[: len(mix)]
     if scale is None:
         scale = 0.85 / max(1e-9, np.abs(mix).max())
-    pcm = (np.stack([mix, mix], 1) * scale * 32767).astype("<i2")
+    # clipped, never wrapped: a voice added over a scale made for the bed alone can pass full scale
+    pcm = np.clip(np.stack([mix, mix], 1) * scale * 32767, -32768, 32767).astype("<i2")
     with wave.open(str(path), "wb") as w:
         w.setnchannels(2)
         w.setsampwidth(2)

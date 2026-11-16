@@ -106,7 +106,8 @@ voice-led piece with no narration files), and say so under `blocked`.
    with it by name: `bold="Nunito:800"` (family, weight, and `:italic` when
    asked) in every text helper, and the same value in the registry item's
    `bold`, which Q301 reads as bold from weight 700 up. If `list` shows a file
-   missing, run `python fonts.py fetch`. For any other font the style names
+   missing, stop under `blocked`: the parent runs `fonts.py fetch`, you cannot
+   download. For any other font the style names
    (most are Mac system fonts), pick the closest installed one (on Windows
    `C:/Windows/Fonts`), put its path first in FONT_BOLD or FONT_REG, and record
    the substitution. A missing font raises; never fall back to the Pillow

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import contract as C
 import numpy as np
+import qa_lint as L
 
 # ---- gate 6: flashes (WCAG 2.2 "general flash and red flash thresholds"; the run accumulator follows EA IRIS) ----
 
@@ -669,9 +670,11 @@ def _holds(scenes, fps, n):
     else:
         import qa  # here, not at the top: qa imports this module
 
-        try:  # a registry older than 2.2 (no "s" key) must not stop the other scans
+        # a registry older than 2.2 (no "s" key) must not stop the other scans, nor a text_items that raises
+        # anything else scenes.py code can (a ValueError)
+        try:
             spans = qa.text_spans(qa.text_frames(scenes, fps))
-        except (KeyError, TypeError, AttributeError, IndexError) as e:
+        except L.USER_ERRORS as e:
             spans = {}
             why.append(f"text registry unreadable ({type(e).__name__} {e})")
         for sp in spans.values():
@@ -1130,13 +1133,48 @@ def scan_thumbs(folder=".", scenes=None, fps=None):
     return rows
 
 
+def _part(codes, what, fix, run):
+    """run(), or one NOT CHECKED row per code naming what it raised: each part of check_rows stands alone, so a
+    truncated thumbs.npy (np.load raises ValueError, an empty one EOFError) no longer takes the measured flash rows
+    with it into one Q100."""
+    try:
+        return run()
+    except L.USER_ERRORS + (EOFError,) as e:
+        return [
+            C.not_checked(
+                code,
+                f"{what} raised {type(e).__name__}: {str(e)[:200]}, so it did not run",
+                fix,
+            )
+            for code in codes
+        ]
+
+
 def check_rows(ctx):
-    """Gate 6 on the linear-light decode, the frame scans on the grey one, and Q1105 against thumbs.npy; when the
-    check names a build folder (ctx.record), each finding's moment also goes into its review_times.json."""
-    rows = flash_rows(None, ctx.fps, ctx.w / ctx.h, scenes=ctx.scenes, lin=ctx.lin())
-    g = ctx.grey()
-    rows += scan_rows(g, ctx.fps, ctx.scenes)
-    rows += match_rows(g, ctx.workdir, ctx.fps)
+    """Gate 6 on the linear-light decode, the frame scans on the grey one, and Q1105 against thumbs.npy, each part on
+    its own (one that raises is NOT CHECKED for its codes only); when the check names a build folder (ctx.record),
+    each finding's moment also goes into its review_times.json."""
+    again = "check the decode (ffmpeg -i <file>) and scenes.py's ALLOW, SCHEDULE, CUTS and CUES, then run it again"
+    rows = _part(
+        ("Q601", "Q602", "Q603"),
+        "the flash gate",
+        again,
+        lambda: flash_rows(
+            None, ctx.fps, ctx.w / ctx.h, scenes=ctx.scenes, lin=ctx.lin()
+        ),
+    )
+    rows += _part(
+        ("Q1101", "Q1102", "Q1103", "Q1104"),
+        "the frame scans",
+        again,
+        lambda: scan_rows(ctx.grey(), ctx.fps, ctx.scenes),
+    )
+    rows += _part(
+        ("Q1105",),
+        f"the {C.THUMBS} match",
+        f"render the frames again (run_all.py full writes {C.THUMBS} and frames.hash together)",
+        lambda: match_rows(ctx.grey(), ctx.workdir, ctx.fps),
+    )
     if ctx.record:
         add_review(rows, ctx.workdir)
     return rows

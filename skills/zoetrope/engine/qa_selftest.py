@@ -43,14 +43,18 @@ def _txt(s):
 
 
 def _fits(w, r):
-    """Why r does not hold want w ('' when it does): item substring, worst_t within tol, metric within mtol, msg."""
+    """Why r does not hold want w ('' when it does): item substring, worst_t within tol, metric within mtol, msg. A
+    nan or inf time or value is a mismatch: abs(nan - x) > tol is False, so each test asks for the fit, not the
+    miss."""
     bad = []
     if w["item"] is not None and w["item"] not in (r.item or ""):
         bad.append(f"item {r.item!r} (want {w['item']!r})")
-    if w["t"] is not None and (r.worst_t is None or abs(r.worst_t - w["t"]) > w["tol"]):
+    if w["t"] is not None and not (
+        r.worst_t is not None and abs(r.worst_t - w["t"]) <= w["tol"]
+    ):
         bad.append(f"worst_t {r.worst_t} (want {w['t']:g} +- {w['tol']:g})")
-    if w["metric"] is not None and (
-        r.metric is None or abs(float(r.metric) - w["metric"]) > w["mtol"]
+    if w["metric"] is not None and not (
+        r.metric is not None and abs(float(r.metric) - w["metric"]) <= w["mtol"]
     ):
         bad.append(f"metric {r.metric} (want {w['metric']:g} +- {w['mtol']:g})")
     if w["msg"] is not None and w["msg"] not in r.msg:

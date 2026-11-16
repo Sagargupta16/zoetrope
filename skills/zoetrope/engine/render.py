@@ -41,6 +41,47 @@ def png_path(i, folder=FRAMES):
     return Path(folder, f"f{i:05d}.png")
 
 
+def empty(folder):
+    """Everything inside folder removed, the folder itself kept when it exists. Windows cannot remove a folder that is
+    a process's working folder (a shell left in frames/), while its contents can go; a file that cannot be removed
+    (open in a viewer) raises with its path, so no old frame is ever left among the new ones."""
+    p = Path(folder)
+    if p.is_dir():
+        for c in p.iterdir():
+            if c.is_dir() and not c.is_symlink():
+                shutil.rmtree(c)
+            else:
+                c.unlink()
+
+
+def reuse_check(n, fps, redraw):
+    """(the frames a --redraw run reads back from frames/, why it cannot or None): every frame of the n that no
+    (t0, t1) span of redraw covers must be there as PNG. run_all asks before it clears the last build;
+    render_to_ffmpeg asks again."""
+    fresh = {
+        i
+        for t0, t1 in redraw
+        for i in range(max(0, C.frame_of(t0, fps)), min(n, C.frame_of(t1, fps)))
+    }
+    read = frozenset(i for i in range(n) if i not in fresh)
+    missing = [i for i in sorted(read) if not png_path(i).exists()]
+    if missing:
+        return read, (
+            f"{FRAMES}/ lacks {len(missing)} of the frames to reuse (first {png_path(missing[0])}): "
+            "run once with keep_frames and no redraw"
+        )
+    # frames/ from another --size passes the count; one frame read back says so before anything is cleared
+    first = png_path(min(read)) if read else None
+    if first:
+        with Image.open(first) as im:
+            if im.size != (E.W, E.H):
+                return read, (
+                    f"{FRAMES}/ holds {im.size[0]}x{im.size[1]} frames ({first}); the build is {E.W}x{E.H}: "
+                    "run once with keep_frames and no redraw"
+                )
+    return read, None
+
+
 def checked(img, i):
     """img as RGB once it is the build's size: one frame of the wrong size would shear every frame after it."""
     if img.size != (E.W, E.H):
@@ -54,8 +95,8 @@ def render_frames(outdir=FRAMES):
     """Every frame as PNG in one process (slow; for a machine where the pool cannot start)."""
     import scenes
 
-    shutil.rmtree(outdir, ignore_errors=True)
-    Path(outdir).mkdir()
+    empty(outdir)
+    Path(outdir).mkdir(exist_ok=True)
     n = frame_count(scenes)
     for i in range(n):
         checked(scenes.draw(i / E.FPS), i).save(png_path(i, outdir), compress_level=1)
@@ -96,7 +137,7 @@ def render_parallel(outdir=FRAMES, procs=None, skip_existing=False, frames=None)
 
     idx = list(frames) if frames is not None else list(range(frame_count(scenes)))
     if frames is None and not skip_existing:
-        shutil.rmtree(outdir, ignore_errors=True)
+        empty(outdir)
     Path(outdir).mkdir(parents=True, exist_ok=True)
     procs = procs or default_procs()
     size = (E.W, E.H, E.FPS, E.SS)
@@ -320,21 +361,12 @@ def render_to_ffmpeg(
     procs = procs or default_procs()
     keep, read = (FRAMES if keep_frames else None), frozenset()
     if keep_frames and redraw:
-        fresh = {
-            i
-            for t0, t1 in redraw
-            for i in range(max(0, C.frame_of(t0, fps)), min(n, C.frame_of(t1, fps)))
-        }
-        read = frozenset(i for i in range(n) if i not in fresh)
-        missing = [i for i in sorted(read) if not png_path(i).exists()]
-        if missing:
-            raise FileNotFoundError(
-                f"{FRAMES}/ lacks {len(missing)} of the frames to reuse (first {png_path(missing[0])}): "
-                "run once with keep_frames and no redraw"
-            )
+        read, why = reuse_check(n, fps, redraw)
+        if why:
+            raise FileNotFoundError(why)
     elif keep_frames:
-        shutil.rmtree(FRAMES, ignore_errors=True)
-        Path(FRAMES).mkdir()
+        empty(FRAMES)
+        Path(FRAMES).mkdir(exist_ok=True)
     if keep_frames and getattr(scenes, "STATIC", None):
         print("note: STATIC is not used with keep_frames: every frame is drawn or read")
     slots, fb = 2 * procs, w * h * 3

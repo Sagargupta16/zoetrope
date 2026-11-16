@@ -72,6 +72,8 @@ CLOCKS = {
     "os.times",
     "time.thread_time",
     "time.thread_time_ns",
+    "time.clock_gettime",
+    "time.clock_gettime_ns",
 }
 # these read the clock when called with at most this many positional arguments (no timestamp given)
 CLOCK_NOW = {
@@ -439,8 +441,10 @@ class _Scan:
     (npr = np.random): np.random.rand -> numpy.random.rand, r.random -> random.random. Module state is a name bound
     at module level, an object reached through an imported module (E.FONT_BOLD, K.LOG), or a mutable default."""
 
-    def __init__(self, path, folder_tops=None, import_time=()):
+    def __init__(self, path, folder_tops=None, import_time=(), folder_rngs=None):
         self.path = Path(path)
+        # {module: rngs()} of the folder modules, each judged in its own file
+        self.folder_rngs = folder_rngs or {}
         self.import_time = set(
             import_time
         )  # defs that only run while the module imports (table builders)
@@ -579,6 +583,21 @@ class _Scan:
         ):
             base = self.qual(e.args[0], stack)
             return ".".join([base, e.args[1].value] + parts[::-1]) if base else None
+        if (  # importlib.import_module("time") is time, __import__("os.path") is os
+            isinstance(e, ast.Call)
+            and e.args
+            and isinstance(e.args[0], ast.Constant)
+            and isinstance(e.args[0].value, str)
+        ):
+            if self.qual(e.func, stack) == "importlib.import_module":
+                return ".".join([e.args[0].value] + parts[::-1])
+            if (
+                isinstance(e.func, ast.Name)
+                and e.func.id == "__import__"
+                and "__import__" not in self.top
+                and self.free("__import__", stack)
+            ):
+                return ".".join([e.args[0].value.split(".")[0]] + parts[::-1])
         if not isinstance(e, ast.Name):
             return None
         kind, val = self.where(e.id, stack)
@@ -628,9 +647,43 @@ class _Scan:
             else f"module state {r}"
         )
 
-    def is_rng(self, name):
-        v = self.top.get(name, (0, None))[1]
-        return isinstance(v, ast.Call) and self.qual(v.func, []) in RNG_MAKERS
+    def rng_kind(self, v):
+        """ "gen" when a module-level value makes a generator (random.Random(7), np.random.default_rng(7)), "pool"
+        when it is a list, tuple, set or dict of them (a display or a comprehension), else None."""
+        if isinstance(v, ast.Call):
+            return "gen" if self.qual(v.func, []) in RNG_MAKERS else None
+        if isinstance(v, (ast.List, ast.Tuple, ast.Set)):
+            items = v.elts
+        elif isinstance(v, ast.Dict):
+            items = v.values
+        elif isinstance(v, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
+            items = [v.elt]
+        elif isinstance(v, ast.DictComp):
+            items = [v.value]
+        else:
+            return None
+        return "pool" if any(self.rng_kind(x) == "gen" for x in items) else None
+
+    def rngs(self):
+        """{name: "gen" or "pool"} of this module's top-level generators: what findings() hands the files that
+        import them."""
+        return {
+            x: k
+            for x, (_, v) in self.top.items()
+            if v is not None and (k := self.rng_kind(v))
+        }
+
+    def generator(self, e):
+        """True when e, the object a method is called on, is a generator that lives at module level: a name bound
+        to one here (RNG = random.Random(7)) or in a folder module it imports (from kit import RNG, kit.RNG), or an
+        item of a module-level list, tuple or dict of them (POOL[0], kit.POOL[0])."""
+        want = "gen"
+        if isinstance(e, ast.Subscript):
+            e, want = e.value, "pool"
+        if isinstance(e, ast.Name) and e.id in self.top:
+            return self.rng_kind(self.top[e.id][1]) == want
+        mod, _, name = (self.qual(e, []) or "").rpartition(".")
+        return self.folder_rngs.get(mod, {}).get(name) == want
 
     def mask_expr(self, v, stack, masks=()):
         """True when v is a mask image: Image.new or .convert in a single-band mode, or a name bound to one."""
@@ -886,14 +939,15 @@ class _Scan:
                 stack,
                 extra=[self.top[r][0]] if r in self.top else (),
             )
-        elif r and isinstance(f.value, ast.Name) and self.is_rng(r):
+        elif r and self.generator(f.value):
+            g = self.seg(f.value, 30)
             self.add(
                 "Q1203",
                 n,
-                f"{r}.{f.attr}() draws from the module-level generator {r}: its stream advances with every frame, "
+                f"{g}.{f.attr}() draws from the module-level generator {g}: its stream advances with every frame, "
                 "so frames depend on draw order",
                 stack,
-                extra=[self.top[r][0]],
+                extra=[self.top[r][0]] if r in self.top else (),
             )
 
 
@@ -920,24 +974,7 @@ def defined_names(path):
 
 def local_modules(path):
     """[Path] of scenes.py and every module file in its folder it imports, transitively; engine and qa_* skipped."""
-    path = Path(path)
-    out, todo = [], [path]
-    while todo:
-        p = todo.pop(0)
-        if p in out:
-            continue
-        out.append(p)
-        for n in ast.walk(ast.parse(p.read_text(encoding="utf-8"))):
-            mods = []
-            if isinstance(n, ast.Import):
-                mods = [a.name.split(".")[0] for a in n.names]
-            elif isinstance(n, ast.ImportFrom) and n.module and not n.level:
-                mods = [n.module.split(".")[0]]
-            for m in mods:
-                q = path.parent / f"{m}.py"
-                if q.exists() and m not in ENGINE_FILES and not m.startswith("qa"):
-                    todo.append(q)
-    return out
+    return C.local_imports(path, skip=lambda m: m in ENGINE_FILES or m.startswith("qa"))
 
 
 def _engine_file(folder):
@@ -1027,11 +1064,13 @@ def findings(path="scenes.py"):
     msg}, plus counts {files, calls, defs, silenced} for the PASS rows."""
     files = local_modules(path)
     trees = {p: ast.parse(p.read_text(encoding="utf-8")) for p in files}
-    tops = {p.stem: _Scan(p).top for p in files}
+    plain = {p.stem: _Scan(p) for p in files}
+    tops = {k: s.top for k, s in plain.items()}
+    rngs = {k: s.rngs() for k, s in plain.items()}
     early = import_time_defs(trees.values())
     out, calls, silenced = [], 0, 0
     for p in files:
-        sc = _Scan(p, tops, early).scan()
+        sc = _Scan(p, tops, early, rngs).scan()
         out += sc.found
         calls += sc.calls
         silenced += sc.silenced

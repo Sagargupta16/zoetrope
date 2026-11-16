@@ -8,6 +8,7 @@
 import argparse
 import difflib
 import hashlib
+import http.client
 import itertools
 import json
 import os
@@ -38,17 +39,9 @@ FILES = (
     ("tokenizer.json", 2128466, "929c5252409436dce1b38a75d1abbcb5e132d170d8e324e4e04ed915fa2d22df"),
     ("vocabulary.txt", 422309, "ff77588746d3a2595d32ab5b69ffd7b95ce2441ac57533cb66fc3eb575a115cf"),
 )  # fmt: skip
-# its own uv environment, like the voice engines: av 18, because faster-whisper 1.2.1 fails to open a file with av 19
-# (SYSTRAN/faster-whisper#1589); clips go in as raw float32 anyway. Every package that changes the words is pinned.
+# its own uv environment, like the voice engines: every package pinned and locked in requirements-speech.in and .txt
 PYTHON = "3.14"
-PACKAGES = (
-    "faster-whisper==1.2.1",
-    "ctranslate2==4.8.5",
-    "av==18.1.0",
-    "onnxruntime==1.31.1",
-    "tokenizers==0.23.3",
-    "numpy==2.5.4",
-)
+LOCK = Path(__file__).with_name("requirements-speech.txt")
 VERSION = 1  # bump to transcribe again after a change the hashed worker cannot see
 SR = 16000  # what the model hears
 PAD = 0.3  # seconds of the timeline kept each side of a line's clip
@@ -67,29 +60,52 @@ STEM_CACHE, MIX_CACHE = "speech.json", "speech_mix.json"  # beside narration.jso
 # ---- the model and the worker ----
 
 
+_SEEN = {}  # (path, bytes, mtime) -> sha256: model.bin (145 MB) is hashed once per process, again only when it changes
+
+
+def _good(p, size, sha):
+    """True when p is a file of the pinned size and sha256 (as fonts.cached checks a font)."""
+    if not p.is_file() or p.stat().st_size != size:
+        return False
+    k = (str(p), size, p.stat().st_mtime_ns)
+    if k not in _SEEN:
+        with open(p, "rb") as f:
+            _SEEN[k] = hashlib.file_digest(f, "sha256").hexdigest()
+    return _SEEN[k] == sha
+
+
 def missing():
-    """What is not ready, by name (empty when the check can run)."""
+    """What is not ready, by name (empty when the check can run): a model file that is not there, or not of its
+    pinned size and sha256."""
     miss = [] if shutil.which("uv") else ["uv (winget install astral-sh.uv)"]
     d = ASR_DIR / MODEL
     return miss + [
-        f"{d / n} ({size} bytes)"
-        for n, size, _ in FILES
-        if not (d / n).is_file() or (d / n).stat().st_size != size
+        f"{d / n} ({size} bytes, sha256 {sha[:12]})"
+        for n, size, sha in FILES
+        if not _good(d / n, size, sha)
     ]
 
 
 def fetch():
-    """Download every model file that is missing or the wrong size into ASR_DIR, each kept only when its size and
-    sha256 match. Exit 0 when all are there, 1 when one failed."""
+    """Download every model file that is missing or not of its pinned size and sha256 into ASR_DIR, each kept only
+    when its size and sha256 match. Exit 0 when all are there, 1 when one failed (a network error included)."""
     d, bad = ASR_DIR / MODEL, 0
     d.mkdir(parents=True, exist_ok=True)
     for n, size, sha in FILES:
         p = d / n
-        if p.is_file() and p.stat().st_size == size:
+        if _good(p, size, sha):
             print(f"have {n}")
             continue
         url = f"https://huggingface.co/{REPO}/resolve/{COMMIT}/{n}"
-        data = urllib.request.urlopen(url, timeout=120).read()
+        try:
+            data = urllib.request.urlopen(url, timeout=120).read()
+        except (
+            OSError,
+            http.client.HTTPException,
+        ) as e:  # URLError, a timeout, a cut-off body (IncompleteRead)
+            print(f"FAIL {n}: download failed ({e})")
+            bad += 1
+            continue
         got = hashlib.sha256(data).hexdigest()
         if len(data) != size or got != sha:
             print(
@@ -106,13 +122,13 @@ def fetch():
 
 
 def code_id():
-    """What makes a transcript: the model's pinned files, the worker, its pins and VERSION."""
+    """What makes a transcript: the model's pinned files, the worker, its lock file and VERSION."""
     parts = [
         MODEL,
         COMMIT,
         *(sha for _, _, sha in FILES),
         _WORKER,
-        repr(PACKAGES),
+        LOCK.read_text(encoding="utf-8"),
         str(VERSION),
     ]
     return hashlib.sha256("\n".join(parts).encode()).hexdigest()[:16]
@@ -143,8 +159,7 @@ def hear(clips):
         }
         jp.write_text(json.dumps(job), encoding="utf-8")
         cmd = ["uv", "run", "--no-project", "--python", PYTHON]
-        for p in PACKAGES:
-            cmd += ["--with", p]
+        cmd += ["--with-requirements", str(LOCK)]
         r = subprocess.run(
             cmd + ["python", str(py), str(jp)],
             check=False,
@@ -288,7 +303,8 @@ def _number(tok):
             [["point"] + point] if n == 0 else []
         )
         if cur and len(frac) == 2:  # $5.99: five dollars ninety nine, five ninety nine
-            name = CURRENCY[cur]
+            # $1.50: one dollar fifty, as one dollar is said below
+            name = CURRENCY[cur][:-1] if n == 1 else CURRENCY[cur]
             cents = cardinal(int(frac))
             say = [r + [name] + cents for r in _readings(n)] + [
                 r + cents for r in _readings(n)
@@ -378,11 +394,12 @@ def _word_reads(p):
 def atoms(text, lex=None):
     """[(index of the word in text, [reading, ...])] where a reading is a list of plain words; the index counts words
     as voice._words does, so it points into a narration line's words[]. A number in digits ($99, 20%, 2026, 3:45) is
-    one atom with every common reading, a word the lexicon respells one atom read either way, and any other word one
-    atom per hyphen or slash part."""
+    one atom with every common reading, a word the lexicon respells one atom read either way (a trailing 's kept, as
+    voice._respell says it), and any other word one atom per hyphen or slash part, a part in digits read as a number
+    (9-to-5, 24/7, COVID-19)."""
     import voice as V
 
-    out, i = [], -1
+    out, i, lex = [], -1, lex or {}
     for tok in text.split():
         if all(unicodedata.category(ch)[0] in "PS" for ch in tok):
             continue  # voice._words skips a token of punctuation alone
@@ -398,16 +415,15 @@ def atoms(text, lex=None):
             for run in re.findall(r"\d+|[A-Za-z]+", core):
                 out.append((i, _said(run) or _word_reads(_plain(run))))
             continue
-        pieces = [
-            p for p in (_plain(x) for x in re.split("[-\u2010-\u2015/]", tok)) if p
-        ]
-        say = (lex or {}).get(V._norm(tok))
+        parts = [x for x in re.split("[-\u2010-\u2015/]", tok) if _plain(x)]
+        k = V._norm(tok)
+        tail = "'s" if k.endswith("'s") and k[:-2] in lex and k not in lex else ""
+        say = lex.get(k[: len(k) - len(tail)])
         if say:
-            out.append(
-                (i, [pieces, [p for p in (_plain(x) for x in V._words(say)) if p]])
-            )
+            respelt = [p for p in (_plain(x) for x in V._words(say + tail)) if p]
+            out.append((i, [[_plain(x) for x in parts], respelt]))
         else:
-            out += [(i, _word_reads(p)) for p in pieces]
+            out += [(i, _said(x.strip(EDGE)) or _word_reads(_plain(x))) for x in parts]
     return out
 
 
@@ -467,6 +483,24 @@ def _narration(ctx_or_path):
     if not p.is_file():
         return None, p
     return json.loads(p.read_text(encoding="utf-8")), p.parent
+
+
+class NoStem(ValueError):
+    """narration.wav is missing beside its narration.json, or does not decode."""
+
+
+FIX_STEM = "run voice.synthesize again (it writes narration.wav beside narration.json), or copy all of narration/"
+
+
+def _stem(where, narr):
+    """The narration's wav (narration.wav) at SR; NoStem naming it when it is missing or does not decode."""
+    import voice as V
+
+    wav = Path(where, narr.get("file", "narration.wav"))
+    try:
+        return V.dec(str(wav), sr=SR)
+    except ValueError as e:
+        raise NoStem(f"{wav.name} is missing or does not decode ({e})") from None
 
 
 def _clips(y, narr, at=0.0):
@@ -617,7 +651,14 @@ def stem_rows(narration, listen=None, scenes=None, at=0.0):
         ]
     import voice as V
 
-    y = V.dec(str(Path(where, narr.get("file", "narration.wav"))), sr=SR)
+    try:
+        y = _stem(where, narr)
+    except NoStem as e:
+        return [
+            C.not_checked(
+                "Q806", f"{e}, so what the narration says was not checked", FIX_STEM
+            )
+        ]
     clips = _clips(y, narr)
     try:
         got = heard([c for c, _ in clips], Path(where, STEM_CACHE), listen)
@@ -688,11 +729,9 @@ def offset(mix, stem):
 
 
 def _placed(ctx, narr, where):
-    """(stem at SR, file's sound at SR, offset, r), worked out once per Ctx."""
+    """(stem at SR, file's sound at SR, offset, r), worked out once per Ctx; NoStem when the stem does not decode."""
     if getattr(ctx, "_qa_speech", None) is None:
-        import voice as V
-
-        stem = V.dec(str(Path(where, narr.get("file", "narration.wav"))), sr=SR)
+        stem = _stem(where, narr)
         mix = ctx.audio(sr=SR)
         ctx._qa_speech = (stem, mix, *offset(mix, stem))
     return ctx._qa_speech
@@ -724,7 +763,14 @@ def mix_rows(ctx, listen=None, listen_stem=None):
                 f"python qa_speech.py fetch ({MODEL}, 147.8 MB, MIT)",
             )
         ]
-    stem, mix, at, z = _placed(ctx, narr, where)
+    try:
+        stem, mix, at, z = _placed(ctx, narr, where)
+    except NoStem as e:
+        return [
+            C.not_checked(
+                "Q807", f"{e}, so the narration in the file was not heard", FIX_STEM
+            )
+        ]
     name = narr.get("file", "narration.wav")
     if z < STALE_Z:
         return [
@@ -800,8 +846,11 @@ def check_rows(ctx):
         and _english(narr)
         and not missing()
     ):
-        _, _, at, z = _placed(ctx, narr, where)
-        at = at if z >= STALE_Z else 0.0
+        try:
+            _, _, at, z = _placed(ctx, narr, where)
+            at = at if z >= STALE_Z else 0.0
+        except NoStem:
+            pass  # stem_rows and mix_rows each name the stem that does not decode
     return stem_rows(ctx, scenes=ctx.scenes, at=at) + mix_rows(ctx)
 
 
@@ -830,7 +879,7 @@ def add_cli(sub):
     s.set_defaults(func=run)
 
 
-_WORKER = r"""# speech_worker.py : written and run by zoetrope qa_speech.py inside uv run --no-project --with <pins>
+_WORKER = r"""# speech_worker.py : written and run by zoetrope qa_speech.py inside uv run --no-project --with-requirements <lock>
 # One job file in (clips as raw float32 at 16 kHz); out.json out: the words heard in each clip, with times.
 import json
 import sys

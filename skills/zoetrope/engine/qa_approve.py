@@ -73,12 +73,56 @@ def stamp(path):
 
 def streamhash(path, ff=None):
     """sha256 of the decoded video frames (ffmpeg -f streamhash), None when it cannot decode: equal when the picture
-    is identical whatever the audio or container. It decodes; a stream copy would compare x264 bitstreams."""
+    is identical whatever the audio or container. It decodes; a stream copy would compare x264 bitstreams. stdin is
+    closed (a key waiting on an inherited one stopped the decode early and hashed part of the picture), and a run
+    that exits non-zero, or hashes a frame count more than 1 off the one the container gives, is None too."""
+    ff = ff or C.find_ffmpeg() or "ffmpeg"
     hashing = ["-map", "0:v:0", "-f", "streamhash", "-hash", "sha256", "-"]
-    cmd = [ff or C.find_ffmpeg() or "ffmpeg", "-v", "error", "-i", str(path), *hashing]
-    r = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    # -progress prints frame=<n> lines on stderr whatever -v says: the count of frames hashed
+    cmd = [
+        ff,
+        "-nostdin",
+        "-v",
+        "error",
+        "-progress",
+        "pipe:2",
+        "-i",
+        str(path),
+        *hashing,
+    ]
+    r = subprocess.run(
+        cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL, check=False
+    )
     m = re.search(r"SHA256=([0-9a-f]+)", r.stdout)
-    return m.group(1) if m else None
+    hashed = re.findall(r"(?m)^frame=(\d+)$", r.stderr)
+    if r.returncode or m is None or not hashed:
+        return None
+    want = _container_frames(path, ff)
+    return m.group(1) if not want or abs(int(hashed[-1]) - want) <= 1 else None
+
+
+def _container_frames(path, ff):
+    """nb_frames of the first video stream as the container gives it (ffprobe), or 0 when it gives none."""
+    r = subprocess.run(
+        [
+            C.ffprobe_of(ff),
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=nb_frames",
+            "-of",
+            "default=nw=1:nk=1",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+        check=False,
+    )
+    n = r.stdout.strip()
+    return int(n) if n.isdigit() else 0
 
 
 def ffmpeg_version(ff=None):
@@ -96,15 +140,7 @@ def ffmpeg_version(ff=None):
 
 def wav_data(path):
     """(sample rate, channels, bits, format code, raw data bytes) of a WAV in any sample format (PCM or float)."""
-    b = Path(path).read_bytes()
-    i, fmt, data = 12, None, b""
-    while i + 8 <= len(b):
-        cid, size = b[i : i + 4], int.from_bytes(b[i + 4 : i + 8], "little")
-        if cid == b"fmt ":
-            fmt = b[i + 8 : i + 8 + size]
-        elif cid == b"data":
-            data = b[i + 8 : i + 8 + size]
-        i += 8 + size + (size & 1)
+    fmt, data = C.read_wav_chunks(path)
     sr, ch, bits, code = (
         int.from_bytes(fmt[a:b], "little")
         for a, b in ((4, 8), (2, 4), (14, 16), (0, 2))
@@ -112,7 +148,7 @@ def wav_data(path):
     # WAVE_FORMAT_EXTENSIBLE: the real format code opens the sub-format GUID
     if code == 0xFFFE and len(fmt) >= 26:
         code = int.from_bytes(fmt[24:26], "little")
-    return sr, ch, bits, code, data
+    return sr, ch, bits, code, data or b""
 
 
 def wav_samples(path):
@@ -302,20 +338,10 @@ def local_modules(folder="."):
     """Every local .py file the build imports, from scenes.py on (engine, grain, a kit's helpers ...), found from
     the import statements anywhere in each file, so an import inside draw() counts too. A file that does not parse
     still counts; the draw that imports it reports the error."""
-    seen, todo = set(), ["scenes"]
-    while todo:
-        name = todo.pop()
-        p = Path(folder, f"{name}.py")
-        if name in seen or not p.exists():
-            continue
-        seen.add(name)
-        tree = _tree(p)
-        for node in ast.walk(tree) if tree else []:
-            if isinstance(node, ast.Import):
-                todo += [a.name.split(".")[0] for a in node.names]
-            elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
-                todo.append(node.module.split(".")[0])
-    return sorted(f"{m}.py" for m in seen)
+    start = Path(folder, "scenes.py")
+    if not start.exists():
+        return []
+    return sorted(p.name for p in C.local_imports(start, tree=_tree))
 
 
 def scene_frames(schedule, fps, n):
@@ -637,14 +663,16 @@ def load_approval(folder="."):
 
 def _swap(folder):
     """Put approved.new/ in the place of approved/ with two renames. The previous approval stays whole until the
-    second rename has happened, and a failed rename puts it back."""
+    second rename has happened, and a failed rename puts it back. A left approved.old/ is removed first only beside
+    an approved/: alone, it is the previous approval of an approve that stopped between the renames (approved_dir
+    reads it), kept until the new one is in place."""
     cur, new, old = Path(folder, C.APPROVED), Path(folder, NEW), Path(folder, OLD)
-    shutil.rmtree(old, ignore_errors=True)
-    if old.exists():
-        raise OSError(
-            f"{old.name}/ is left from an earlier approve and cannot be removed (a file in it is open)"
-        )
     if cur.exists():
+        shutil.rmtree(old, ignore_errors=True)
+        if old.exists():
+            raise OSError(
+                f"{old.name}/ is left from an earlier approve and cannot be removed (a file in it is open)"
+            )
         cur.rename(old)
     try:
         new.rename(cur)
@@ -891,6 +919,18 @@ def approve(
             refuse.append(
                 f"{C.QA_JSON} is older than {rel}: run qa.py check on it again with --json {C.QA_JSON}"
             )
+        # the rows must be of this file: the qa.json of another file approved one that fails Q801 (2026-11-16)
+        checked = C.rows_file(qa_path)
+        if checked is None:
+            refuse.append(
+                f"{C.QA_JSON} does not name the file it checked (written before qa.py check recorded it): run "
+                f"qa.py check on {rel} again with --json {C.QA_JSON}"
+            )
+        elif checked.get("sha256") != sha256_file(vid):
+            refuse.append(
+                f"{C.QA_JSON} holds the rows of {checked.get('path')}, not of {rel} (sha256 differs): run qa.py "
+                f"check on {rel} again with --json {C.QA_JSON}"
+            )
     if refuse and not override:
         for r in refuse:
             print(f"REFUSED: {r}")
@@ -929,7 +969,12 @@ def approve(
         if f.is_file()
     }
 
-    loud = qa.loud(str(vid)) if p["acodec"] else None
+    try:
+        loud = qa.loud(str(vid)) if p["acodec"] else None
+    except (
+        RuntimeError
+    ):  # ebur128 read no audio (Q801 NOT CHECKED, approved only with --override)
+        loud = None
     scenes = {}
     for name, frames in keys.items():
         dig = [res["digests"][i] for i in frames]

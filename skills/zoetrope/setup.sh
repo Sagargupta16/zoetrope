@@ -57,7 +57,8 @@ engine_python() {
 
 if [ "$fail" -eq 0 ]; then
   # first run downloads the pinned wheels into the uv cache; later runs are instant. Each requirements.in pin is
-  # held against what requirements.txt really installs, so the two files cannot drift apart unseen
+  # held against what requirements.txt really installs, so the two files cannot drift apart unseen (a pin it does not
+  # install at all prints MISSING)
   pkg_out=$(engine_python 'import sys
 from importlib import metadata
 import numpy, PIL
@@ -66,18 +67,31 @@ for line in open("requirements.in", encoding="utf-8"):
     pin = line.split("#")[0].strip()
     if "==" in pin:
         name, want = (p.strip() for p in pin.split("==", 1))
-        print("pkg", name.lower(), want, metadata.version(name))' 2>&1 | tr -d '\r')
+        try:
+            have = metadata.version(name)
+        except metadata.PackageNotFoundError:
+            have = "MISSING"
+        print("pkg", name.lower(), want, have)' 2>&1)
+  pkg_rc=$?
+  pkg_out=$(printf '%s\n' "$pkg_out" | tr -d '\r')
   if printf '%s\n' "$pkg_out" | grep -q "^py "; then
     echo "ok   python $(printf '%s\n' "$pkg_out" | sed -n 's/^py //p') (engine/.python-version says $pyver)"
     while read -r name want have; do
       [ -n "$name" ] || continue
-      if [ "$have" = "$want" ]; then
+      if [ "$have" = "MISSING" ]; then
+        echo "FIX  $name is pinned to $want in requirements.in but requirements.txt does not install it -> uv pip compile --universal --generate-hashes requirements.in -o requirements.txt (in engine/)"
+        fail=1
+      elif [ "$have" = "$want" ]; then
         echo "ok   $name $have, equal to its requirements.in pin"
       else
-        echo "FIX  $name $have installs from requirements.txt but requirements.in pins $want -> uv pip compile --generate-hashes requirements.in -o requirements.txt (in engine/)"
+        echo "FIX  $name $have installs from requirements.txt but requirements.in pins $want -> uv pip compile --universal --generate-hashes requirements.in -o requirements.txt (in engine/)"
         fail=1
       fi
     done <<< "$(printf '%s\n' "$pkg_out" | sed -n 's/^pkg //p')"
+    if [ "$pkg_rc" -ne 0 ]; then
+      echo "FIX  the requirements.in pin check stopped with exit $pkg_rc ($(printf '%s\n' "$pkg_out" | tail -1)) -> fix what that line names in engine/requirements.in, then rerun setup.sh"
+      fail=1
+    fi
   else
     echo "FIX  pinned Pillow and numpy did not install on Python $pyver ($(printf '%s\n' "$pkg_out" | tail -1)) -> check network once, or uv python install $pyver, then rerun setup.sh"
     fail=1

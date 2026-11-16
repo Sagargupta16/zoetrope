@@ -91,8 +91,8 @@ carried them.
    and read `review/audio.png` (1600 px wide): a log-frequency spectrogram,
    loudness lanes (momentary, short-term, the integrated line), the true peak
    per 100 ms with every frame over -1 dBTP in red, cue ticks coloured by
-   their measured offset (green within 1 frame, amber within 100 ms, red
-   missing, grey not measured) and the proof cells by number. Check: every
+   their Q902 status (green ok, red late, early or missing, grey not
+   measured) and the proof cells by number. Check: every
    scenario moment with a sound has a tick and a visible onset (a bright
    vertical edge) at it; nothing stacks on a hit (two edges a few px apart);
    no dark hole at a dashed cut unless the scenario plans a stop-down; M is
@@ -150,10 +150,10 @@ carried them.
 3. Run `python qa.py audiostrip <video> --scenes .` and read
    `review/audio.png` (its numbered ticks are the proof_keys cells). Every
    red TP frame needs a Q802 row, and a Q802 FIX must show red bars; a frame
-   red here but not on the proof strip is the AAC encode's overshoot. An amber
-   tick (more than one frame off, within 100 ms) is a Q902 FIX when the sound
-   is late or more than 40 ms early, a Q902 NOTE when 40 ms early or less; a
-   mark with no row, or a FIX row with no mark, is a P1 R801. Every red or amber cue tick should match a
+   red here but not on the proof strip is the AAC encode's overshoot. A red
+   tick is a Q902 FIX (late past one frame, early past 40 ms, or missing); a
+   green tick can still carry a Q902 NOTE (outside -5 to +15 ms); a
+   mark with no row, or a FIX row with no mark, is a P1 R801. Every red cue tick should match a
    Q902 row (Q902 rows name the cue and its ms; a row from the no-cue-sheet
    detector is a guess); a grey tick on a cue that must sound goes under
    cannot verify. Report what only the picture shows as R801, with the time.

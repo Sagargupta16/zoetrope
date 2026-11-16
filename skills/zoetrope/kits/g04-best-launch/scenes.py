@@ -5,11 +5,12 @@
 from __future__ import annotations
 
 import math
+import os
 import random
 from functools import lru_cache
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 import engine as E
 from engine import (
@@ -305,8 +306,30 @@ def dots(img, items):
     comp(img, lay, X0, Y0)
 
 
+# the three extra Segoe UI weights this build was approved with (ported from engine_used.py); "bold" and "reg"
+# still go through the engine's font()
+FONT_FILES = {
+    "black": ["C:/Windows/Fonts/seguibl.ttf"],  # wordmark, big numerals
+    "semi": ["C:/Windows/Fonts/seguisb.ttf"],  # UI labels, pills
+    "ital": ["C:/Windows/Fonts/segoeuii.ttf"],  # "(n.)" in the dictionary card
+}
+
+
+@lru_cache(maxsize=None)
+def _kit_font(px, key):
+    for p in FONT_FILES[key]:
+        if os.path.exists(p):
+            return ImageFont.truetype(p, px)  # zoetrope: text-ok
+    raise FileNotFoundError(
+        f"no font found in {FONT_FILES[key]}; put an installed font path first"
+    )
+
+
 def font(size, key="bold"):
-    return E.font(max(1, size * SS), {"bold": True, "reg": False}.get(key, key))
+    px = max(1, size * SS)
+    if key in FONT_FILES:
+        return _kit_font(int(px), key)
+    return E.font(px, {"bold": True, "reg": False}.get(key, key))
 
 
 def text_w(s, size, key="bold"):
