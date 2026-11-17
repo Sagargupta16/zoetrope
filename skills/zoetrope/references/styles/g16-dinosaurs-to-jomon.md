@@ -41,6 +41,16 @@ Original score at 90 BPM in D, one bar = 2.667 s, every chapter starts on a bar 
 - Keep chapters in a SCHEDULE dict; shorten by dropping chapters, not by speeding them up.
 - Fact-check every date against a source the user trusts; the build kept a "facts checked" list with rounded on-screen values (for example 252 / 201 / 143 / 66 / 23 / 2.6 Ma).
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.lower_third(name, role=kicker, style="kicker", xy=<left column>)` for a chapter's kicker chip over its name; the date range and up-to-three facts stay on the card's own staggered slide-up.
+- **Data:** `blocks_data.counter(value=66, start=145, suffix=" Ma", t0=chapter_start, ...)` for the years-ago counter at the top right, one call a chapter (the only ticker block in each scene); `blocks_data.line_draw(values, xlabels, ...)` for the Ice Ages sea-level fall to -120 m; `blocks_data.route_arc(a, b, labels, halo=<ground colour>)` for the arrival-route arrows over the map, where `halo` keeps the labels readable on the relief.
+- **Backgrounds and effects:** `blocks_fx.starfield(t, sky=("#05070D", "#05070D"))` behind the globe on the title and the early chapters.
+- **Helpers:** `engine.fbm(x, y, 0.5, octaves=4, seed="relief")` on numpy coordinate arrays for the seeded noise heightmap (it is 0 at whole-number triples, so keep `z` fractional).
+- **Gates:** write `quiz.json` (Q210) from the facts-checked list (252, 201, 143, 66, 23 and 2.6 Ma and their chapters), each answer's keys on one frame. The impact flash at 49.33 s: run `qa.flash_window(draw, 48.5, 50.5, fps)` so it stays local or brief.
+
 ## Pitfalls (from what went wrong in our build)
 - The basin-opening map was a schematic (two rigid blocks rotating on today's relief); label any simplification on screen.
 - Ice-age and later coastlines used today's topography with sea level shifted, which ignores uplift and sediment; say "approximate".

@@ -28,13 +28,22 @@ Bar n starts at (n-1)*2 s; beat = 0.5 s.
 - Layout and texture: lots of empty space; vertical clips cropped to 9:16; floor reflections under the carousel; camera language is one slow push-in (scale 1.00 to 1.04 per shot), every entry moves upward or leftward.
 
 ## Motion
-Easing: expo or quint out for entries, cubic in-out for travel; no bounce, no overshoot. Masked reveals: text rises from below a clip rectangle. Match cuts: measure the box of the outgoing element at draw time and interpolate its rect into the incoming one. Circle wipe: radius from 0 to full over the drop bar, centred on the button. The whip is a horizontal blur plus fast ease. Rotated panel: fade the wrapper, never the 3D element itself. Everything is a function of t.
+Easing: expo or quint out for entries, cubic in-out for travel; no bounce, no overshoot. Masked reveals: text rises from below a clip rectangle. Match cuts: measure the box of the outgoing element at draw time and interpolate its rect into the incoming one. Circle wipe: radius from 0 to full over the drop bar, centred on the button. The whip is a horizontal blur plus fast ease (`FX_MENU["whip_pan"]` does both). Rotated panel: fade the wrapper, never the 3D element itself. Everything is a function of t.
 
 ## Audio
 120 BPM 4/4, 10 bars. Bars 1-2 intro: soft pluck on every beat (octave up on the colour wipe), no kick, filtered pad, riser in bar 2, beat 4 of bar 2 pulls back to a gap so the click reads. Typing = key ticks on 32nds. Drop at 4.0: kick, sub, chord. Bars 3-8 full groove: kick 4/4, clap on 2 and 4, sub, offbeat hats. Whoosh with its measured peak at 9.80. Flip swish at 11.0, ticks on result rows. Bar 9: groove stops, final chord plus low hit at 16.0. Bar 10 reverb tail to silence by 20.0. Place each SFX so its measured peak, not its file start, lands on the event. Keep SFX quiet under the music. Master -14 LUFS (build measured -14.0).
 
 ## Build notes
-Generate the track in numpy with the drop at bar 3, then run beat analysis on it and calibrate the grid to the kick peaks; write the grid to a small dict used by draw(t). The build used 14 licensed real clips (Wikimedia Commons, CC0/CC BY/CC BY-SA/CC BY 3.0) with a CREDITS file. We must use the user's own clips (extract frames with ffmpeg on the device, if present) or generated stills; it must not download footage it cannot license, and it must list credits for anything with an attribution licence. Motion blur: render 3 sub-frames around t (minus, at, plus 1/240 s) and average. 3D carousel: fake with scaled and offset clip frames sorted by depth plus a flipped, faded copy for the reflection.
+Generate the track in numpy with the drop at bar 3, then run beat analysis on it and calibrate the grid to the kick peaks; write the grid to a small dict used by draw(t). The build used 14 licensed real clips (Wikimedia Commons, CC0/CC BY/CC BY-SA/CC BY 3.0) with a CREDITS file. We must use the user's own clips (extract frames with ffmpeg on the device, if present) or generated stills; it must not download footage it cannot license, and it must list credits for anything with an attribution licence. Motion blur: `engine.motion_blur(draw, t, samples=3)` averages 3 sub-frame draws around t in linear light. 3D carousel: fake with scaled and offset clip frames sorted by depth plus a flipped, faded copy for the reflection.
+
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults. Only parts that stay inside the ban list: no `chromatic_split`, `glitch_slices` or `noise_warp`, no `light_leak`, no `engine.wobble` shake, no bouncy easing.
+
+- **Text:** `blocks_text.marker("underline", key_word_box, t0=7.0, dur=0.5, colour=accent, hand=0)` for the accent rule under the key word (`hand=0` keeps it a straight rule); pass the word's `text_box`.
+- **Transitions and camera:** `blocks_fx.FX_MENU["whip_pan"](a, b, p, direction="left")` for the motion-blurred whip at 9.5 s (it eases itself, low flash risk); `blocks_fx.push_in(img, k, scale=1.04)` for the one slow push-in per shot; `engine.motion_blur(draw, t, samples=3)` for any other fast move.
+- **Helpers:** `footage.Clip(name, fit="cover").frame(t)` for the user's own clips (the card allows real footage only; `python footage.py prepare <name|all>` first).
+- **Gates:** Q1106 notes a cut whose exit and entry trade axis or point opposite; the card's rule that every entry moves upward or leftward already keeps them together, so hold to it at every cut. `brand.json` (one accent, `Inter`) when the user has a brand.
 
 ## Pitfalls (from what went wrong in our build)
 - The build session dropped before its own final QA; always run the check step yourself (duration, fps, loudness, contact sheet).

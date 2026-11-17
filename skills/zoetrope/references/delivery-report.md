@@ -13,10 +13,12 @@ Length: {mm:ss} | Size: {resolution} at {fps} fps | Codec: {video codec} + {audi
 Encode rung used: {a: H.264 MP4, frames piped into the encode / b: AV1 MP4 or VP9 WebM from PNG frames / c: GIF preview}
 Why this rung: {for example "ffmpeg with libx264 was found on this machine"}
 Plays in: {what we know, for example "Chrome and Slack web; older QuickTime may not play AV1/VP9"}
-Extra files: {GIF preview for Slack, poster PNG, 720p cut, none}
+Extra files: {GIF preview for Slack, poster PNG, 720p cut, draft.mp4, <name>_alpha.webm or .mov, variants/<WxH>/ builds, none}
 
 What is in it: {one line per scene, with start time}
-Audio: {music synthesized by us | music supplied by you | voice: {engine} {voice name}} | Loudness {x} LUFS, true peak {y} dBTP
+Audio: {music synthesized by us | music supplied by you | a score made elsewhere (audio.music_file) | voice: {engine} {voice name}} | Loudness {x} LUFS, true peak {y} dBTP
+Loudness target: {-14 (the default, left out) | the --loudness value, as recorded in build.json}
+Brand kit: {brand.json: palette, fonts and logo file used, and `python brand.py check` as printed | none}
 Master: {the master line as printed, and any re-master lines}
 
 QA run: {the QA: line as printed, for example "QA: PASS (49 checks, 0 FIX, 0 NOTE, 0 NOT CHECKED)"}
@@ -30,12 +32,13 @@ QA run: {the QA: line as printed, for example "QA: PASS (49 checks, 0 FIX, 0 NOT
 - Audio and video sync at hits (Q902, Q903): {worst ms on the stem, mux ms / list}
 - Loudness and true peak (Q801, Q802, Q805): {values}
 - What the narration says (Q806, Q807): {words heard as written / each NOTE and what listening found / no narration}
-- Frame scans (Q1101 to Q1105): {NOTEs and what each turned out to be / none}
+- Frame scans (Q1101 to Q1106): {NOTEs and what each turned out to be, a Q1106 seam NOTE with the cut's time / none}
+- Quiz (Q210): {each answer on screen together, or in the narration only / not run: no quiz.json}
 - Not checked: {every NOT CHECKED row and anything skipped, and listening by ear: checked by measurement only, not by ear}
 
 Facts used (checked {date}):
 - {claim} -> {source}
-Media and credits: {file, source, licence, attribution card yes/no | "no third-party media"}{; recorded instruments: the lines `sampler.credits(names)` prints, CC0}
+Media and credits: {file, source, licence, attribution card yes/no | "no third-party media"}{; recorded instruments: the lines `sampler.credits(names)` prints, CC0}{; score made elsewhere: file, who made it or the model and its licence, "generated for this video" or the licence it came under}{; footage clips and image plates: file, the model and its licence or the source and licence, "generated for this video"}
 Known weak spots: {honest list, for example "small labels on a phone", "mix checked by measurement, not by ear"}
 
 Want changes? Tell us the scene and the time (for example "scene 3, 0:12") and we will rebuild only what changes.
@@ -60,13 +63,14 @@ Every value in the message is copied from a tool's output in this session, never
 |---|---|
 | File name | `<slug>_<aspect>_<length>s_v<n>.mp4` (`formats.md`) |
 | Length, size, resolution, fps, codec | The `DELIVERED` line and ffprobe's `duration`, `size`, `width`, `height`, `r_frame_rate`, `codec_name` (rung a is h264 with aac) |
-| Loudness | The `DELIVERED` line and the ebur128 Summary. A silent piece says `silent` there and in the report |
+| Loudness | The `DELIVERED` line and the ebur128 Summary. A silent piece says `silent` there and in the report. The target is the `"loudness"` key of `build.json` (`qa.build_loudness`; -14 when absent) and Q801's row names it: a build made with `--loudness podcast` says -16, not -14, and the report says which number the user asked for (`mixing.md`) |
 | Encode rung | Which rung of the ladder made the file and why, every time, even rung a: rung a needs only "libx264 present"; rung b names the missing libx264 and the encoder used; rung c says the GIF is a preview |
 | QA run | The `PROOF:` and `QA:` summary lines as printed; every reviewer id with its verdict (for example proof-1 REVIEW PASS, final-1 REVIEW FIX, final-2 REVIEW PASS) |
 | Not checked | Always two lines: how it looks and sounds to a person (no script listens or watches; the reviewer read the sheets and frames) and photosensitivity (the flash gates measure WCAG 2.2 limits, but no tool certifies compliance). Then every `NOT CHECKED` row (on rung b, Q705, Q707 and Q708 by design) and anything skipped, such as a platform's own overlay zones or a voice engine's word clock on a voice nobody measured |
 | Known weak spots | Every NOTE row in the final check and why it stays (an `ALLOW` entry says it was designed), every reviewer P1 or P2 left open with its time, anything close to a limit, and a true peak inside -1 dBTP but within the meter tolerance (run_all prints a `note:` line for that) |
 | Facts used | The scenario's Facts table: each claim on screen, its source and the date it was read. A claim with no source is not on screen |
-| Media and credits | The font files `engine.font()` used; the music (made in code by `audio.py` or `synth.py`, recorded instruments with the `sampler.credits` lines, or the user's own track and its licence); the voice engine, voice and weights licence (`voice.md`); every image, logo or clip the user supplied, with its source |
+| Media and credits | The font files `engine.font()` used; the music (made in code by `audio.py` or `synth.py`, recorded instruments with the `sampler.credits` lines, a score made elsewhere and placed with `audio.music_file` with its maker or model and its licence, or the user's own track and its licence); every footage clip (`footage.Clip`) and image plate with its source or model, licence and "generated for this video" (`image-plates.md`); the `brand.json` used; the voice engine, voice and weights licence (`voice.md`); every image, logo or clip the user supplied, with its source |
+| Alpha and batch | `run_all.py alpha` ends with one `ALPHA` line (file, size, fps, length, pixel format, MB): quote it, and say the alpha file is not the approved picture and ran no gates. `run_all.py batch --sizes ...` prints one `BATCH <size> <stage> exit <rc>` line per size and builds in `variants/<WxH>/`; each line quotes that size's `DELIVERED` (or `REJECTED`) line, and the whole run is in `variants/<WxH>/run.log`, so report each size from its own line and read its `APPROVAL` line there; a size whose line is not `DELIVERED` is not delivered. A `draft` run ends with one `DRAFT` line and is a preview only: never report it as the delivery |
 | Next options | Two or three concrete follow-ups that fit the brief: a 9:16 cut (`--size 1080x1920`), a GIF preview (rung c), a shorter cut, a 720p cut for email, a poster PNG of the strongest frame, another voice from `voice_samples.py` |
 
 ## Rules

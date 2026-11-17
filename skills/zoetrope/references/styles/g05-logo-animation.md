@@ -40,6 +40,16 @@ Sound follows the picture from one cue sheet. Morph hits are boings whose pitch 
 - If the user has no logo file, ask for it or draw a simple mark from shapes; keep the final frame equal to the supplied mark.
 - Synthesize boings (sine with falling pitch plus wobble), marimba (sine with fast decay) and a whistle (swept sine) in numpy.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Transitions and camera:** `blocks_fx.push_in(img, k, scale=1.022)` for the 6.60-8.50 s hold's slow push-in; `engine.motion_blur(draw, t, samples=8)` on the two fastest moves only, the catapult (0.50-0.95 s) and the whip to the lockup (3.45-4.40 s).
+- **Helpers:** `engine.ease_out_elastic` (it overshoots to 1.37) where that much jelly is wanted; the card's own `spring(t, overshoot, period)` stays for the 1.0 to 1.15 settles. Never on the tagline or on colour.
+- **Gates:** `brand.json` with the brand's palette, font and `logo` file, then `python brand.py check`; the last frame still has to match that logo.
+
+No text, data or background block: the animation is the logo, and the card has no grain.
+
 ## Pitfalls (from what went wrong in our build)
 - Cartoony boings and slide whistle may feel too cute for a calm brand: lower the boing gains.
 - Letters are thin slivers for 1-2 frames as they start (a speck at 4.20 s); the dot is a wide ellipse when squashing into the doorway; mint-to-lilac blend reads dusty blue for about 0.1 s at 1.0 s. Acceptable in motion; hold min letter height or blend in a better colour space if stills matter.

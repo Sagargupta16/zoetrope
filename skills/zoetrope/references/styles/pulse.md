@@ -75,6 +75,15 @@ Beat-locked kinetic type for 9:16 social reels: words land on the beat, build in
 - Helpers: `canvas` (fields), `text`, `text_box`, `text_w`, `fit_size`, `prog`, `lerp`, `clamp`, `ease_out_cubic`.
 - CUES: every landing (kind `both`), the drop as `{"t": 12.0, "label": "drop", "payoff": True}`, the end card (16.0). KEY_TIMES: the frame after each phrase's last word settles (1.2, 5.7, 9.7), 12.2 and 19.5. `STATIC = [(19.0, 20.0)]`.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+The reel is words on flat fields with hard cuts and no shake, so no background, transition, camera or motion helper applies.
+
+- **Text:** `blocks_text.end_card(title="{call to action}", handle="@handle", accent=ZEST, ink=TYPE, dark=FIELD_B)` for the end card (the handle as typed); for a lyric-style cut `blocks_text.captions(words, style="pop", ink=TYPE, accent=HOT)` takes `(word, start, end)` tuples at the landing beats, but each caption word is a reading-hold record, so a word still needs 1.0 s or more on screen.
+- **Gates:** none.
+
 ## QA watch-outs
 
 - Q401: every word here rests 2.5 s or more, because words land in a phrase's first bar and stay through its second; land none later than beat 1 of the second bar.

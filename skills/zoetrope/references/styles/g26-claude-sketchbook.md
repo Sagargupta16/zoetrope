@@ -32,6 +32,16 @@ One 6-bar theme in F major, 3/4 at 90 BPM (1 bar = 2 s), first half on the left 
 ## Build notes
 Three.js page curl and the 3D desk scene cannot run in the engine. Workable substitute: a 2D flat or slightly skewed top-down book. Draw each page with PIL as an image from a stroke list (seeded), reveal strokes by progress, and draw the pencil tip as a small sprite following the current point. Fake the page turn by a horizontal squeeze (cos of an angle) with a darkening gradient and a drop shadow; fake the lamp with a radial warm vignette. Keep the video short: 6 to 10 pages (about 40 to 60 s) is realistic; at about 5 s per page, 20 pages is too slow to build and to watch. Do not claim real page-curl geometry. Piano and foley are numpy: sums of decaying sine partials with a noise burst, band-passed noise for scratch.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+The handwriting, charts and page turn are the card's own hand-built strokes; the data blocks are too clean for a page in a used sketchbook.
+
+- **Text:** `blocks_text.marker("strike", box, colour=...)` and `"circle"`, `"underline"` for the struck words and the circled notes (the marks wobble like a hand, and `marker_items` returns `[]` since a mark is not text).
+- **Backgrounds and effects:** `blocks_fx.paper_texture(t, color=..., grain=..., seed=...)` as the page ground, with the card's paper tone `#e6dcc4`; `blocks_fx.vignette` for the lamp falloff.
+- **Helpers:** `engine.wobble(t, amp=..., hz=..., seed=...)` for the handheld drift and tiny roll; `engine.smootherstep` for ramping the page curl in and out so a turn never pops.
+
 ## Pitfalls (from what went wrong in our build)
 - Pages draw fast (about 5 s each); dense pages cannot be read in real time. Slow down or reduce the density.
 - Lamp light washed colour out: blue watercolour read grey-blue and ochre washes were faint. Boost saturation before the lamp tint.

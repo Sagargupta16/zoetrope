@@ -75,6 +75,14 @@ Every pair clears 4.5:1, so any pair may carry text at any size. A brand colour 
 - One `layout(t)` feeds `draw()` and `text_items()`. Register the name, promise, headlines, panel labels, call to action and address. Filler copy inside a mock panel is `texture=True` and under 24 px at 1080; the cursor and toggles are shapes.
 - CUES: every cut (the 16.0 cut sits inside the push window, so kind `audio`), each interface moment (`both`). KEY_TIMES: each moment plus 2 frames, and 19.5. `STATIC = [(19.0, 20.0)]`.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** inside a panel, `blocks_text.chat_thread(img, t, [("them", "..."), ("me", "...")], t0=..., step=...)`, `blocks_text.notification(title, body, ...)` or `blocks_text.code_diff(old, new, lang="python", ...)` can be an idea's one interface moment, drawn in PANEL, TEXT and ACCENT; each has a twin `_items` called with the same arguments.
+- **Data:** `blocks_data.progress_bar(pct, label=..., color=ACCENT, track=LINE)` or `stat_ring` for "a bar fills"; `blocks_data.counter` for the one number of the 24 s proof beat.
+- **Gates:** write `quiz.json` (Q210) from the facts list when a headline makes a claim; when a brand colour replaces ACCENT, put it in `brand.json` and run `python brand.py check`.
+
 ## QA watch-outs
 
 - Q501: frame 0 is the thumbnail; draw the name and panel A fully there. CANVAS alone reads grey 37, so the floor of 25 holds.

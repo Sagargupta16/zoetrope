@@ -32,9 +32,18 @@ Each chapter hands its main shape to the next (ball to plum frame, dial to iris,
 ## Build notes
 900 frames at 60 fps is heavy in PIL: use 30 fps if short on time and say so. Replace CSS 3D with perspective warps.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.notification(title, body, t0=pop_time, ...)` for the generic notifications of chapter 05, generic copy only.
+- **Data:** `blocks_data.counter(value=2, start=4, suffix=" to go", ...)` for the "4 to go" to "2 to go" roll in chapter 04, and `counter(value=6)` for the 6-day streak in chapter 06; one ticker block per scene.
+- **Transitions and camera:** `engine.motion_blur(draw, t, samples=4)` on the fast moves (the ball drop, the dial rushing the lens, the cards flying up); at 60 fps it costs `samples` times each frame. `engine.wobble(t, amp=..., hz=..., seed=...)` for the notification jitter in chapter 05. No `FX_MENU` entry: each chapter hands its main shape to the next.
+- **Gates:** `brand.json` with the brand's palette and mark, then `python brand.py check`. A hand-off is a cut on motion: keep exit and entry on the same axis and direction (the seam law, Q1106).
+
 ## Pitfalls (from what went wrong in our build)
 - Two seconds per chapter is too fast for small labels (26 px HUD unreadable): use 36 px or larger.
-- Quiet dip was only 2 to 3 dB: go 6 dB or more. Use the final logo path from the start, not a circle swapped in one frame. Add frame blending for fast moves.
+- Quiet dip was only 2 to 3 dB: go 6 dB or more. Use the final logo path from the start, not a circle swapped in one frame. Add frame blending for fast moves (`engine.motion_blur`).
 
 ## Style QA
 - Cuts land on the beat grid (bar every 2 s).

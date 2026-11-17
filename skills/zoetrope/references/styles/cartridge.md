@@ -78,6 +78,14 @@ These six colours and no others: no gradients, no anti-aliasing, no blur, no gra
 - Helpers: `stepped`, `rng`, `prog`, `lerp`, `clamp`, `hexrgb`, `scenes_at`, `transitions.wipe`, `transitions.iris`.
 - CUES: the grabs (6.4, 8.8, 11.2), the hits (16.0, 17.6, 19.2, 20.8) and the KO as `{"t": 22.4, "label": "ko", "payoff": True}`, STAGE CLEAR (24.4), the score landing (26.4), every cut (4.8 and 24.0 sit inside windows: kind `audio`). `CUE_LAG = 0`. KEY_TIMES: 6.4, 16.0, 22.4, 24.4, 26.4 and 31.5. `STATIC = [(31.0, 32.0)]`.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+None of the blocks fits; the look is hand-built. Every text and data block draws anti-aliased vector text and shapes, and each `FX_MENU` transition blurs, splits channels or warps, which the six flat colours with no anti-aliasing, blur or gradient rule forbids. What the card uses stays `transitions.wipe` and `transitions.iris` on the virtual screens.
+
+- **Gates:** the title-to-stage wipe goes `"right"`; keep the stage's scroll moving the same way, so exit and entry share a direction (the seam law, Q1106).
+
 ## QA watch-outs
 
 - Q208: keep every string on the bitmap-font route; one pasted-rectangle title is text the gates never see.

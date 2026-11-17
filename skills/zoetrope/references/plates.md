@@ -78,9 +78,15 @@ Units are metres and Z is up. A character faces -Y, toward a camera at negative 
 - **The same pose crosses a cut.** End a scene in the pose the next one starts in, or bring the arm down before the cut.
 - **Leave room for the caption.** Decide where each line sits before placing the camera: the pilot kept the top left wall empty for two lines and the right two thirds for the end card.
 
+## Moving 2D clips
+
+A plate is a still render per frame. For a moving picture that is not 3D (a rain loop, a short image-to-video clip the parent session made, or a licensed file), `footage.Clip("rain", fit="cover", mode="loop")` at module level and `CLIP.frame(t)` in `draw(t)` play it frame-exact, with the same rules as a plate: the parent makes it, the builder fetches nothing, `run_all.py` stops with `CLIP:` lines when the decode is missing or stale, and the text over it is the engine's. Steps, modes and the licence line are in `image-plates.md`. A scene can use both.
+
+`engine.motion_blur` does not blur either. `Plate.frame(t)` and `Clip.frame(t)` return a whole rendered or decoded frame chosen by `floor(t * fps)`, so the sub-frame samples of `motion_blur(draw, t)` return that same frame, or at the edge of the shutter the frame before it: nothing in between is rendered, and the plate's own motion is not smoothed. Blur only what `scenes.py` itself moves over the plate.
+
 ## What it cannot do yet
 
-- Motion blur (each frame is posed and rendered alone), hair, cloth or fluid.
+- Motion blur in the plate (each frame is posed and rendered alone), hair, cloth or fluid.
 - Models, textures or HDRIs from outside: we download nothing, so the look is built shapes, soft light and clean colour.
 - A character beyond `Buddy`: a new one is new rig code in the stage script. Keep it to rounded shapes and tubes.
 - Speed for long pieces: a 60 s film at 30 fps is 1,800 frames, about 1 h 20 min to 1 h 30 min of final render on the machine above. Offer 24 fps, a shorter cut, or a plate on twos.

@@ -35,6 +35,8 @@ with S.recording() as sheet:
 
 Then write the mix, the SFX stem and the sheet on one scale and master, exactly as `music.md` shows.
 
+A whole score made elsewhere (a generated one, or a licensed WAV) goes in beside the sampler with `audio.music_file` instead (`music.md`, A score made elsewhere); its credit line is the one the brief gives it, not `SP.credits`.
+
 - `note(inst, midi, dur, vel=0.8, seed=0)`: a pitched note held for `dur` seconds. A float `midi` plays between the keys. `dur=None` lets a struck or plucked note ring out, or plays a sustain's recording as it is.
 - `chord(inst, midis, dur, vel=0.8, strum=0.0, seed=0)`: the notes summed, each at `vel` (not normalised), all released at `dur`. `strum` seconds between notes in the order given; negative strums from the last note. Note k takes `seed + k`.
 - `hit(inst, variant=None, vel=0.8, seed=0)`: an unpitched hit, whole. `variants(inst)` lists the variants, the default first.

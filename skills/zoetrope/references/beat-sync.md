@@ -28,6 +28,10 @@
 
 11. The beat map in a style card writes a moment as bar.beat, both counted from 1, four beats to the bar (`3.1` is the first beat of bar 3). A score turns it into seconds with `def t(bar, beat): return ((bar - 1) * 4 + (beat - 1)) * 60 / BPM`; at 120 BPM `t(3, 1)` is 4.0 and `t(1, 2.5)` is the off-beat after beat 2.
 
+12. A score made elsewhere (`audio.music_file`, `music.md`) has its own grid. Measure its kick or beat onsets as in item 7, fit `t0` and the period, and put `BPM` and the cut times on that fit: cuts then land on its beats as on ours. Cutting to the beat does not excuse the seam law (`playbook.md`): the exit and entry of a cut at a downbeat still share an axis and a direction, and Q1106 NOTEs a cut that does not.
+13. A whip or other fast move into a cut looks steppy at 30 fps (`pitfalls.md`, item 15): wrap that scene in `engine.motion_blur`, at 4 to 8 samples, and leave the rest of the film unblurred (it costs `samples` times a frame).
+14. A visualizer that follows the music (`blocks_data.audio_bars`) is driven by `blocks_data.analyse_wav(path, fps)` of the WAV, one row of band levels per frame; it moves with the sound by construction, so there is no cue to place. Call `analyse_wav` once at import, not inside `draw(t)` (`blocks.md`).
+
 ## One clock for sound and picture
 
 `contract.py` rounds time one way for both: `frame_of(t, fps)` is the nearest frame (halves up), `sample_of(t, sr)` the nearest sample (halves up), `frame_sample(frame, fps, sr)` the first sample of a frame (frame 60 at 30 fps is sample 88200 at 44.1 kHz; frame 1 at 24 fps is sample 1837.5, rounded to 1838). A sound placed on a frame cue (`frame=` and `fps=`) puts its landmark on that frame's first sample.

@@ -42,6 +42,15 @@ Springy overshoot (ease_out_back) for anything the brand touches; ease_out_expo 
 - No narration, so no voice is needed.
 - Use only facts the user supplied; do not add sync, availability, price or user-count claims.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.notification(title, body, t0=pop_time, icon="M", card=<a muted generic tone>)` for each of the 18 "other apps" cards in the 0.0-5.0 noise section, generic copy and the generic tones only (the brand colours stay the product's); `blocks_text.lower_third(name, role="Feature 01", style="kicker", accent=CORAL)` for a feature's one-line caption.
+- **Data:** `blocks_data.counter(value=18, color=...)` for the climbing counter in the noise section and `counter(value=6)` for the six day tiles in Feature 03; one ticker block per scene.
+- **Transitions and camera:** `engine.motion_blur(draw, t, samples=6)` on the two dives into the logo shape (14.4 and 34.4 s) and nowhere else; `engine.wobble(t, amp=..., hz=..., seed="chaos")` for the camera jitter, only in the noise section (the card allows jitter nowhere else); `blocks_fx.push_in(img, k, scale=1.15)` for its push-in.
+- **Gates:** `brand.json` with the product's palette, `"Nunito:800"` and the logo, then `python brand.py check`. No backgrounds from `blocks_fx` (`mesh_gradient`, `aurora`): the card is flat colour fields.
+
 ## Pitfalls (from what went wrong in our build)
 - Music was mixed by meters only: it came out slightly bass-heavy (most energy under 120 Hz) and the synth keys sounded simple. Cut kick and bass by 1-2 dB and brighten the keys.
 - At 5.0-5.3 s the tile popped in over the fading headline for about 0.3 s: fade the headline out before the tile lands.

@@ -36,6 +36,15 @@ A waltz on recorded instruments (`sampler.py`): plucked bass on one, harp on two
 ## Build notes
 Follow `plates.md`: `beats.py` first, stills, the proof plate, the proof, then the final plate in the background and `run_all.py full --fps 24`. Times on an RTX 4070 Laptop: proof plate about 3 minutes, final plate 17 to 20 minutes for 396 frames, and a change to the stage means the final plate again. For 9:16, set `SIZE = (1080, 1920)` in `beats.py` and restage every camera: the tall frame suits a reach upward, and the captions move to the top and bottom bands. For a brand, the character's colours and the thing it wants change; the rig is `Buddy`, and a logo is only ever an official file the user supplies, never rebuilt in 3D.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+None of the blocks fits; the look is 3D plates, lit and rendered in Blender, and the motion is posed per frame (motion blur is not built for plates, as above). Only the type over a plate is open to a part.
+
+- **Helpers:** `engine.ease_out_back` for a caption's entry on its ink pill; the captions stay Nunito 800 on empty wall.
+- **Gates:** none beyond the card's own.
+
 ## Pitfalls (from what went wrong in our build)
 - The character was a fifth of the frame height in three scenes of five: bring the camera in, or lower what it reaches for.
 - Blender's default view (AgX) turned the palette pastel; the stage uses Khronos PBR Neutral.

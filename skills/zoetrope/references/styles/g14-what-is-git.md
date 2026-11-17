@@ -32,10 +32,18 @@ One metaphor per idea, then reuse it: snapshots for commits, a game save point f
 Narration: calm, clear male voice (original: en-US-AndrewMultilingualNeural at -4% rate). Here use a text-to-speech voice (`voice.md`; audition 2 or 3 voices and measure their pace). Quiet synthesized music bed, about 150 sound effects (clicks, whooshes, camera shutter, stamp). Duck music about 7 dB under speech. Target -14 LUFS, true peak under -1 dBTP (original -14.0 LUFS, -1.3 dBTP). Last seconds: a single fading chord.
 
 ## Build notes
-Generate the voice per scene, measure each mp3 with ffprobe, and build SCHEDULE from the real durations plus gaps; approximate word times by splitting each line's duration by character count (most text-to-speech engines give no word timestamps). Draw captions in PIL from those times. Terminal text must be real output: run the tool in the sandbox if available, otherwise only show output we are certain of. Use a fictional user and placeholder URL. For a chat-sized cut, keep 3 to 4 metaphors and 4 to 5 commands. Omit logos; draw a simple glyph instead.
+Generate the voice per scene, measure each mp3 with ffprobe, and build SCHEDULE from the real durations plus gaps; take word times from `narration.json` (`V.word_cue(N, word)`, snapped with `C.snap`; the engine times every word, `voice.md`), not from a character-count split. Draw captions from those times (`blocks_text.captions` reads them). Terminal text must be real output: run the tool in the sandbox if available, otherwise only show output we are certain of. Use a fictional user and placeholder URL. For a chat-sized cut, keep 3 to 4 metaphors and 4 to 5 commands. Omit logos; draw a simple glyph instead.
+
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.captions(img, t, N, style="highlight", accent="#F05133")` for the bottom captions, `N` the loaded narration (`caption_words(N, line="L03")` for one line), with `HOLD_PROFILE = "caption"` and `per_page` held to what the voice says in about 2 s; `blocks_text.marker("circle", box, colour=red)` around the latest-file question in scene 01 and `marker("cross", box)` over the deleted branch in scene 06; `blocks_text.code_typing(code, t0=..., dur=..., mono="IBM Plex Mono:400")` for the terminal (it colours only Python and JavaScript, so shell lines come out plain; its default size is larger than the 24 px the card's pitfall warns about, and the output shown must be real).
+- **Backgrounds and effects:** `blocks_fx.paper_texture(t, color="#F4EFE6")` for the warm paper.
+- **Gates:** write `quiz.json` (Q210) from the checked facts, each answer's keys on one frame and in the narration; narration word times come from `narration.json` (`V.word_cue`, `voice.md`).
 
 ## Pitfalls (from what went wrong in our build)
-- TTS may read "git" as "get": listen to or transcribe those lines and respell phonetically if needed.
+- TTS may read "git" as "get": listen to or transcribe those lines (`qa.py speech` reads Q806) and respell with `lexicon=` in `voice.synthesize`, which leaves the script's word on screen (`voice.md`).
 - Terminal text at 24 px is small on a phone; use 32 px or more for mobile targets.
 - Some scenes had too much empty space (top half of the branch scene); use a denser layout for small screens.
 - Do not reuse state across frames; flashes and tints that start "visible" before their cue stay stuck. Compute them purely from t.

@@ -43,6 +43,15 @@ Masked line-by-line slide-up reveals with ease_out_expo. Outlines snap on the be
 ## Build notes
 Build one scene-data list of (time, rectangle) events in Python; derive the counter, the outlines and the boop times from it. Draw top-down worlds as filled boxes with PIL.rectangle (supersample not needed for axis-aligned boxes). The pixel-map is a hand-built land mask of squares at 5 degree cells (72x26); keep it rough. Flags: only draw ones that are plain stripes or blocks, with correct colours and proportions. Nepal's double-pennon needs a polygon and counts as a deliberate exception. Sound is pure numpy.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Backgrounds and effects:** `blocks_fx.paper_texture(t, color="#F4F1EA")` for the empty-paper hook and the header panel (the aerial scenes fill the frame, so it is only behind them there); ink and the one blue accent stay yours.
+- **Transitions and camera:** `blocks_fx.pull_out(img, k, scale=1.2)` for the "Now zoom out" pull up off the bed (it only scales, so no empty canvas shows). No `FX_MENU` entry: the glitches are the card's own counter and outline jitter.
+- **Helpers:** `engine.wobble(t - glitch_start, amp=..., hz=..., seed="nepal")` for the outline jitter and counter shake in both glitches (a str seed, never `hash()`).
+- **Gates:** write `quiz.json` (Q210) from the verified facts (tatami proportion, flags, A4 fold) before the build, each answer's keys on one frame. The counter stays the card's own, driven by the event list: `blocks_data.counter` rolls by time, not by event, so it does not fit.
+
 ## Pitfalls (from what went wrong in our build)
 - The world map coastlines are rough; keep it stylised.
 - The A4 fold read as flaps flipping over and the nested-ratio diagram was faint (35% ink); make the fold a clear hinge.
