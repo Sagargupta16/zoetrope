@@ -145,7 +145,9 @@ def synthesize(
     captions, holds and word_cue keep the script's word. A line may hold [pause], [pause 300ms] or [pause 1.5s]: its
     parts are spoken apart and joined with exactly that silence between their speech. A line {id, text, fit} gets a
     slot of exactly fit seconds; speech that overruns it is spoken faster, up to FIT_FAST, and a line that would need
-    more raises with how many words to cut."""
+    more raises with how many words to cut. A line dict may also name its own "voice" (and "engine"): a second host.
+    A line without one is spoken by the call's engine and voice; narration.json records each line's engine, voice
+    and lang, and its top level names the default voice."""
     eng = get_engine(engine)
     eng.require()
     if speed <= 0 or rule not in ("ours", "showtime"):
@@ -153,27 +155,16 @@ def synthesize(
             f"need speed above 0 and rule 'ours' or 'showtime', got {speed}, {rule!r}"
         )
     items = _lines(lines, _lexicon(lexicon))
-    voice = voice or eng.default_voice()
-    if voice is None:
-        raise ValueError(
-            f"{engine}: name a voice; the user picks it from voice_samples.py. Voices here: "
-            f"{', '.join(eng.voices()) or 'none downloaded'}"
-        )
-    if voice not in eng.voices():
-        close = difflib.get_close_matches(voice, eng.voices(), n=3, cutoff=0.4)
-        raise ValueError(
-            f"{engine}: no voice {voice!r}; close: {', '.join(close) or 'none'}"
-        )
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
-    job = {
-        "eng": eng,
-        "model": eng.model_id(voice),
-        "code": eng.code_id(),
-        "voice": voice,
-        "folder": folder,
-        "units": {},
-    }
+    job = {"eng": eng, "folder": folder, "units": {}, "spk": {}}
+    main = _speaker(job, engine, voice)
+    voice = job["voice"] = main["voice"]
+    job["model"] = main["model"]
+    for ln in items:  # a line's own engine and voice, else the call's
+        e = ln["engine"] or engine
+        v = ln["voice"] or (voice if e == engine else None)
+        ln["engine"], ln["voice"] = e, _speaker(job, e, v)["voice"]
     speeds = {ln["id"]: speed for ln in items}
     made = set()
     for _ in range(FIT_ROUNDS):
@@ -214,6 +205,32 @@ def synthesize(
     return narr
 
 
+def _speaker(job, engine, voice):
+    """{eng, model, code, voice} for one engine and voice (the default voice when None), checked and kept in
+    job["spk"]; raises when the engine is not ready or the voice is not there."""
+    eng = get_engine(engine)
+    eng.require()
+    voice = voice or eng.default_voice()
+    if voice is None:
+        raise ValueError(
+            f"{engine}: name a voice; the user picks it from voice_samples.py. Voices here: "
+            f"{', '.join(eng.voices()) or 'none downloaded'}"
+        )
+    if (engine, voice) not in job["spk"]:
+        if voice not in eng.voices():
+            close = difflib.get_close_matches(voice, eng.voices(), n=3, cutoff=0.4)
+            raise ValueError(
+                f"{engine}: no voice {voice!r}; close: {', '.join(close) or 'none'}"
+            )
+        job["spk"][engine, voice] = {
+            "eng": eng,
+            "model": eng.model_id(voice),
+            "code": eng.code_id(),
+            "voice": voice,
+        }
+    return job["spk"][engine, voice]
+
+
 def _lines(lines, lex=None):
     """[{id, script, text, fit, parts}] from strings (ids L01, L02, ...), dicts {id, text[, fit]} or (id, text) pairs.
     text is the script without pause markers: what captions, holds and word_cue read. Each part {spoken, own, pause}
@@ -221,12 +238,12 @@ def _lines(lines, lex=None):
     says, and the silence after it."""
     out = []
     for i, ln in enumerate(lines):
-        fit = None
+        fit = who = None
         if isinstance(ln, str):
             lid, script = f"L{i + 1:02d}", ln
         elif isinstance(ln, dict):
             lid, script = ln.get("id") or f"L{i + 1:02d}", ln["text"]
-            fit = ln.get("fit")
+            fit, who = ln.get("fit"), (ln.get("engine"), ln.get("voice"))
         else:
             lid, script = ln
         lid, script = str(lid), str(script).strip()
@@ -239,6 +256,8 @@ def _lines(lines, lex=None):
                 "id": lid,
                 "script": script,
                 "fit": None if fit is None else float(fit),
+                "engine": (who or (None, None))[0],
+                "voice": (who or (None, None))[1],
             }
             | _parts(lid, script, lex or {})
         )
@@ -313,12 +332,18 @@ def _respell(lid, text, lex, base=0):
     return spoken, own
 
 
+def _spk(job, ln):
+    """The speaker (engine, model, code, voice) of line ln."""
+    return job["spk"][ln["engine"], ln["voice"]]
+
+
 def _part_key(job, ln, part, speeds):
+    s = _spk(job, ln)
     return _key(
-        job["eng"].name,
-        job["model"],
-        job["code"],
-        job["voice"],
+        s["eng"].name,
+        s["model"],
+        s["code"],
+        s["voice"],
         speeds[ln["id"]],
         part["spoken"],
     )
@@ -327,34 +352,40 @@ def _part_key(job, ln, part, speeds):
 def _make(job, items, speeds):
     """Synthesize and cache every part not cached yet, one engine run per speed; returns the keys made. A part said
     twice is made once."""
-    eng, folder = job["eng"], job["folder"]
-    todo = {}  # key -> (spoken, speed, line id)
+    folder = job["folder"]
+    todo = {}  # key -> (spoken, speed, line id, speaker)
     for ln in items:
         for p in ln["parts"]:
             k = _part_key(job, ln, p, speeds)
             if not _cached(folder, k):
-                todo.setdefault(k, (p["spoken"], speeds[ln["id"]], ln["id"]))
+                todo.setdefault(
+                    k, (p["spoken"], speeds[ln["id"]], ln["id"], _spk(job, ln))
+                )
     bad = []
-    for s in sorted({v[1] for v in todo.values()}):
-        ks = [k for k, v in todo.items() if v[1] == s]
+    for name, voice, s in sorted(
+        {(v[3]["eng"].name, v[3]["voice"], v[1]) for v in todo.values()}
+    ):  # one engine run per engine, voice and speed
+        spk = job["spk"][name, voice]
+        eng = spk["eng"]
+        ks = [k for k, v in todo.items() if v[3] is spk and v[1] == s]
         got = eng.synth(
-            [todo[k][0] for k in ks], job["voice"], s, [folder / f"{k}.wav" for k in ks]
+            [todo[k][0] for k in ks], spk["voice"], s, [folder / f"{k}.wav" for k in ks]
         )
         for k, raw in zip(ks, got):
-            spoken, _, lid = todo[k]
+            spoken, _, lid, _ = todo[k]
             wav = folder / f"{k}.wav"
             try:  # check before caching: a bad file left in the cache would fail every later run
                 _timed(eng, raw, spoken, dec(str(wav)))
             except (ValueError, KeyError) as e:
                 wav.unlink(missing_ok=True)
-                bad.append(f"{lid} ({wav}, deleted, not cached): {e}")
+                bad.append(f"{lid} [{eng.name}] ({wav}, deleted, not cached): {e}")
                 continue
             side = {
                 "v": CACHE_VERSION,
                 "engine": eng.name,
-                "model": job["model"],
-                "code": job["code"],
-                "voice": job["voice"],
+                "model": spk["model"],
+                "code": spk["code"],
+                "voice": spk["voice"],
                 "speed": s,
                 "text": spoken,
                 "raw": raw,  # the engine's own timing data, turned into words at every layout
@@ -364,7 +395,7 @@ def _make(job, items, speeds):
             tmp.write_text(json.dumps(side, indent=1), encoding="utf-8")
             os.replace(tmp, folder / f"{k}.json")
     if bad:
-        raise ValueError(f"{eng.name} wrote unusable audio: {'; '.join(bad)}")
+        raise ValueError(f"a voice engine wrote unusable audio: {'; '.join(bad)}")
     return set(todo)
 
 
@@ -488,7 +519,7 @@ def _hold(text, profile=None):
     return qa.min_hold(len(text.split()))
 
 
-def _unit(job, lid, k, spoken):
+def _unit(job, lid, k, spoken, eng):
     """(y, (c0, c1, s0, s1), words) of one cached part: its samples, trim bounds and word times in seconds of its
     file (ends filled in). Decoded once per synthesize call."""
     if k not in job["units"]:
@@ -496,7 +527,7 @@ def _unit(job, lid, k, spoken):
         try:
             y = dec(str(path))
             side = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
-            bounds, words = _timed(job["eng"], side["raw"], spoken, y)
+            bounds, words = _timed(eng, side["raw"], spoken, y)
         except (ValueError, KeyError) as e:
             raise ValueError(f"{lid} ({path}): {e}") from None
         if words:
@@ -515,7 +546,9 @@ def _assemble(job, ln, speeds):
     )
     for i, p in enumerate(ln["parts"]):
         k = _part_key(job, ln, p, speeds)
-        _, (c0, c1, s0, s1), ws = _unit(job, ln["id"], k, p["spoken"])
+        _, (c0, c1, s0, s1), ws = _unit(
+            job, ln["id"], k, p["spoken"], _spk(job, ln)["eng"]
+        )
         at = max(0, end + gap - (s0 - c0)) if i else 0
         first = first if i else s0 - c0
         placed.append((k, c0, c1, at))
@@ -585,6 +618,9 @@ def _layout(job, items, speeds, speed, fps, rule, profile, lexicon):
                 "id": ln["id"],
                 "text": ln["text"],
                 "script": ln["script"],
+                "engine": ln["engine"],
+                "voice": ln["voice"],
+                "lang": _spk(job, ln)["eng"].lang(ln["voice"]),
                 "spoken": [p["spoken"] for p in ln["parts"]],
                 "pauses": [p["pause"] for p in ln["parts"][:-1]],
                 "speed": speeds[ln["id"]],
@@ -622,7 +658,15 @@ def _layout(job, items, speeds, speed, fps, rule, profile, lexicon):
         "engine": eng.name,
         "model": job["model"],
         "voice": job["voice"],
-        "lang": eng.lang(job["voice"]),
+        # Q806 reads English only: one other-language line makes the whole narration read as that language
+        "lang": next(
+            (
+                ln["lang"]
+                for ln in out
+                if not (ln["lang"] or "en").lower().startswith("en")
+            ),
+            eng.lang(job["voice"]),
+        ),
         "speed": speed,
         "fit_fast": FIT_FAST,
         "lexicon": dict(lexicon or {}),

@@ -2,6 +2,7 @@
 # CLI: `python qa.py check out.mp4 --scenes . --size 1920x1080` prints coded findings and exits 1 on any FIX;
 #      `python qa.py look out.mp4` writes small frame copies plus review/look.jpg for a model to view.
 import importlib
+import json
 import math
 import re
 import subprocess
@@ -48,6 +49,11 @@ def inside(b, W, H, m=0.04):
 
 def overlap(a, b):
     return not (a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1])
+
+
+def _box_gap(a, b):
+    """Squared distance between the centres of two (l, t, r, b) boxes."""
+    return ((a[0] + a[2]) - (b[0] + b[2])) ** 2 + ((a[1] + a[3]) - (b[1] + b[3])) ** 2
 
 
 def lum(rgb):
@@ -285,6 +291,44 @@ COLOR_WANT = ("bt709", "bt709", "bt709", "tv")
 # sound (the 2026-10-28 samples, the 2026-11-10 and 2026-11-15 reels and their versions, the 3D pilot's six) it
 # stopped 0.000 s early on every one (2026-11-16).
 AUDIO_SHORT = 0.1
+# Q801: the integrated loudness a delivery asks for, LUFS. run_all.py --loudness <preset|LUFS> masters to it and records
+# it in build.json ("loudness"); Q801 reads it there, -14 when absent.
+LOUDNESS_DEFAULT = -14.0
+LOUDNESS_PRESETS = {
+    "youtube": -14.0,
+    "spotify": -14.0,
+    "podcast": -16.0,
+    "apple": -16.0,
+    "broadcast": -23.0,  # EBU R128
+}
+LOUDNESS_RANGE = (-40.0, -6.0)  # a number outside it is a typo, not a target
+
+
+def loudness_target(arg):
+    """--loudness as LUFS: a preset name or a number. ValueError names what was wrong."""
+    key = str(arg).strip().lower()
+    if key in LOUDNESS_PRESETS:
+        return LOUDNESS_PRESETS[key]
+    try:
+        x = float(key)
+    except ValueError:
+        raise ValueError(
+            f"--loudness {arg!r} is not a preset ({', '.join(LOUDNESS_PRESETS)}) or a number of LUFS"
+        ) from None
+    if not LOUDNESS_RANGE[0] <= x <= LOUDNESS_RANGE[1]:
+        raise ValueError(
+            f"--loudness {x:g} LUFS is outside {LOUDNESS_RANGE[0]:g} to {LOUDNESS_RANGE[1]:g}"
+        )
+    return x
+
+
+def build_loudness(folder="."):
+    """The loudness target in folder's build.json, LOUDNESS_DEFAULT when there is none (or it is not a number)."""
+    try:
+        v = json.loads(Path(folder, C.BUILD).read_text(encoding="utf-8"))["loudness"]
+        return float(v)
+    except (OSError, ValueError, KeyError, TypeError):
+        return LOUDNESS_DEFAULT
 
 
 def probe(path, ff="ffmpeg"):
@@ -785,13 +829,24 @@ def _ticker_passing(frames):
     one was a Q401 FIX. Returns (passing strings, number of values a ticker settles on)."""
     runs = {}  # string -> [[first frame, last frame, box at first, box at last], ...] while on screen
     for i, (_, items) in enumerate(frames):
+        used = set()  # (string, run index) already continued this frame
         for it in _readable(items):
             if it.get("ticker"):
                 r = runs.setdefault(it["s"], [])
-                if r and r[-1][1] >= i - 1:
-                    r[-1][1], r[-1][3] = i, it["box"]
+                # two tickers can show one string at once (two bars of a race both at "$53"): each item continues
+                # the open run of that string nearest to it, so one run never jumps between them
+                open_ = [
+                    k
+                    for k, x in enumerate(r)
+                    if x[1] >= i - 1 and (it["s"], k) not in used
+                ]
+                if open_:
+                    k = min(open_, key=lambda k: _box_gap(r[k][3], it["box"]))
+                    r[k][1], r[k][3] = i, it["box"]
+                    used.add((it["s"], k))
                 else:
                     r.append([i, i, it["box"], it["box"]])
+                    used.add((it["s"], len(r) - 1))
     starts = [(r[0], s, r[2]) for s, rs in runs.items() for r in rs]
     passing, settled = set(), set()
     for s, rs in runs.items():
@@ -1306,11 +1361,13 @@ def check(
     max_mb=None,
     silent=False,
     ff="ffmpeg",
+    loudness=None,
     **opts,
 ):
     """Every gate measurable on the final file, as contract.Row rows (they unpack as (status, code, message, fix)).
     Status is PASS, FIX, NOTE or NOT CHECKED; opts reach the gate modules as ctx.opts. ff is the ffmpeg to run
-    (run_all passes the one it found; ffprobe is taken from beside it). scenes.SILENT counts as --silent."""
+    (run_all passes the one it found; ffprobe is taken from beside it). scenes.SILENT counts as --silent. loudness:
+    the LUFS Q801 wants (a preset or a number); else the "loudness" in scenes_dir's build.json, else -14."""
     rows = []
 
     def add(ok, code, msg, fix, note=False, **kw):
@@ -1483,13 +1540,18 @@ def check(
                 )
             )
         else:
+            want = LOUDNESS_DEFAULT
+            if loudness is not None:
+                want = loudness_target(loudness)
+            elif scenes_dir:
+                want = build_loudness(scenes_dir)
             add(
-                abs(L["I"] + 14) <= 1,
+                abs(L["I"] - want) <= 1,
                 "Q801",
-                f"loudness {L['I']} LUFS (want -14 +/- 1)",
+                f"loudness {L['I']} LUFS (want {want:g} +/- 1)",
                 "rerun audio.master on the raw mix, then re-encode",
                 metric=L["I"],
-                limit=-14.0,
+                limit=want,
             )
         rows += _silence_rows(ctx.audio(8000), scn, pic)
 
@@ -1813,6 +1875,11 @@ if __name__ == "__main__":
     )
     c.add_argument("--max-mb", type=float)
     c.add_argument(
+        "--loudness",
+        help="Q801's target: a preset (youtube, spotify, podcast, apple, broadcast) or LUFS "
+        "(default: build.json in --scenes, else -14)",
+    )
+    c.add_argument(
         "--silent", action="store_true", help="the piece has no audio on purpose"
     )
     c.add_argument(
@@ -1883,6 +1950,11 @@ if __name__ == "__main__":
             ff=ff,
         )
         sys.exit(0)
+    if a.loudness is not None:
+        try:
+            loudness_target(a.loudness)
+        except ValueError as e:
+            ap.error(str(e))
     st = Path(a.video).stat()
     print(
         f"qa check: {a.video} (written {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(st.st_mtime))}, {st.st_size / 1e6:.1f} MB)"

@@ -79,12 +79,13 @@ voice-led piece with no narration files), and say so under `blocked`.
    replace the content, keep the machinery. A kit's scenes.py predates the
    registry: add `text_items(t)`, `CUES` (that name) and `KEY_TIMES`, or the
    proof fails (Q204 FIX for text no registry reports, Q200 NOT CHECKED).
-3. Before writing a helper, read the index:
+3. Before writing a helper or an effect, search the blocks and read the index. The block library (`references/blocks.md`: text, data and fx blocks, brand kits, easings) has a gallery (`python <skill>/engine/blocks_preview.py <folder>` writes sheets of every block). Then the index:
    `python <skill>/engine/kit_index.py` lists every public
    function and class in the engine and the kits with its signature, first
    docstring line and file:line, and `kit_index.py show <name>` prints one
    (`show g04:text` picks a file). Run the skill's copy: the one in the
-   working folder finds no kits. Reuse what exists.
+   working folder finds no kits. Reuse what exists. A block `name(img, t, ...)` goes with its `name_items(t, ...)` twin in `text_items(t)`.
+   When the brief gives a `brand.json`, run `python brand.py check` and draw with its palette, fonts and logo. Wrap a fast move (a zoom, a scroll near 1,200 px/s) in `engine.motion_blur`. At every cut keep the seam rule: same axis, same direction, matched speed, cut mid-motion (`playbook.md`). A clip the brief lists is `footage.Clip(name)` after `python footage.py prepare <name>`; never fetch one.
 4. Write scenes.py for this video: a `TIMELINE` of `Scene` and `Transition`
    compiled with `compile_schedule` (the template shows it), one function per
    scene (`scene_<name>`) with shared helpers kept apart, so a finding routes
@@ -150,7 +151,15 @@ voice-led piece with no narration files), and say so under `blocked`.
    strobe for flashes:
    `python -c "import run_all, qa, scenes, contract as C; print(*map(C.line, qa.flash_window(scenes.draw, T0, T1, N)), sep='\n')" --size WxH --fps N`
    prints its Q601, Q602 and Q603 rows. Open nothing; the parent shows the
-   sheets.
+   sheets. For a quick look at motion between proof and render,
+   `python run_all.py draft --size WxH --fps N` writes a small draft.mp4 and
+   touches no build file; it is no gate and no proof.
+   Q1106 (NOTE: a cut whose exit and entry trade axis or point opposite):
+   look at the cut and fix the move, or keep it for a stated reason; do not
+   mute it. Q210 (FIX: a `quiz.json` key is on no frame and in no narration
+   line): put the fact on screen, or tell the parent the key is wrong; a NOTE
+   means it is only in the narration. Q210 reads the quiz the parent wrote;
+   never edit it.
 8. Report and stop. Do not render all frames.
 
 A follow-up message with fixes is still proof mode: apply them, run the

@@ -1,5 +1,5 @@
 # scans.py : gate 6 (qa_scan flashes, WCAG 2.2 on the linear-light decode) on short encoded clips, the reviewer's
-# pointer scans (Q1101 to Q1104) on synthetic thumbs.npy files, and Q1105 on a file whose encode does not show the
+# pointer scans (Q1101 to Q1104, and Q1106 the seam between two scenes) on synthetic thumbs.npy files, and Q1105 on a file whose encode does not show the
 # drawn frames. The two flash fixtures the old gate could not fail (a 3.4 Hz triangle with every step under 20/255,
 # an equal-luminance red and green strobe) must fail here. Lifted from lane F's make_flash.py, fix/regress.py and
 # fix/q1105.py (outputs/batchA/notes/f.md).
@@ -161,6 +161,36 @@ def moving():
     return g
 
 
+# ---- Q1106: the motion on each side of a cut ----
+
+
+def texture(seed):
+    """A blocky random picture, 108 x 192 grey: something a pan can carry."""
+    rng = np.random.default_rng(seed)
+    return np.kron(rng.integers(30, 220, (27, 48)), np.ones((4, 4), int)).astype(
+        np.uint8
+    )
+
+
+def seam(a, b, n=90, cut=45):
+    """Frames 0..cut-1 of scene A and the rest of scene B, each a texture moved by (dx, dy) px a frame ((0, 0) is
+    still): the cut is at cut / 30 s, and each scene runs its own texture from its own first frame."""
+
+    def make():
+        g = np.empty((n, 108, 192), np.uint8)
+        for i in range(n):
+            tex, (dx, dy), k = (
+                (texture(1), a, i) if i < cut else (texture(2), b, i - cut)
+            )
+            g[i] = np.roll(tex, (dy * k, dx * k), axis=(0, 1))
+        return g
+
+    return make
+
+
+SEAMS = {"a": (0.0, 1.5), "b": (1.5, 3.0)}
+
+
 # ---- Q1105: the encoded file against the drawn frames ----
 
 
@@ -265,6 +295,31 @@ CASES = [
     case("scans.flash_not_cut", thumbs(flash2), [want("Q1103", "PASS")]),
     case("scans.stall", thumbs(stall), [want("Q1104", "NOTE", "x", 1.5, tol=0.001)]),
     case("scans.moving", thumbs(moving), [clean(), want("Q1104", "PASS")]),
+    case(
+        "scans.seam_mirrored",
+        thumbs(seam((-6, 0), (6, 0)), SCHEDULE=SEAMS),
+        [want("Q1106", "NOTE", "b", 1.5, tol=0.001, metric=6, mtol=1.5, msg="x-")],
+    ),
+    case(
+        "scans.seam_axis",
+        thumbs(seam((-6, 0), (0, 6)), SCHEDULE=SEAMS),
+        [want("Q1106", "NOTE", "b", 1.5, tol=0.001, metric=6, mtol=1.5, msg="y+")],
+    ),
+    case(
+        "scans.seam_matched",
+        thumbs(seam((-6, 0), (-9, 0)), SCHEDULE=SEAMS),
+        [want("Q1106", "PASS"), want("Q1103", "PASS")],
+    ),
+    case(
+        "scans.seam_still_to_moving",
+        thumbs(seam((0, 0), (6, 0)), SCHEDULE=SEAMS),
+        [want("Q1106", "PASS")],
+    ),
+    case(
+        "scans.seam_allowed",
+        thumbs(seam((-6, 0), (6, 0)), SCHEDULE=SEAMS, ALLOW={"Q1106": [1.5]}),
+        [want("Q1106", "PASS")],
+    ),
     case(
         "scans.match_turned",
         match(True),
