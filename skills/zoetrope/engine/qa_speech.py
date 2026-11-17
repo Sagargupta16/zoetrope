@@ -22,6 +22,7 @@ import urllib.request
 from pathlib import Path
 
 import contract as C
+import envs
 import numpy as np
 
 ASR_DIR = Path(
@@ -39,7 +40,8 @@ FILES = (
     ("tokenizer.json", 2128466, "929c5252409436dce1b38a75d1abbcb5e132d170d8e324e4e04ed915fa2d22df"),
     ("vocabulary.txt", 422309, "ff77588746d3a2595d32ab5b69ffd7b95ce2441ac57533cb66fc3eb575a115cf"),
 )  # fmt: skip
-# its own uv environment, like the voice engines: every package pinned and locked in requirements-speech.in and .txt
+# its own environment, like the voice engines: every package pinned in requirements-speech.in and locked in .txt,
+# each wheel checked against the lock's sha256 when envs.side builds it
 PYTHON = "3.14"
 LOCK = Path(__file__).with_name("requirements-speech.txt")
 VERSION = 1  # bump to transcribe again after a change the hashed worker cannot see
@@ -136,7 +138,8 @@ def code_id():
 
 def hear(clips):
     """[{text, words: [{w, start, end, p}]}] for each clip (float32 at SR), seconds from the clip's start. Runs the
-    worker once in its own uv environment; raises RuntimeError when it fails."""
+    worker once in its own environment (envs.side); raises RuntimeError when it fails, a wheel whose sha256 does not
+    match the lock included."""
     if not clips:
         return []
     with tempfile.TemporaryDirectory() as tmp:
@@ -158,10 +161,8 @@ def hear(clips):
             "threads": max(1, min(8, os.cpu_count() or 1)),
         }
         jp.write_text(json.dumps(job), encoding="utf-8")
-        cmd = ["uv", "run", "--no-project", "--python", PYTHON]
-        cmd += ["--with-requirements", str(LOCK)]
         r = subprocess.run(
-            cmd + ["python", str(py), str(jp)],
+            [str(envs.side(LOCK, PYTHON)), str(py), str(jp)],
             check=False,
             capture_output=True,
             stdin=subprocess.DEVNULL,
@@ -879,7 +880,7 @@ def add_cli(sub):
     s.set_defaults(func=run)
 
 
-_WORKER = r"""# speech_worker.py : written and run by zoetrope qa_speech.py inside uv run --no-project --with-requirements <lock>
+_WORKER = r"""# speech_worker.py : written and run by zoetrope qa_speech.py in the environment envs.side built from its lock
 # One job file in (clips as raw float32 at 16 kHz); out.json out: the words heard in each clip, with times.
 import json
 import sys

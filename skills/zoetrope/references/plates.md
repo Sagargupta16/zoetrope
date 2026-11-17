@@ -4,8 +4,8 @@ True 3D for a video, kept apart from the 2D engine. Blender renders the 3D pictu
 
 ## What it needs
 
-- **Blender as a Python module**: `python plate3d.py fetch` once per machine (bpy 5.2.4 LTS on 2026-11-16, 324 MB, GPL-3.0-or-later, into the uv cache; nothing is installed globally). `python plate3d.py missing` says whether it is there, and `setup.sh` prints the same as a note.
-- **The pin** is set in `engine/requirements-bpy.in`, and the environment runs the lock compiled from it, `requirements-bpy.txt`, which pins every package bpy pulls in (the compile command is at the top of the `.in`). uv does not check that lock's `--hash` lines (uv 0.13.8, 2026-11-16): the exact pins are what hold the set still. The lock is part of every plate's key, so a new pin makes every plate stale, and `missing` asks for a fetch again.
+- **Blender as a Python module**: `python plate3d.py fetch` once per machine (bpy 5.2.4 LTS on 2026-11-16, 324 MB, GPL-3.0-or-later, into its own venv in `~/.cache/zoetrope/envs/`; nothing is installed globally). `python plate3d.py missing` says whether it is there, and `setup.sh` prints the same as a note.
+- **The pin** is set in `engine/requirements-bpy.in`, and the environment runs the lock compiled from it, `requirements-bpy.txt`, which pins every package bpy pulls in (the compile command is at the top of the `.in`). `envs.py` builds the environment from it with `uv pip install --require-hashes` (each wheel checked against its sha256) into `~/.cache/zoetrope/envs/`, where `fetch` puts Blender. The lock is part of every plate's key, so a new pin makes every plate stale, and `missing` asks for a fetch again.
 - **A GPU** for a sensible wait. Measured on an RTX 4070 Laptop (OptiX), 1920x1080: proof quality 0.42 s a frame (396 frames in 168 s), final quality 2.6 to 3.0 s a frame over a whole plate (17 to 20 minutes for 396 frames; a single still takes 3.3 to 3.6 s, the first one more). Without a GPU Cycles falls back to the CPU and is many times slower: say so before starting.
 - Nothing else is downloaded. Every shape is built in code; we bring in no models, textures or HDRIs.
 
@@ -95,8 +95,8 @@ Units are metres and Z is up. A character faces -Y, toward a camera at negative 
 | `PLATE: plates/main is being rendered` | A render holds `render.lock`. If none is running (it was killed), delete that file and render again: it resumes |
 | `PLATE: plates/main lacks N of M frames` | A stills render or a stopped one: run the command the line gives |
 | A traceback ending `plates/main has no plate.json` | Nothing has been rendered for this build yet: `python plate3d.py render stage.py --quality proof` |
-| `not ready: Blender as a Python module` | `python plate3d.py fetch` (324 MB, once) |
-| The render re-downloads Blender | The uv cache was cleaned; the fetch note in `~/.cache/zoetrope/blender/` only says it once imported here. Let it download |
+| `not ready: Blender as a Python module` | `python plate3d.py fetch` (324 MB, once): its venv in `~/.cache/zoetrope/envs/` is missing (removed, or a new lock), or the fetch note in `~/.cache/zoetrope/blender/` is |
+| `not ready: uv pip install failed ... Hash mismatch for bpy==...` | The downloaded wheel is not the file `requirements-bpy.txt` recorded: never edit the hash to match; nothing was installed |
 | `ModuleNotFoundError: bmesh` | Something imported before `bpy`: Blender's other modules exist only after it |
 | A frame file appears in `C:\plates` | A relative path reached Blender, which reads it from the drive root. `stage3d.run` resolves `--out`; do the same for any path you pass it |
 | Device `CPU` in `plate.json` | No GPU backend was found: the render is right but slow |

@@ -22,6 +22,7 @@ bash skills/zoetrope/setup.sh
   mkdir -p /tmp/zoetrope-selftest
   cp -r skills/zoetrope/engine/. /tmp/zoetrope-selftest/
   cd /tmp/zoetrope-selftest
+  uv run --no-project python envs.py
   uv run --no-project --with-requirements requirements.txt python qa.py selftest
   ```
 

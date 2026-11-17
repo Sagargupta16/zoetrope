@@ -69,7 +69,11 @@ voice-led piece with no narration files), and say so under `blocked`.
    never pip install anything.
 2. Copy the whole `engine/` folder into the working folder
    (`cp -r <skill>/engine/. <working folder>/`, so
-   `qa_fixtures/` comes along). If the card has a kit (`<skill>/kits/<card-id>/`,
+   `qa_fixtures/` comes along), then run `uv run --no-project python envs.py`
+   there: it must print `ENV: OK` (the folder's `.venv`, each wheel checked
+   against its sha256 in `requirements.txt`; the `uv run` line above runs in
+   it). `ENV: FIX` with a hash mismatch goes under `blocked`; never edit a
+   hash. If the card has a kit (`<skill>/kits/<card-id>/`,
    the router and the card say so), read its README and copy the modules it
    lists: they are working code from an approved build of that style;
    replace the content, keep the machinery. A kit's scenes.py predates the

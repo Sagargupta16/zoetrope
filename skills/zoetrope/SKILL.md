@@ -34,7 +34,7 @@ Never:
 
 | Need | Use |
 |---|---|
-| Python | Python 3 with the pinned Pillow and numpy: `uv run --no-project --with-requirements requirements.txt python <script>` from a working folder that holds a copy of `engine/`. Run `bash <skill>/setup.sh` once to check uv, ffmpeg and the fonts. |
+| Python | Python 3 with the pinned Pillow and numpy: `uv run --no-project --with-requirements requirements.txt python <script>` from a working folder with a copy of `engine/`. Run `bash <skill>/setup.sh` once to check uv, ffmpeg and the fonts. |
 | ffmpeg | Local `ffmpeg` with libx264 (`setup.sh` prints the install line). Check with `ffmpeg -encoders \| grep libx264`. |
 | Voice | `voice.synthesize` (`references/voice.md`): offline narration, slots and word times in `narration.json`. Narrator Kokoro `af_heart` (the default). |
 | 3D, image plates | A 3D card renders its picture in Blender as a plate (`references/plates.md`; generated: `references/image-plates.md`): run `python <skill>/engine/plate3d.py fetch` here once (324 MB); the builder cannot download. |
@@ -46,8 +46,8 @@ Save outputs to `outputs/<slug>/` under the current folder (never inside `<skill
 
 ## Files
 
-- `setup.sh`: first-use check of uv, ffmpeg with libx264, the Python pin, Pillow and numpy against their pins, and the default font; safe to rerun.
-- `engine/`: the Python engine as real files, `requirements.txt` (pinned, hashed) and `.python-version` (3.15); copy it with `cp -r <skill>/engine/. <working folder>/` for each video, so the hidden pin and `qa_fixtures/` come along. Drawing, sound (audio, synth, sampler, voice), build (render, run_all, proof) and checks (qa and its gate modules, contract, cards for the router below): `references/engine.md` says what each file does.
+- `setup.sh`: first-use check of uv, ffmpeg with libx264, the Python pin, hash-checked Pillow and numpy, and the default font; safe to rerun.
+- `engine/`: the Python engine as real files, `requirements.txt` (pinned, hashed) and `.python-version` (3.15); copy it with `cp -r <skill>/engine/. <working folder>/` per video (hidden pin and `qa_fixtures/` too); `uv run --no-project python envs.py` there makes its hash-checked `.venv`. Drawing, sound (audio, synth, sampler, voice), build (render, run_all, proof) and checks (qa and its modules): `references/engine.md` says what each file does.
 - Agents (`../../agents/`): `zoetrope:zoetrope-builder` builds, renders and runs the gates; `zoetrope:zoetrope-reviewer` is the fresh-eyes review that returns REVIEW PASS or REVIEW FIX with findings ranked P0, P1 and P2.
 - `references/playbook.md` (workflow, timing math, composition, motion, directing), `references/engine.md` (contract, file map, encode ladder), `references/formats.md` (sizes, fps, layout, file names), `references/voice.md` (intake, text-to-speech, writing for the ear), `references/music.md` (numpy synth, songs on a BPM grid), `references/instruments.md` (recorded CC0 instruments and their credits line), `references/plates.md` (3D plates), `references/mixing.md` (voice placement, duck, loudness), `references/beat-sync.md` (one grid, cuts on beats, SFX by landmark), `references/house-rules.md`, `references/qa-gates.md` (the Q codes), `references/pitfalls.md` (past problems, their fixes), `references/delivery-report.md` (the delivery message), `references/troubleshooting.md` (when a step fails)
 - `references/styles/`: one file per style card, plus `families.md` with what each family shares

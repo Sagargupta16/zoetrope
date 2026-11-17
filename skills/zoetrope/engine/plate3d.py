@@ -28,6 +28,7 @@ from pathlib import Path
 from PIL import Image
 
 import engine as E
+import envs
 
 # Blender as a Python module, in its own uv environment like the voice engines: bpy 5.2 has wheels for Python 3.13
 # only. GPL-3.0-or-later: stage3d.py and every stage.py call its API, so they could only ever be shared under
@@ -47,17 +48,10 @@ QUALITIES = ("proof", "final")
 EVERY = 24
 
 
-def _uv(*tail):
-    return [
-        "uv",
-        "run",
-        "--no-project",
-        "--python",
-        PYTHON,
-        "--with-requirements",
-        str(REQUIREMENTS),
-        *tail,
-    ]
+def _blender(*tail):
+    """A command for Blender's Python: the venv envs.side builds from the lock (each wheel checked against its
+    sha256) and tail. Raises envs.EnvError when it cannot be built."""
+    return [str(envs.side(REQUIREMENTS, PYTHON)), *tail]
 
 
 def _pin():
@@ -67,8 +61,9 @@ def _pin():
 
 
 def _fetched():
-    """The note fetch() leaves once this lock has imported here. uv keeps no copy of a wheel this large that an
-    offline run can find (uv 0.13.6, 2026-11-10), so the cache itself cannot be asked."""
+    """The note fetch() leaves once bpy has imported in this lock's venv. The venv holds the wheels itself, so a run
+    with no network finds them; uv's cache keeps no copy of a wheel this large that an offline uv run can find
+    (uv 0.13.6, 2026-11-10)."""
     digest = hashlib.sha256(REQUIREMENTS.read_bytes()).hexdigest()[:12]
     return BLENDER_DIR / f"{_pin().replace('==', '-')}-{digest}.txt"
 
@@ -81,19 +76,26 @@ def missing():
         return [
             f"{REQUIREMENTS.name} beside plate3d.py: copy the whole engine folder (cp -r <skill>/engine/. .)"
         ]
-    if _fetched().is_file():
+    if _fetched().is_file() and envs.ready(
+        envs.side_dir(REQUIREMENTS, PYTHON), REQUIREMENTS
+    ):
         return []
     return [f"Blender as a Python module ({_pin()}, 324 MB): python plate3d.py fetch"]
 
 
 def fetch():
-    """Download the Blender module into the uv cache (nothing is installed globally) and note that it imports.
-    Exit 0 when it does."""
+    """Download the Blender module into its own venv (envs.side: nothing is installed globally, and each wheel is
+    checked against the lock's sha256) and note that it imports. Exit 0 when it does."""
     if not shutil.which("uv"):
         print("not ready: uv (winget install astral-sh.uv)")
         return 1
+    try:
+        cmd = _blender("-c", "import bpy; print(bpy.app.version_string)")
+    except envs.EnvError as e:
+        print(f"not ready: {e}")
+        return 1
     r = subprocess.run(
-        _uv("python", "-c", "import bpy; print(bpy.app.version_string)"),
+        cmd,
         capture_output=True,
         text=True,
         stdin=subprocess.DEVNULL,
@@ -218,7 +220,7 @@ def _render(stage, out, quality, frames, stills):
     with (
         log.open("a", encoding="utf-8", errors="backslashreplace") as keep,
         subprocess.Popen(
-            _uv("python", str(stage), "--", *args),
+            _blender(str(stage), "--", *args),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
@@ -264,7 +266,7 @@ def run(stage, args=()):
         print("not ready: " + "; ".join(miss))
         return 1
     r = subprocess.run(
-        _uv("python", str(stage), *args),
+        _blender(str(stage), *args),
         stdin=subprocess.DEVNULL,
         env={**os.environ, "PYTHONUTF8": "1"},
         check=False,
@@ -543,7 +545,7 @@ def main(argv=None):
     )
     sub.add_parser(
         "fetch",
-        help="download Blender, the bpy pin in requirements-bpy.in (324 MB, GPL-3.0), into the uv cache",
+        help="download Blender, the bpy pin in requirements-bpy.in (324 MB, GPL-3.0), into its own venv",
     )
     sub.add_parser("info", help="each plate here")
     c = sub.add_parser(
