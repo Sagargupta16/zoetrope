@@ -2,6 +2,15 @@
 
 Every change to this copy of the video-producer package it was adapted from. The version numbers are this copy's own; the package as received is 1.0.0. File and section names in 1.0.0 and 1.1.0 refer to the package's original layout (`references/01-producer-playbook.md` to `10-qa-and-house-rules.md`).
 
+## 2.7.2 - 2026-11-17
+
+The lock hashes are checked now, not only recorded. `uv run --with-requirements` installs a wheel whose `--hash` line is wrong (uv 0.13.8: a zeroed hash for six installed with exit 0; no uv setting changes it, and `uv run` reads no pylock.toml), while `uv pip install --require-hashes` refuses it, a cached wheel included.
+
+- **`engine/envs.py`** (standard library only) builds each Python environment as a venv filled by `uv pip install --require-hashes` from its lock, in a temp folder that becomes the venv only once every wheel matched, with a stamp holding the lock's sha256. `uv run --no-project python envs.py` makes a working folder's `.venv`; the documented build command, `uv run --no-project --with-requirements requirements.txt python <script>`, finds it, sees every pin met and runs in it with nothing added. It refuses to replace a `.venv` it did not make.
+- **Side environments.** `qa_speech.py`, `voice.py` (kokoro-ts) and `plate3d.py` run their workers with the interpreter of `envs.side(lock, python)`, a venv in `~/.cache/zoetrope/envs/<lock>-py<ver>-<sha12>/` (`ZOETROPE_ENVS` moves it), so a changed lock builds a new one and never touches the old. A zeroed hash in a copy of each lock is refused (`Hash mismatch for ctranslate2==4.9.0`, `onnxruntime==1.32.0`, `bpy==5.2.4`) and leaves nothing behind. `plate3d.missing()` also asks for the Blender venv, beside the note `fetch` leaves; plate keys are unchanged, so approved plates stay current. The Kokoro and speech caches synthesize and transcribe once more (the worker code is in their keys).
+- **setup.sh** checks the engine in the same kind of venv (`envs.py --cache`), so the skill's `engine/` never holds a `.venv` that `cp -r` would copy into every working folder, and prints `FIX` with uv's hash line when a wheel does not match. CI and CONTRIBUTING build the `.venv` before the selftest; the builder agent builds it right after copying the engine and reports `ENV: FIX` under `blocked`.
+- Not covered: a `uv run --with-requirements` with no `.venv` in its folder or a parent (the storyboard's `qa.py holds`, run from `<skill>/engine`) still gets the pinned versions unchecked. SECURITY.md, README, CLAUDE.md, the three `.in` headers and `references/` (engine, plates, qa-gates, voice, troubleshooting) say so instead of "versions, not bytes" and "into the uv cache".
+
 ## 2.7.1 - 2026-11-16
 
 Every finding of the 2026-11-16 whole-repo audit (66 rows, each confirmed by a refute pass), plus one found while fixing them. No gate code was added; the selftest still reads 161 fixtures and 60 of 60 codes, and every template and kit frame the engine draws is byte-identical.

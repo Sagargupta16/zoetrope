@@ -16,6 +16,7 @@ import wave
 from pathlib import Path
 
 import contract as C
+import envs
 import numpy as np
 
 SR = 44100  # same rate as audio.py and synth.py; audio.master writes the final 48 kHz mix
@@ -1050,9 +1051,9 @@ class Sapi(Engine):
 
 
 class _Worker(Engine):
-    """An engine that runs in its own uv environment (uv run --no-project --with-requirements <lock>), so
-    engine/requirements.txt stays Pillow and numpy only. lock names the compiled lock beside this file (its .in file
-    holds the pins); uv fetches the wheels on first use."""
+    """An engine that runs in its own environment, so engine/requirements.txt stays Pillow and numpy only. lock names
+    the compiled lock beside this file (its .in file holds the pins); envs.side builds the venv on first use, each
+    wheel checked against the lock's sha256."""
 
     python = "3.14"
     lock = ""
@@ -1085,10 +1086,9 @@ class _Worker(Engine):
             jp.write_text(
                 json.dumps(job | {"out": str(Path(tmp, "out.json"))}), encoding="utf-8"
             )
-            cmd = ["uv", "run", "--no-project", "--python", self.python]
-            cmd += ["--with-requirements", str(Path(__file__).with_name(self.lock))]
+            env = envs.side(Path(__file__).with_name(self.lock), self.python)
             r = subprocess.run(
-                cmd + ["python", str(py), str(jp)],
+                [str(env), str(py), str(jp)],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -1197,7 +1197,7 @@ class KokoroTs(_Worker):
     lock = "requirements-kokoro.txt"
     needs = (
         "Python 3.13 (uv fetches it) with kokoro-onnx, onnxruntime, phonemizer and espeakng-loader as "
-        "requirements-kokoro.txt pins them (about 40 MB of wheels, fetched by uv on first use), and from "
+        "requirements-kokoro.txt pins them (about 40 MB of wheels, checked against its sha256 on first use), and from "
         f"https://huggingface.co/{KOKORO_REPO} at commit {KOKORO_COMMIT[:8]} (Apache-2.0): onnx/model.onnx (fp32, "
         "325.5 MB; or onnx/model_fp16.onnx, 163.2 MB, which can turn out NaN) plus voices/<name>.bin (0.5 MB each), "
         f"into {VOICE_DIR / 'kokoro-82m-v1.0-onnx-timestamped'} keeping the onnx/ and voices/ folders, each of the "
@@ -1348,7 +1348,7 @@ Unregister-Event -SourceIdentifier zdone
 $s.Dispose()
 """
 
-_WORKER = r'''# voice_worker.py : written and run by zoetrope voice.py inside uv run --no-project --with-requirements <engine lock>
+_WORKER = r'''# voice_worker.py : written and run by zoetrope voice.py in the environment envs.side built from the engine's lock
 # One job file in; one WAV per line plus out.json out.
 import json
 import sys

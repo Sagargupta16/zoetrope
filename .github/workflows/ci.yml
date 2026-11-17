@@ -57,6 +57,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/selftest"
           cp -r skills/zoetrope/engine/. "$RUNNER_TEMP/selftest/"
           cd "$RUNNER_TEMP/selftest"
+          # the folder's .venv, each wheel checked against its sha256 in requirements.txt; the next line runs in it
+          uv run --no-project python envs.py
           uv run --no-project --with-requirements requirements.txt python qa.py selftest
 
       - name: Show the template QA findings on failure

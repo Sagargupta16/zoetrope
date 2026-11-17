@@ -6,7 +6,7 @@ Run all gates on the final file, not only on stills. `run_all.py full` and `run_
 
 ## Where the gates run
 
-Every gate runs on this machine, with Python, Pillow, numpy and the ffmpeg and ffprobe the engine finds. Only the speech gates (Q806, Q807) start a second uv environment, to run a speech model that `python qa_speech.py fetch` put in the cache (the first run of that environment may fetch its pinned wheels, as uv does); no gate module itself opens a network connection.
+Every gate runs on this machine, with Python, Pillow, numpy and the ffmpeg and ffprobe the engine finds. Only the speech gates (Q806, Q807) start a second environment, to run a speech model that `python qa_speech.py fetch` put in the cache (`envs.side` builds that venv on first use, which may fetch its pinned wheels, each checked against its sha256 in `requirements-speech.txt`); no gate module itself opens a network connection.
 
 | Step | What it reads | Codes it makes |
 |---|---|---|
