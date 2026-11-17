@@ -515,13 +515,16 @@ def strip(ctx, frames, out=C.AUDIO_PNG):
             + ", ".join(f"{counts[w]} {w}" for w in CUE_WORDS if counts.get(w))
             + f" (of {n_aud} audio cues)"
         )
-    i_ok = L.get("I") is not None and abs(L["I"] + 14) <= 1
+    import qa  # build.json's loudness target (--loudness), else -14
+
+    want = qa.build_loudness(ctx.workdir)
+    i_ok = L.get("I") is not None and abs(L["I"] - want) <= 1
     tp_ok = L.get("peak") is not None and L["peak"] <= TP_MAX
     _segments(
         d,
         (8, 26),
         [
-            (f"I {L.get('I')} LUFS (want -14 +/- 1)", TEXT if i_ok else AMBER),
+            (f"I {L.get('I')} LUFS (want {want:g} +/- 1)", TEXT if i_ok else AMBER),
             (f"   LRA {L.get('LRA')} LU   ", DIM),
             (
                 f"true peak {L.get('peak')} dBTP (want <= -1): {len(over)} of {len(frames)} frames over",

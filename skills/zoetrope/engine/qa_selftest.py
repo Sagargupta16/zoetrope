@@ -4,10 +4,14 @@
 # proof and full with no FIX and no NOT CHECKED. Exit 0 all held; 1 a gate missed or misreported a planted fault (or a
 # control failed); 2 the selftest could not prove a code: no fixture and no EXPECTED_GAPS entry, a fixture file
 # missing, a gate that considered 0 items, a case that raised. 1 wins over 2, as FIX wins over NOT CHECKED.
+# The template's pixels at fixed times are also held against stored small images (the golden control below); `--bless`
+# rewrites them after a change that was meant to move pixels.
 import contextlib
+import datetime
 import hashlib
 import importlib
 import io
+import json
 import re
 import shutil
 import subprocess
@@ -188,6 +192,267 @@ def _control(size, root, quick, results):
         results.append(("ERROR", f"template {size}", f"{type(e).__name__}: {e}"))
 
 
+# ---- the golden render control (the template's pixels at fixed times, against stored small images) ----
+# draw(t) is pure, so a second run gives the same pixels and the only noise is another machine's font rasteriser.
+# Each size is drawn in its own process (the frame size is set before scenes is imported), cut down to GOLDEN_LONG px
+# on its long side with one fixed filter, and compared with qa_fixtures/golden/<font>/<size>/<n>.png by PSNR against
+# the floor in golden.json. The text is drawn by the platform's bold font (engine.FONT_BOLD), so a set belongs to one
+# font file name; a machine whose font has no set says so and checks nothing (bless there to add one).
+GOLDEN = FIXTURES / "golden"
+GOLDEN_TIMES = (
+    0.0,
+    0.35,
+    1.2,
+    2.4,
+    2.6,
+    3.8,
+    5.1,
+    7.4,
+)  # entrance, hold, exit and the end card of each scene
+GOLDEN_LONG = 384  # px on the long side: 1920x1080 and 1080x1920 are cut by exactly 5
+GOLDEN_FILTER = "BOX"  # area average: no ringing, and an integer cut is exact
+# dB, the worst frame of a set. A re-run is bit-identical (inf), so the floor only has to clear another machine's
+# rasteriser and stay under a real change. Measured on the 1920x1080 set (2026-11-17, one platform): title moved
+# 0.25 or 0.5 px 48.2 dB, 1 px 39.9, 2 px 34.2; title 1 px larger 29.8; one letter changed 21.8; the night gradient
+# +4 levels of blue 45.7 and +8 levels 39.7; accent recoloured 31.7; white title #EEEEEE 44.8. A 1 to 16 level nudge
+# of the accent or the ink (a few small shapes) reads 57 to 76 dB and is not caught.
+GOLDEN_FLOOR = 45.0
+
+
+def _git(*args):
+    """git's stdout in this folder, '' when git or the repo is missing."""
+    try:
+        r = subprocess.run(
+            ["git", *args],
+            cwd=HERE,
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            check=False,
+        )
+    except OSError:
+        return ""
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def _golden_draw(size, out, long_side, times):
+    """The worker, run as its own process: draw the template at each time, cut it down, save out/<n>.png and print
+    one JSON line with the bold font's file stem and the Pillow version."""
+    import engine as E
+    from PIL import Image
+
+    w, h = (int(v) for v in size.split("x"))
+    E.W, E.H = w, h  # before scenes is imported
+    import scenes
+
+    k = long_side / max(w, h)
+    small = (round(w * k), round(h * k))
+    Path(out).mkdir(parents=True, exist_ok=True)
+    for i, t in enumerate(times):
+        scenes.draw(t).resize(small, getattr(Image, GOLDEN_FILTER)).save(
+            Path(out) / f"{i}.png", optimize=True
+        )
+    font = next((p for p in E.FONT_BOLD if Path(p).exists()), "none")
+    print(json.dumps({"font": Path(font).stem.lower(), "pillow": Image.__version__}))
+
+
+def _golden_run(size, out, spec):
+    """(font stem, Pillow version, seconds) after drawing spec's times at size into out in a fresh process."""
+    t0 = time.perf_counter()
+    r = subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).resolve()),
+            "--golden-draw",
+            size,
+            str(out),
+            str(spec["long_side"]),
+            json.dumps(spec["times"]),
+        ],
+        cwd=HERE,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdin=subprocess.DEVNULL,
+        check=False,
+    )
+    if r.returncode:
+        raise RuntimeError(f"the draw process exited {r.returncode}: {r.stderr[-300:]}")
+    info = json.loads(r.stdout.strip().splitlines()[-1])
+    return info["font"], info["pillow"], time.perf_counter() - t0
+
+
+def _psnr(a, b):
+    """dB between two PNG files of one size; inf when they are the same pixels, None when the sizes differ."""
+    import numpy as np
+    from PIL import Image
+
+    x = np.asarray(Image.open(a).convert("RGB"), dtype=np.float64)
+    y = np.asarray(Image.open(b).convert("RGB"), dtype=np.float64)
+    if x.shape != y.shape:
+        return None
+    mse = float(np.mean((x - y) ** 2))
+    return float("inf") if mse == 0 else 10 * np.log10(255.0**2 / mse)
+
+
+def _golden_spec(meta, font):
+    """The set of one font from golden.json, or None."""
+    return (meta.get("sets") or {}).get(font)
+
+
+def _golden_control(size, root, results):
+    """One size of the golden control: draw it, compare every frame with the font's stored set, one row."""
+    name = f"golden {size}"
+    try:
+        meta = json.loads((GOLDEN / "golden.json").read_text(encoding="utf-8"))
+        # the font is only known once a process has drawn, so draw with the first set's times (a bless writes the
+        # same times to every set it makes) and then pick the set that font owns
+        sets = meta.get("sets") or {}
+        if not sets:
+            results.append(("MISSING", name, "golden.json holds no set"))
+            return
+        out = root / f"golden_{size.replace('x', '_')}"
+        font, _, secs = _golden_run(size, out, next(iter(sets.values())))
+        spec = _golden_spec(meta, font)
+        if spec is None:
+            results.append(
+                (
+                    "skip",
+                    name,
+                    (
+                        f"not checked: no golden set for the font {font} (sets: {', '.join(sets)}); "
+                        f"`python qa.py selftest --bless` on this machine makes one"
+                    ),
+                )
+            )
+            return
+        if size not in spec["sizes"]:
+            results.append(("MISSING", name, f"the {font} set has no {size}"))
+            return
+        scores = []
+        for i, t in enumerate(spec["times"]):
+            gold = GOLDEN / font / size / f"{i}.png"
+            if not gold.exists():
+                results.append(("MISSING", name, f"{gold.relative_to(HERE)} not found"))
+                return
+            scores.append((_psnr(out / f"{i}.png", gold), i, t))
+        floor = spec["floor_db"]
+        low = [s for s in scores if s[0] is None or s[0] < floor]
+        n = len(scores)
+        if low:
+            p, i, t = min(low, key=lambda s: -1 if s[0] is None else s[0])
+            how = "size differs" if p is None else f"PSNR {p:.1f} dB"
+            results.append(
+                (
+                    "WRONG",
+                    name,
+                    (
+                        f"frame {i} (t={t:g} s) {how}, under the floor {floor:g} dB; {len(low)} of {n} frames "
+                        f"under it; drawn frames in {out}"
+                    ),
+                )
+            )
+            return
+        worst = min(s[0] for s in scores)
+        said = "identical" if worst == float("inf") else f"min PSNR {worst:.1f} dB"
+        results.append(
+            (
+                "ok",
+                name,
+                f"({n} frames, {said}, floor {floor:g} dB, font {font}) in {secs:.1f} s",
+            )
+        )
+    except Exception as e:  # noqa: BLE001 (a control that cannot run is reported, never a crash of the selftest)
+        results.append(("ERROR", name, f"{type(e).__name__}: {e}"))
+
+
+def bless(a):
+    """qa.py selftest --bless: draw the template at both sizes again and store it as the golden set of this machine's
+    font, printing which frames moved and by how much against the set it replaces. Exit 0, 2 when it cannot draw."""
+    tpl = HERE / "scenes.py"
+    meta_path = GOLDEN / "golden.json"
+    meta = (
+        json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
+    )
+    meta.setdefault("sets", {})
+    root = Path(tempfile.mkdtemp(prefix="zoetrope_golden_"))
+    try:
+        old = next(iter(meta["sets"].values()), {})
+        spec = {
+            "times": list(old.get("times", GOLDEN_TIMES)),
+            "long_side": old.get("long_side", GOLDEN_LONG),
+        }
+        floor = old.get("floor_db", GOLDEN_FLOOR)
+        drawn = {}
+        for size in SIZES:
+            font, pil, _ = _golden_run(size, root / size, spec)
+            drawn[size] = (root / size, font, pil)
+        font = {d[1] for d in drawn.values()}.pop()
+        before = meta["sets"].get(font)
+        print(f"bless: the template {tpl} drawn with the font {font}")
+        changed = 0
+        for size, (folder, _, _) in drawn.items():
+            for i, t in enumerate(spec["times"]):
+                gold = GOLDEN / font / size / f"{i}.png"
+                if before is None or not gold.exists():
+                    print(f"  {size} frame {i} (t={t:g} s): new")
+                    changed += 1
+                    continue
+                p = _psnr(folder / f"{i}.png", gold)
+                if p == float("inf"):
+                    continue
+                changed += 1
+                print(
+                    f"  {size} frame {i} (t={t:g} s): "
+                    + (
+                        "size changed"
+                        if p is None
+                        else f"PSNR {p:.1f} dB against the old set"
+                    )
+                )
+        for size, (folder, _, _) in drawn.items():
+            dst = GOLDEN / font / size
+            shutil.rmtree(dst, ignore_errors=True)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(folder, dst)
+        dirty = _git("status", "--porcelain", "--", ".")
+        commit = _git("rev-parse", "--short", "HEAD") or "unknown"
+        meta["sets"][font] = {
+            "font": font,
+            "sizes": list(SIZES),
+            "times": spec["times"],
+            "long_side": spec["long_side"],
+            "filter": GOLDEN_FILTER,
+            "floor_db": floor,
+            "commit": commit + ("+changes" if dirty else ""),
+            "scenes_sha256": hashlib.sha256(tpl.read_bytes()).hexdigest()[:12],
+            "pillow": next(iter(drawn.values()))[2],
+            "blessed": datetime.date.today().isoformat(),
+        }
+        meta_path.write_text(
+            json.dumps(meta, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        others = [k for k in meta["sets"] if k != font]
+        print(
+            f"bless: {len(SIZES) * len(spec['times'])} frames written to {GOLDEN / font}, "
+            f"{changed} changed"
+            + (
+                f"; sets for other fonts left as they were: {', '.join(others)}"
+                if others
+                else ""
+            )
+        )
+        return 0
+    except Exception as e:  # noqa: BLE001 (said with its type, exit 2: nothing was proven)
+        print(f"bless: {type(e).__name__}: {e}")
+        return 2
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 # ---- running the cases ----
 
 
@@ -296,6 +561,12 @@ def run(a):
         if tpl.exists():
             sha = hashlib.sha256(tpl.read_bytes()).hexdigest()[:12]
             print(f"selftest: the template is {tpl} (sha256 {sha})")
+        for (
+            size
+        ) in SIZES:  # the golden frames: a draw and a compare, a second or two each
+            th = threading.Thread(target=_golden_control, args=(size, root, controls))
+            th.start()
+            threads.append(th)
         if ff is None:
             controls.append(
                 (
@@ -427,4 +698,15 @@ def add_cli(sub):
         action="store_true",
         help="keep the temp folder even on a PASS (a failing run always keeps it; its path is printed)",
     )
-    p.set_defaults(func=run)
+    p.add_argument(
+        "--bless",
+        action="store_true",
+        help="draw the template again and store it as this machine's golden set (qa_fixtures/golden/), printing "
+        "which frames changed and by how much; runs nothing else",
+    )
+    p.set_defaults(func=lambda a: bless(a) if a.bless else run(a))
+
+
+if __name__ == "__main__" and sys.argv[1:2] == ["--golden-draw"]:
+    # the worker of _golden_run: size, output folder, long side, times (JSON)
+    _golden_draw(sys.argv[2], sys.argv[3], int(sys.argv[4]), json.loads(sys.argv[5]))

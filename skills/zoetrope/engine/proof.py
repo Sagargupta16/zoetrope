@@ -325,6 +325,63 @@ def _tile(long):
     return round(long * E.W / E.H), long
 
 
+def grid_of(size):
+    """(columns, rows) of the anchor grid on a frame of `size` (w, h): 6 by 4 at 16:9 or wider, 4 by 6 standing."""
+    return (6, 4) if size[0] >= size[1] else (4, 6)
+
+
+def anchor_box(cell, size):
+    """Pixel box (x0, y0, x1, y1) of the anchor cell named `cell` ('C2': column letter, row number from 1) on a
+    frame of `size` (w, h); the same grid the key sheet draws, so 'C2: caption clipped' names this box."""
+    m = re.fullmatch(r"([A-Za-z])([0-9]+)", str(cell).strip())
+    cols, rows = grid_of(size)
+    if not m or not 0 <= ord(m[1].upper()) - 65 < cols or not 1 <= int(m[2]) <= rows:
+        raise ValueError(
+            f"no cell {cell!r} on a {cols} by {rows} grid (A1 to {chr(64 + cols)}{rows})"
+        )
+    c, r = ord(m[1].upper()) - 65, int(m[2]) - 1
+    w, h = size
+    return (c * w // cols, r * h // rows, (c + 1) * w // cols, (r + 1) * h // rows)
+
+
+def _grid(img, f):
+    """img (a key sheet tile, a review copy only) with the thin anchor grid: column letters along the top edge, row
+    numbers down the left, each on a small dark chip so it reads on any picture."""
+    base = img.convert("RGBA")
+    ov = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(ov)
+    cols, rows = grid_of(base.size)
+    for k in range(1, cols):
+        d.line(
+            [(k * base.width // cols, 0), (k * base.width // cols, base.height)],
+            fill=(255, 255, 255, 90),
+        )
+    for k in range(1, rows):
+        d.line(
+            [(0, k * base.height // rows), (base.width, k * base.height // rows)],
+            fill=(255, 255, 255, 90),
+        )
+    for c in range(cols):
+        x0, y0, x1, _ = anchor_box(f"{chr(65 + c)}1", base.size)
+        d.rectangle(
+            (x0 + (x1 - x0) // 2 - 8, y0, x0 + (x1 - x0) // 2 + 8, y0 + 14),
+            fill=(0, 0, 0, 150),
+        )
+        d.text(
+            (x0 + (x1 - x0) // 2, y0 + 7),
+            chr(65 + c),
+            font=f,
+            fill=(255, 255, 255, 235),
+            anchor="mm",
+        )
+    for r in range(rows):
+        x0, y0, _, y1 = anchor_box(f"A{r + 1}", base.size)
+        cy = y0 + (y1 - y0) // 2
+        d.rectangle((x0, cy - 7, x0 + 12, cy + 7), fill=(0, 0, 0, 150))
+        d.text((x0 + 6, cy), str(r + 1), font=f, fill=(255, 255, 255, 235), anchor="mm")
+    return Image.alpha_composite(base, ov).convert("RGB")
+
+
 def _pages(out, n):
     """Names of n pages of one sheet: out, then out_2, out_3 ... Pages left from a longer run are removed, so every
     page on disk belongs to this run."""
@@ -374,11 +431,12 @@ def _panel(d, rows, source, y, w, f):
     return 18 * (min(len(rows), PANEL_ROWS) + 1 + (len(rows) > PANEL_ROWS)) + 10
 
 
-def _key_png(shown, out, cols, tw, total, cap, panel=(), source=""):
+def _key_png(shown, out, cols, tw, total, cap, panel=(), source="", grid=True):
     """proof_keys.png: a cell per shown moment (frame, number, scene, time, rank, every reason) under a legend, and
     on page 1 the panel of rows that name no moment. Cells that do not fit one page of PAGE_H px go on
     proof_keys_2.png and on: a taller image is shrunk when it is read, and its captions blur. tw is a tile's long
-    side; a 9:16 film gets standing tiles in more columns."""
+    side; a 9:16 film gets standing tiles in more columns. grid draws the labelled anchor grid on each tile (a
+    review copy: `anchor_box` maps 'C2' to pixels)."""
     w, h = _tile(tw)
     cols = cols if E.W >= E.H else max(1, cols * tw // w)
     f1, f2 = E.font(17, True), E.font(15, False)
@@ -417,7 +475,8 @@ def _key_png(shown, out, cols, tw, total, cap, panel=(), source=""):
             c, (l1, l2) = shown[i], text[i]
             x, y = (k % cols) * w, top + (k // cols) * (hh + h)
             col = COLOUR[RANKS[c["rank"]]]
-            img.paste(still(c["t"], w, h), (x, y + hh))
+            tile = still(c["t"], w, h)
+            img.paste(_grid(tile, f2) if grid else tile, (x, y + hh))
             d.rectangle((x + 1, y + 1, x + w - 2, y + hh + h - 2), outline=col, width=3)
             for j, ln in enumerate(l1):
                 d.text((x + 8, y + 6 + j * 18), ln, font=f1, fill=col)
@@ -683,7 +742,7 @@ def gantt(shown=(), out=C.GANTT, width=1920, fps=None):
     return img.size
 
 
-def draw_sheets(out, times_json, cols, tw, cap, mine, panel=(), source=""):
+def draw_sheets(out, times_json, cols, tw, cap, mine, panel=(), source="", grid=True):
     """The three review sheets from review_times.json, with the rows in `panel` (timeless FIX and NOT CHECKED, from
     `source`) listed on page 1. Each shown cell's number n is written back (null when the cap left a time off the
     sheet), so review/audio.png can draw matching ticks."""
@@ -696,7 +755,7 @@ def draw_sheets(out, times_json, cols, tw, cap, mine, panel=(), source=""):
     C.add_review_times(
         [{"t": t, "n": c.get("n")} for c in cells for t in c["ts"]], times_json
     )
-    pages = _key_png(shown, out, cols, tw, len(cells), cap, panel, source)
+    pages = _key_png(shown, out, cols, tw, len(cells), cap, panel, source, grid)
     if panel:
         print(f"listed {len(panel)} rows with no moment on {Path(out).name}")
     strips = _strip_png(cells, STRIPS, fps)
@@ -720,6 +779,7 @@ def key_sheet(
     tw=480,
     cap=40,
     findings=None,
+    grid=True,
 ):
     """Proof stage: start review_times.json afresh with the key times plus a 'finding' entry at the worst moment of
     every FIX and NOTE row (qa.py diff's 'changed' times stay: they hold until the next approval), then draw
@@ -729,7 +789,9 @@ def key_sheet(
     Path(times_json).write_text("[]", encoding="utf-8")
     C.add_review_times(_order(keep + mine), times_json)
     panel = timeless(findings)
-    return draw_sheets(out, times_json, cols, tw, cap, mine, panel, "the proof gates")
+    return draw_sheets(
+        out, times_json, cols, tw, cap, mine, panel, "the proof gates", grid
+    )
 
 
 def _order(entries):
@@ -760,7 +822,13 @@ def _changed(entries):
 
 
 def keys(
-    times_json=C.REVIEW_TIMES, out="proof_keys.png", cols=4, tw=480, cap=40, rows=None
+    times_json=C.REVIEW_TIMES,
+    out="proof_keys.png",
+    cols=4,
+    tw=480,
+    cap=40,
+    rows=None,
+    grid=True,
 ):
     """Redraw proof_keys.png, proof_strips.png and proof_gantt.png from review_times.json as it stands (after qa.py
     check, qa.py diff or the scans added to it); proof.png is not touched. With no file yet, start one from the key
@@ -780,7 +848,7 @@ def keys(
                 pass
         source = " and ".join(found)
     panel = list({(r.status, r.code, r.msg): r for r in timeless(rows)}.values())
-    return draw_sheets(out, times_json, cols, tw, cap, mine, panel, source)
+    return draw_sheets(out, times_json, cols, tw, cap, mine, panel, source, grid)
 
 
 if __name__ == "__main__":
@@ -803,6 +871,11 @@ if __name__ == "__main__":
         "--size", help="WxH (default: build.json, else frames.hash, else run_all.py)"
     )
     k.add_argument("--fps", type=int, help="frames per second (default: as --size)")
+    k.add_argument(
+        "--no-grid",
+        action="store_true",
+        help="no labelled anchor grid on the cells of proof_keys.png",
+    )
     a = ap.parse_args()
     b = C.read_build()  # run_all.py records the frame size in every stage
     m = C.read_frame_manifest()  # the render's own record, once a render ran
@@ -823,5 +896,5 @@ if __name__ == "__main__":
     print(f"drawing at {E.W}x{E.H}, {E.FPS} fps, supersampling {E.SS} (from {src})")
     if m and (m["w"], m["h"], m["fps"]) != (E.W, E.H, E.FPS):
         print(f"note: frames.hash says {m['w']}x{m['h']} at {m['fps']} fps")
-    out, n_keys, n_shown = keys(a.times, cap=a.cap)
+    out, n_keys, n_shown = keys(a.times, cap=a.cap, grid=not a.no_grid)
     print(f"wrote {out} ({n_shown} of {n_keys} key times) and {a.times}")

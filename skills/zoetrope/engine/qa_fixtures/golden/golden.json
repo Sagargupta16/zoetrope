@@ -1,0 +1,28 @@
+{
+  "sets": {
+    "arialbd": {
+      "blessed": "2026-11-17",
+      "commit": "a9416fc+changes",
+      "filter": "BOX",
+      "floor_db": 45.0,
+      "font": "arialbd",
+      "long_side": 384,
+      "pillow": "13.0.0",
+      "scenes_sha256": "a41a8181b467",
+      "sizes": [
+        "1920x1080",
+        "1080x1920"
+      ],
+      "times": [
+        0.0,
+        0.35,
+        1.2,
+        2.4,
+        2.6,
+        3.8,
+        5.1,
+        7.4
+      ]
+    }
+  }
+}

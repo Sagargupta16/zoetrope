@@ -616,6 +616,12 @@ CODES = {
         "NOTE",
         "text_items(t) reports text at alpha 0.5 or more that nothing draws",
     ),
+    "Q210": (
+        "qa_quiz",
+        2,
+        "FIX",
+        "a quiz answer is carried nowhere: not on screen and not in the narration",
+    ),
     "Q301": ("qa", 3, "FIX", "text under its contrast minimum"),
     "Q401": ("qa", 4, "FIX", "reading hold under the card's profile"),
     "Q402": ("qa", 4, "NOTE", "key text under 36 px at 1080"),
@@ -655,7 +661,12 @@ CODES = {
     ),
     "Q707": ("qa", 7, "FIX", "colour tags not bt709 / tv"),
     "Q708": ("qa", 7, "FIX", "colour round trip off by more than 8 levels"),
-    "Q801": ("qa", 8, "FIX", "integrated loudness off -14 LUFS"),
+    "Q801": (
+        "qa",
+        8,
+        "FIX",
+        "integrated loudness off its target (build.json loudness, default -14 LUFS)",
+    ),
     "Q802": (
         "qa_stack",
         8,
@@ -710,6 +721,12 @@ CODES = {
         "FIX",
         "the encoded file does not match the drawn frames (thumbs.npy): a wrong-size or sheared encode",
     ),
+    "Q1106": (
+        "qa_scan",
+        1,
+        "NOTE",
+        "seam: the motion across a cut changes axis or reverses direction",
+    ),
     "Q1201": ("qa_purity", 1, "FIX", "draw(t) not pure: same frame, different pixels"),
     "Q1202": ("qa_lint", 1, "FIX", "unseeded randomness or wall-clock time in scenes"),
     "Q1203": ("qa_lint", 1, "NOTE", "module state written inside draw"),
@@ -751,6 +768,7 @@ GATE_MODULES = (
     "qa_sync",
     "qa_speech",
     "qa_registry",
+    "qa_quiz",
     "qa_approve",
 )
 CLI_MODULES = (

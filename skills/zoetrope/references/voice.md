@@ -33,7 +33,7 @@ N = V.synthesize(lines, engine="sapi", folder="narration")  # a robotic timing d
 
 Then check what it says before anything is built on it: `qa.py speech narration/narration.json` (Q806, below).
 
-`lines` are strings (ids L01, L02 ...), `{id, text}` or `{id, text, fit}` dicts or `(id, text)` pairs; one voice per call.
+`lines` are strings (ids L01, L02 ...), `{id, text}`, `{id, text, fit}` or `{id, text, voice}` dicts or `(id, text)` pairs. The call's `engine` and `voice` speak every line that names none of its own; a line that does is a second host (below).
 
 - **Per part.** A line is one part, or several when it holds pause markers. Each part is synthesized alone and cached as `narration/<key>.wav`, key = sha256 of the engine, the model id (a hash of every model file the voice reads, or the SAPI voice id and Windows build), the code id (the engine's own code, its SAPI bridge or uv worker program and its lock file), the voice, the speed and the text spoken, as showtime caches per line. Editing one line synthesizes only that line's parts again; an unchanged re-run synthesizes nothing (on three SAPI lines: 0 of 3), so render never needs the engine; an edit to an engine, its pins or its model files synthesizes again. Each new file is checked (speech found, word times inside it) before it is cached; a bad one is deleted and the error names the line and the file. Word times are rebuilt from the engine's raw data at every run, so the trim tunables and the word mapping apply without new audio. Old part files stay when lines change: delete the folder to clear them.
 - **Trim and join.** Each part is trimmed to its speech (10 ms windows, a peak above -48 dBFS is speech, 40 ms kept each side: explainroo's numbers, tunables `TRIM_DB`, `TRIM_KEEP`, `TRIM_WIN`) and placed by integer sample counts, never by summed durations. The timeline is `narration/narration.wav` (mono, 44.1 kHz, 16-bit); slots end on whole frames (`fps=`, default 30).
@@ -44,17 +44,36 @@ Then check what it says before anything is built on it: `qa.py speech narration/
 - **scenes.py reads, never synthesizes**: `N = V.load_narration("narration/narration.json")`. Render workers import scenes.py once each, and would each run the engine and rewrite narration.wav at the same time. Give each scene its line's `slot["duration"]` and cue reveals with `C.snap(V.word_cue(N, word), FPS)`.
 - Mix with `V.duck_mix(bed, V.dec("narration/narration.wav"))` (`mixing.md`).
 
+### Two hosts on one timeline (2.8.0)
+
+A line dict may carry its own `"voice"` and `"engine"`. Lines without them are spoken by the call's engine and voice (the narrator, `af_heart`, when the call names none); a line that names only a `"voice"` uses the call's engine, and one that names only an `"engine"` uses that engine's default voice. Both hosts go on one timeline through one `voice.synthesize` call, so the slots tile, `fit=` and `[pause]` work per line as before, and `word_cue` reads any line:
+
+```python
+N = V.synthesize([
+    {"id": "A1", "text": "Welcome back. Today we look at Mars."},
+    {"id": "B1", "text": "It is two hundred twenty five million kilometres away.", "voice": "am_michael"},
+], folder="narration")
+```
+
+Run on 2026-11-17 this synthesized 2 of 2 parts and wrote `narration.json` with `A1` as `kokoro-ts` / `af_heart` / `en-us` and `B1` as `kokoro-ts` / `am_michael` / `en-us`; `qa.py speech narration/narration.json` then read `PASS Q806  2 narrated lines, 16 words: every word heard as written`. A voice that is not downloaded raises with its close matches (`kokoro-ts: no voice 'am_mike'; close: ...`). The cache key holds the voice, so editing one host's line speaks that line again and nothing else.
+
+- **Which voices.** The Kokoro voices cached on this machine are the 20 in the engine table below: `af_heart` (the narrator), `af_bella`, `bf_emma`, nine American male voices (`am_michael` and eight more), four British male voices (`bm_george` among them) and the four Hindi ones. For a two-host chat take one female and one male voice so listeners can tell them apart: `af_heart` with `am_michael` is the pair run above. A pair is not picked for the user: audition with `voice_samples.py` (the 2026-11-03 samples hold every male voice).
+- **What narration.json records.** Each line has its own `engine`, `voice` and `lang`. The top-level `voice` and `model` are the call's default speaker. The top-level `lang` is the default voice's language, or the first line's when a line is in another language: Q806 reads English only, so one line in Hindi makes the whole narration read as Hindi (a NOTE).
+- **Captions and scenes.** Nothing else changes: a scene still takes its line's `slot["duration"]` and `V.word_cue(N, word)` reads the word on whichever line has it. The line `id` and its voice are in `narration.json`, so a scene can tell the hosts apart.
+- **Later option, not installed.** Dia is a two-speaker text-to-speech model of 6.4 GB, a candidate for two-host dialogue. It is not downloaded and not wired in as an engine; the per-line voice above is the route until the user says yes to the download, and the engine rule under Engines applies (a job no other engine holds, and a run here).
+
 ### narration.json
 
 The shape of showtime's timeline.json. Times are seconds on the narration timeline.
 
 | Key | Meaning |
 |---|---|
-| `engine`, `model`, `voice`, `lang`, `speed` | What spoke it, the language (`en-us`, `en-gb`, `hi`; Q806 checks English only) and the call's speed |
+| `engine`, `model`, `voice`, `lang`, `speed` | What spoke it by default (the call's engine and voice; each line records its own, below), the language (`en-us`, `en-gb`, `hi`; Q806 checks English only; the first line in another language sets it) and the call's speed |
 | `lexicon`, `fit_fast` | The respellings given, and the fit speed cap |
 | `sr`, `fps`, `rule`, `profile`, `trim` | 44100; the slots' frame grid; the slot rule; the hold profile; the trim tunables |
 | `duration`, `samples`, `file` | Length of `narration.wav` in seconds and samples, and its name |
 | `lines[].id`, `text`, `script` | `L01`, `L02` ... (or the ids given), the line without pause markers, and the line as written |
+| `lines[].engine`, `voice`, `lang` | Who spoke the line: its own engine and voice when the line named them, else the call's, and the language of that voice |
 | `lines[].spoken`, `pauses` | Each part as the engine read it (respellings in), and the silence after each part but the last |
 | `lines[].speed`, `fit` | The speed it was spoken at (above the call's speed when fit sped it up) and its fit, or null |
 | `lines[].start`, `end` | Where the trimmed clip sits (40 ms of margin around the speech) |

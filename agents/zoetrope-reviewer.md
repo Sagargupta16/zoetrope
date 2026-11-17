@@ -108,6 +108,8 @@ carried them.
    1080x1920), so
    `python -c "from PIL import Image; im = Image.open('proof.png'); h = 1161; [im.crop((0, y, im.width, min(im.height, y + h))).save(f'review/proof_row{y // h + 1}.png') for y in range(0, im.height, h)]"`
    pages it.
+   Name every finding by its anchor cell, as `#7 C2: ...` (the number is the proof cell, `C2` the column and row of the grid drawn on it; `proof.anchor_box(cell, size)` maps a cell to pixels).
+   When `quiz.json` is in the folder, answer its questions from the frames alone before you read the Q210 rows: `python qa_quiz.py` prints them without answers. Then compare with the Q210 rows; an answer you could not read off a frame is a finding.
    Then the directing checks (`references/playbook.md` section 5), each a P1
    with its still: the subject under a third of the frame height at a key
    moment, or against an edge; a caption over the subject; two stills in a
@@ -142,7 +144,9 @@ carried them.
    draw(t) drew: back to the builder); a NOT CHECKED row goes under cannot
    verify with its code. The scan NOTEs (Q1101 to Q1104) and the flash rows
    point at moments: open each, as a strip for a pop; a NOTE needs a look,
-   not a fix, unless the look shows a fault.
+   not a fix, unless the look shows a fault. A Q1106 NOTE is a seam: look at
+   the frames either side of the cut and say whether the direction change
+   has a visible cause.
 2. Read the sheets again as at the proof stage: `run_all.py full` redrew
    them with the file's findings, pops and changes. The strips show draw(t),
    so a pop the scans report that is not on its strip came from the render or

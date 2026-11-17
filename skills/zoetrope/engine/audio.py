@@ -106,6 +106,76 @@ def music(dur, bpm, cuts=(), voice_spans=()):
     return m + s
 
 
+def _decode_mono(path, ff=None):
+    """Any audio file as mono float at SR through ffmpeg (-nostdin). ValueError naming the file when it is missing,
+    does not decode, is empty, or decodes to a length that is not its own (ffprobe's duration, 50 ms)."""
+    if not Path(path).is_file():
+        raise ValueError(f"music_file: {path} is not a file")
+    ff = ff or C.find_ffmpeg()
+    if not ff:
+        raise ValueError(f"music_file: no ffmpeg to decode {path}")
+    cmd = [ff, "-nostdin", "-v", "error", "-i", str(path), "-vn", "-f", "f32le"]
+    r = subprocess.run(
+        [*cmd, "-ac", "1", "-ar", str(SR), "-"], capture_output=True, check=False
+    )
+    if r.returncode or len(r.stdout) % 4:
+        tail = r.stderr.decode(errors="replace").strip().splitlines()[-2:]
+        err = "; ".join(s.strip() for s in tail)[-300:] or f"exit {r.returncode}"
+        raise ValueError(f"music_file: ffmpeg could not decode {path}: {err}")
+    y = np.frombuffer(r.stdout, np.float32).astype(float)
+    if not len(y) or not np.isfinite(y).all():
+        raise ValueError(f"music_file: {path} decodes to no usable audio")
+    try:
+        want = float(
+            C.ffprobe_json(path, "-show_entries", "format=duration")["format"][
+                "duration"
+            ]
+        )
+    except (subprocess.CalledProcessError, KeyError, ValueError):
+        raise ValueError(
+            f"music_file: ffprobe could not read the length of {path}"
+        ) from None
+    if abs(len(y) / SR - want) > 0.05:
+        raise ValueError(
+            f"music_file: {path} decoded to {len(y) / SR:.3f} s, its header says {want:.3f} s (a cut file?)"
+        )
+    return y
+
+
+def music_file(
+    path, start=0.0, gain_db=0.0, fade_in=0.5, fade_out=1.0, duration=None, ff=None
+):
+    """A music bed from an audio file (a score made elsewhere, any licensed WAV or MP3) as one mono float buffer at SR,
+    its first sample at `start` seconds, gain_db applied, faded in and out (seconds; shortened to fit a short clip)
+    and cut to `duration` seconds when given. It records itself on the cue sheet like any synth sound (sound
+    'music', bus 'music', align start), so the stack and true-peak gates can name it. Raises ValueError for a file
+    that is missing or does not decode."""
+    if (
+        start < 0
+        or fade_in < 0
+        or fade_out < 0
+        or (duration is not None and duration <= 0)
+    ):
+        raise ValueError(
+            f"music_file: start, fade_in and fade_out are seconds from 0 and duration above 0, got {start}, "
+            f"{fade_in}, {fade_out}, {duration}"
+        )
+    y = _decode_mono(path, ff)
+    if duration is not None:
+        y = y[: C.sample_of(duration, SR)]
+    n = len(y)
+    fi, fo = min(C.sample_of(fade_in, SR), n), min(C.sample_of(fade_out, SR), n)
+    if fi:
+        y[:fi] *= np.linspace(0.0, 1.0, fi, endpoint=False)
+    if fo:
+        y[n - fo :] *= np.linspace(1.0, 0.0, fo, endpoint=False)
+    buf = np.zeros(C.sample_of(start, SR) + n)
+    place(
+        buf, y, start, 10 ** (gain_db / 20), align="start", sound="music", stem="music"
+    )
+    return buf
+
+
 def write_wav(path, mono, voice=None, scale=None):
     """mono (plus voice) as 16-bit stereo at SR, peak-normalised to 0.85 unless scale is given. Returns the scale,
     so a stem written with the same scale lines up with this mix sample for sample."""
@@ -256,12 +326,14 @@ def _write16(path, y, sr):
         w.writeframes(pcm.tobytes())
 
 
-def master(src, dst, ff="ffmpeg", I=-14, TP=CEILING, passes=6, tol=0.05):
-    """Master src to dst (16-bit stereo, 48 kHz): one static gain to I LUFS, the true-peak limiter at TP dBTP, then
-    ebur128 again and the gain nudged, up to `passes` times, until I is within tol LU and the true peak is at or
+def master(src, dst, ff="ffmpeg", target=-14, TP=CEILING, passes=6, tol=0.05):
+    """Master src to dst (16-bit stereo, 48 kHz): one static gain to `target` LUFS (-14 by default; a delivery
+    preset names -16 or -23), the true-peak limiter at TP dBTP, then ebur128 again and the gain nudged, up to
+    `passes` times, until I is within tol LU and the true peak is at or
     under TP (Z03). No delay is added (wave-0's alimiter delayed the mix by its 4 ms attack). Returns {I, LRA, tp
     (measured on dst), gain_db, passes, ceiling, limit_db (deepest gain reduction), limit_t (when), limited_s (seconds
     under more than 1 dB of it), cost_db (loudness the limiter took), input (src measured), rows: [Q805]}."""
+    I = target  # the loudness the body below names I, as ebur128 does
     x = _decode(src, ff)
     m0 = measure(x, ff)
     if m0["I"] < -60:  # nothing to master: the raw mix is silent
