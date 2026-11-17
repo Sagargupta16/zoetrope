@@ -38,6 +38,15 @@ Voice: calm male (original en-US-AndrewMultilingualNeural, rate -4%); here use a
 ## Build notes
 No LaTeX or Manim in the engine: draw graphs in PIL by sampling the function (numpy) to a polyline, with 2x supersampling. Formulas as text in STIX Two Text (check it exists in /System/Library/Fonts or /Library/Fonts, else a serif italic). Compute every number shown (slopes, readouts) from code, not by hand. Generate narration per line, measure durations, then lay out the scenes and the SCHEDULE from them; assert that each scene ends on its audio length. Burn captions in PIL. A 60 to 120 s cut keeping hook, secant to tangent, one worked example, one think pause and the close is realistic.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults. The kit holds the typesetter, axes, curves and tangents; the blocks only add what it lacks.
+
+- **Text:** `blocks_text.captions(img, t, N, style="pill", per_page=5)` for the caption strip, `N` the loaded narration, with `HOLD_PROFILE = "caption"`; it is a pure function of t, so the stale-cache doubling of captions drawn inside the animation does not come back. `blocks_text.marker("circle", box, colour=gold)` for "where is the slope exactly zero" and the corner of |x|.
+- **Gates:** write `quiz.json` (Q210) from the maths the lesson teaches (d/dx x^2 = 2x, (sin x)' = cos x, |x| has no derivative at 0), each answer's keys on one frame and in the narration; this is the card's core gate.
+
+The think-pause ring stays hand-drawn: `blocks_data.stat_ring` prints a rolling percentage in its centre, which would sit in the silent pause.
+
 ## Pitfalls (from what went wrong in our build)
 - 0.3 to 0.4 s of empty frame at the start of each scene read as a cut to black; start the first cue at once or design a transition.
 - Captions drawn inside the animation engine doubled up (stale cache); draw captions as a separate post pass.

@@ -61,6 +61,14 @@ Extra instruments seen in past scores (add if needed): `bell(m,dur)` = sine at f
 
 For real instruments instead of oscillators, `engine/sampler.py` (`import sampler as SP`) plays recorded glockenspiel, marimba, harp, pizzicato and sustained strings, flute, horn, timpani and orchestral percussion (CC0, Versilian Studios) as mono arrays at `S.SR`, placed with `S.place` beside this kit: `SP.note("harp", 60, 1.0)`, `SP.chord("violins", [60, 64, 67], 4.0)`, `SP.hit("cymbal", "swell4")`. Fetch what a score plays before the build (`python engine/sampler.py fetch harp pizz`), place sustained strings, flute and horn with `align="pad"`, and print `SP.credits(names)` in the delivery report. Ranges, layers, loops, licences and the measurements are in `instruments.md`.
 
+### A score made elsewhere
+
+`audio.music_file(path, start=0.0, gain_db=0.0, fade_in=0.5, fade_out=1.0, duration=None)` is the other way to get a bed: a score the parent session made (a generated one, for example through the ACE-Step Hugging Face Space) or any licensed WAV or MP3. It returns one mono buffer at `synth.SR` that you add into the music bus inside `with S.recording() as sheet:`, as in the example above, in place of the synth bed; the cues (hits, whooshes) still go on the SFX bus with `S.place`, so Q902 measures them against the picture as before. The builder never fetches or makes the file: it is listed in the brief with its licence, and the report credits it (`delivery-report.md`, Media and credits). Details, errors and what Q802 and Q804 do with it are in `mixing.md`.
+
+- **Loudness.** The master brings the mix to the build's target whatever the file's own level: `--loudness <youtube|spotify|podcast|apple|broadcast|LUFS>` on `run_all.py full` or `audio` (`mixing.md`, Loudness targets). Set `gain_db` for the balance against the voice and the hits, not for loudness.
+- **Tempo.** A file has a tempo of its own that nothing here knows. Cut on its beats only after measuring them (`beat-sync.md`, item 7), set `BPM` to the fitted value, and keep the seam law (`playbook.md`) when cuts move to the beat.
+- **A visualizer.** `blocks_data.audio_bars` draws from `analyse_wav(path, fps)` of a WAV; call `analyse_wav` once at import (`blocks.md`).
+
 ### The template score as it plays
 
 `audio.render_audio(scenes, folder=".", fps=None)` is the score a build gets unless the working folder has a `score.py`. It reads `DURATION` and `BPM` (120 when absent), takes the cuts from `scenes.CUTS` (else every `SCHEDULE` start after 0), gives each cut's hit the label of the CUES entry with sound within half a frame of it, and writes `mix_raw.wav`, `sfx.wav`, `cuesheet.json` and `cue_sounds.npz`, returning their paths under `mix_raw`, `sfx`, `cuesheet` and `cue_sounds`. `audio.bed(dur, bpm, cuts=(), voice_spans=(), fps=None, labels=())` returns the two buses at 44.1 kHz:

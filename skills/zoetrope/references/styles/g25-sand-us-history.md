@@ -48,6 +48,17 @@ Art is stop-motion on twos (15 fps held to 30 fps). Things are drawn with soft d
 - Tell hard chapters through symbols, no violence, no faces, no living politicians.
 - Frame-time sanity: render proof stills of 6 to 12 chapters before the full run.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+Most of the look is its own lightbox pass, so the text and data blocks (smooth, full colour) do not fit; the carved captions stay hand-built.
+
+- **Backgrounds and effects:** `blocks_fx.vignette(img, strength=..., color=...)` with the warm lightbox tone as `color`, after the density-to-colour pass.
+- **Transitions and camera:** `blocks_fx.FX_MENU["noise_warp"](a, b, p, strength=..., seed=...)` on two density frames, before the lightbox pass, for the granular dissolve; no glitch or split transition on a sand story.
+- **Helpers:** `engine.fbm(x, y, z, octaves=..., seed=...)` and `engine.noise` for the clump and grain layers (a fractional `y` or `z`, since noise is 0 at whole numbers).
+- **Gates:** write `quiz.json` (Q210) from the checked facts list (years and figures); the palm sweeps are seams for Q1106, so a sweep that exits right is followed by one that enters moving right.
+
 ## Pitfalls (from what went wrong in our build)
 - Figures were stylized silhouettes; the blanket-wrapped walkers looked blocky at small sizes. Draw them larger or fewer.
 - Early reviews found wobbly small text, banner overflow, a ship off-screen, Earth reading as a moon, light beams reading as towers, skyline seams and sign overlaps. Review 4 rounds of stills.

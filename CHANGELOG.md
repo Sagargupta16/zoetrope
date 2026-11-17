@@ -2,6 +2,17 @@
 
 Every change to this copy of the video-producer package it was adapted from. The version numbers are this copy's own; the package as received is 1.0.0. File and section names in 1.0.0 and 1.1.0 refer to the package's original layout (`references/01-producer-playbook.md` to `10-qa-and-house-rules.md`).
 
+## 2.8.1 - 2026-11-17
+
+The references that 2.8.0 did not touch now use its parts. Docs only; no engine file changed.
+
+- **Every style card** (40) gains a `## Blocks` section naming the blocks, backgrounds, transitions, camera moves and helpers that fit its look, with the arguments that fit (`lower_third(style="kicker")`, `bar_race(..., decimals=1)`, `FX_MENU["whip_pan"]`, `motion_blur` on a named fast move), and its gates (quiz.json for a card that teaches facts, the seam law where it cuts on motion, brand.json for a brand piece, two voices where it has dialogue). Cards whose look is their own say no block fits: cartridge, g19, g27, g29 and toy-studio-3d. Seven lines the engine now covers point at it: g12's three-sub-frame blur and whip, g10's dolly zoom, g11's grain tile, g14's word times (`narration.json`) and respelling (`lexicon=`), and the "blend frames" fixes in g04 and g08. No Spec, Use when or Kit line changed (`CARDS: OK`).
+- **pitfalls.md**: item 15 names `engine.motion_blur` and its cost; new items for two tickers showing one string (fixed in 2.8.0), a quiz answer split across screens, a seam that reverses, the per-font golden set, and block text that skips its `_items` twin.
+- **delivery-report.md**: lines for a loudness target, the brand kit, a music_file score, footage clips with their licence and origin, the draft, alpha and batch files, Q1101 to Q1106 and the Q210 quiz.
+- **house-rules.md**: two rules: the facts a video teaches go in quiz.json and on screen; a build fetches nothing, and a score, clip or plate comes from the parent with its licence.
+- **music.md, beat-sync.md, instruments.md**: a score made elsewhere (`audio.music_file`, the ACE-Step Space), loudness targets, the seam law on beat cuts, motion blur on fast moves and `audio_bars` from the mix.
+- **plates.md**: moving 2D clips (`footage.Clip`) beside 3D plates, and why `motion_blur` does not smooth a plate (it picks whole frames). **kits/README.md**: a block can replace a kit helper; `blocks_preview.py --kits` draws each kit's poster.
+
 ## 2.8.0 - 2026-11-17
 
 Fifteen ideas from a survey of the most-starred video tools (heygen-com/hyperframes, Remotion, openfilm, Code2Video, Paper2Video, MoneyPrinterTurbo, editly, Manim, Motion Canvas; ideas only, no code copied), built with nothing downloaded. Template pixels are unchanged: 60 template frames are byte-identical to 2.7.2, and the default master gives the same bytes.

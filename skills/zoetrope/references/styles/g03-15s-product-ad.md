@@ -31,6 +31,15 @@ Five beats on a 120 BPM grid (beat 0.5 s). Ripple: circle scaling to cover the f
 ## Build notes
 Pure PIL. Pre-build every changing text (timecodes, typed query) as a state function of t. Name the input platform in text only; never draw a real platform logo, use a neutral white play circle and a fake URL ID.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Transitions and camera:** `blocks_fx.FX_MENU["whip_pan"](a, b, p, direction="up")` for the 8.0 s wipe from the yellow field up into the timestamp wall (it eases itself, low flash risk); `engine.motion_blur(draw, t, samples=6)` on the wall, which scrolls about 1,200 px/s.
+- **Gates:** keep the wall scrolling the way the wipe moves, so exit and entry share a direction (the seam law, Q1106). `brand.json` when the user has a brand whose colours replace the yellow.
+
+The odometer, the ripple and the highlighter sweep stay hand-built: none of the text or data blocks draws them, and the look has one loud yellow moment, so no background or glitch part is added.
+
 ## Pitfalls (from what went wrong in our build)
 - First frame was nearly black (hook fades in over about 0.3 s): fade in faster or pick a poster frame later.
 

@@ -30,6 +30,7 @@ Working code from approved builds, one folder per style card. A builder making t
 
 What every kit has in common:
 
+- **The block library can replace a kit helper.** `engine/blocks_text.py`, `blocks_data.py` and `blocks_fx.py` (`references/blocks.md`) cover lower thirds, captions, end cards, counters, charts, backgrounds and transitions, each with the `_items` twin the registry needs. A new build in a kit's style that wants one of those takes the block and its `_items` rather than the kit's own copy; keep a kit helper where the card's look needs something the block lacks. `python blocks_preview.py <out folder> --kits` (in the engine folder) draws `kits.png`, one poster per kit, so a style can be seen before a kit is copied.
 - `scenes.py` is the full worked example: read it for structure, then write your own content with the registry above. `python kit_index.py` (in the engine folder) lists every kit helper with its signature and file:line, and `python kit_index.py show g04:text` prints one.
 - `engine_used.py` is the build's own copy of `engine.py`, kept to diff against `engine/engine.py`. Carry over only its font lists (the Nook kit's extra weights, `"black"`, `"semi"` and `"ital"`, are already in its `scenes.py`, which looks them up itself because the current `engine.font()` takes only a family name, `True` or `False`); use the current engine for everything else.
 - Superseded scripts were left out on purpose: each build's own gate, sync and parallel-render scripts are now `qa.py check`, `qa.text_gates`, Q902 and the render in `run_all.py full`.

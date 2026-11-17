@@ -34,6 +34,14 @@ One continuous shot, no cuts. The tilt is a sine ease over 7.4 s; seven depth pl
 ## Build notes
 Draw a 480x270 PIL frame per t, then resize x4 with Image.NEAREST. Build the figure from z-ordered shapes, then run a resolve pass that dithers each shading ramp (Bayer 4x4) and adds the rim light, instead of hand-placing pixels. Bloom: blur a copy of the emissive layer with ImageFilter.GaussianBlur twice and add it (ImageChops.screen). Water: scrolling streak noise on the risers, calmer noise on the treads. Keep crowd as dark silhouettes (head plus shoulders, about 330 figures) with a lighter wet plaza behind. Write a single SCHEDULE with the timings above and derive both picture and score from it. Score in numpy only (no scipy): saw/square arp, sine sub, noise for crash and cheer. Render at 30 fps; the build took 3 to 5 ms per frame in a browser, PIL will be slower, so render proof frames at 3, 9, 16, 20, 25 s first.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+None of the blocks fits; the look is hand-built. They draw anti-aliased at full size (`blocks_fx.starfield` is sub-pixel gaussians, the text blocks use smooth fonts), which breaks the hard-edged pixel rule, and the shot has no cuts, so no transition applies.
+
+- **Helpers:** `engine.wobble(t, amp=..., hz=..., seed=...)` for the 2 px climax shake at 15.6 s, rounded to whole pixels on the 480x270 grid before it is used; `engine.noise` for the title's misfiring letter, with a fractional `y` or `z`.
+
 ## Pitfalls (from what went wrong in our build)
 - First layout had skyscrapers taller than the figure: lower the skyline so the figure rises above it.
 - 1,100 coloured 3 px people read as confetti: use about 330 dark silhouettes against a lit plaza.

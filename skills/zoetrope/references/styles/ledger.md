@@ -74,6 +74,13 @@ A data story: numbers that count up, bars and lines that draw on the beat, and e
 - Registry: the counting figure is one item with `ticker=True`; titles, labels, categories, values, every source line and the byline are items. Bars, lines, dots and rules are shapes.
 - CUES: each count landing (8.0, 36.8), each bar landing, the KEY change (20.8), the line's end (29.6), every cut. KEY_TIMES: 8.0, 20.8, 29.6, 36.8 and 47.5. `STATIC = [(47.0, 48.0)]`.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Data:** `blocks_data.counter(value, start=0, decimals=..., prefix=..., suffix=..., ease=engine.ease_out_expo, t0=..., dur=1.6, color=INK)` for a figure's count-up; `blocks_data.bar_race(img, t, keys, decimals=1, colors=..., text_color=INK, muted=SUB)` for figure 2's bars (keys `[(0, {name: 0}), (t1, {name: value})]`, the first and last key held 1 s, `decimals=1` when two rows can show one value, short names in 9:16); `blocks_data.line_draw(values, xlabels, color=SERIES, dur=...)` for figure 3, held 1 s after it lands so its last label shows; `blocks_data.pie` or `stat_ring` for a share or a percentage. One ticker block per scene: a count and a race do not share one.
+- **Gates:** write `quiz.json` (Q210) with each figure and its source as questions, so the gate proves they are on a frame; no brand file unless the user's palette replaces SERIES and KEY. The blocks' own easings (`ease_out_cubic` for bars and rings, `ease_in_out_sine` for the line) differ from the card's `linear` line and its on-twos count, so keep those two hand-drawn when the card's motion rule matters.
+
 ## QA watch-outs
 
 - Q401: values on the way are ticker values and need no hold; the settled figure rests 1.5 s at least under slow (the map gives it 4.8 s or more).

@@ -34,6 +34,15 @@ D minor (Dm, Dm, Bb, C, Dm, Bb, C, Dm add9). Bar 0 has no kick: ticking clock an
 ## Build notes
 Pick 4 to 5 chapters if time is limited rather than all 7. On-screen labels must be literally true (BPM, point counts, focal values); an earlier "fov 62" label was wrong and was replaced.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Backgrounds and effects:** `blocks_fx.vignette(img, strength=0.45)` and `grain.grain(img, t, std=1.6)` last, for the card's vignette and film grain (grain sizes in `formats.md`).
+- **Transitions and camera:** `blocks_fx.FX_MENU["zoom_through"](a, b, p, focus=(fx, fy))` for the hand-off from the ball filling the frame into the type chapter (it eases itself, low flash risk); `engine.motion_blur(draw, t, samples=6)` on the ball drop and the star frame blowing past the lens.
+- **Helpers:** `engine.ease_in_out_expo` for the 0.3 s expo in-out morphs; `engine.rng("burst", i)` for the 3,200 seeded particles.
+- **Gates:** the chapter 04 white-out to bone is a flash: run `qa.flash_window(draw, t0, t1, fps)` over it before the render. No `FX_MENU` glitch or channel split: the card has none.
+
 ## Pitfalls (from what went wrong in our build)
 - 19 px HUD labels are unreadable at 1.875 s per chapter: go larger.
 - Grain pushed bitrate to about 18.9 Mb/s (35.5 MB): CRF 20 roughly halves it.

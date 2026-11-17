@@ -76,6 +76,16 @@ A technical explainer: a diagram that draws itself on a ruled sheet, one part pe
 - Time every exit to the cut in `CUTS`, not to the scene's `SCHEDULE` end: inside the iris window the outgoing scene is still drawn past its cut, and its text must already be gone.
 - CUES: each stroke's end, each `reveal_end`, each packet hop, every cut (the 52.8 cut is inside the iris window: kind `audio`). KEY_TIMES: the last frame of each step (14.3, 23.9, 33.5, 43.1), 50.0 and 59.5. `STATIC = [(59.0, 60.0)]`.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.marker("circle", node_text_box, t0=step_start, colour=LIVE, hand=0)` rings the part being explained as a redline (`hand=0` removes the wobble); pass the node's `text_box`; it draws no text, so there is no twin to call. No `captions`, `code_typing` or other typed block: text never types here.
+- **Transitions and camera:** none. Steps accumulate on one sheet, the iris to the end card is already `transitions.iris`, and a camera move on text shimmers.
+- **Gates:** write `quiz.json` (Q210) when each step's one sentence must reach the viewer: every key of an answer on one frame. `brand.json` (`python brand.py check`) when the user has a brand to apply. The seam law (Q1106) does not come up: the cuts are one hard cut and one iris.
+
+None of the data blocks or backgrounds is used: every label needs its SHEET plate (Q301), which a block does not draw, and the ruled sheet is the background.
+
 ## QA watch-outs
 
 - Q301: a label without its plate picks up grid lines in the ring Q301 samples; keep every plate.

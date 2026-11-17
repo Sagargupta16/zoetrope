@@ -33,6 +33,16 @@ One phone object glides left and right between beats (about 0.6 to 1 s, ease_in_
 ## Build notes
 Draw the phone UI in PIL as layered states, not screenshots. The 48x dive is the signature: render the mark large and crop-scale it.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.notification(title, body, t0=pop_time, ...)` for the 16 pop-in cards of the 0.0-4.8 noise section, generic copy only.
+- **Data:** `blocks_data.counter(value=6, start=1, ...)` for the streak badge in Feature 4.
+- **Backgrounds and effects:** `blocks_fx.mesh_gradient(t, colors=(plum, lilac, cream), speed=0.1)` for the soft blobs behind the product scenes, colours from the card's palette; `grain.grain(img, t, std=1.6)` last for the film grain (`formats.md`).
+- **Transitions and camera:** `engine.motion_blur(draw, t, samples=6)` on the 48x dive into the cream square (4.1-6.2 s); `engine.wobble(t, amp=..., hz=..., seed=card_index)` for each notification's shake.
+- **Gates:** `brand.json` with the user's colours and font, then `python brand.py check`.
+
 ## Pitfalls (from what went wrong in our build)
 - Brand coral and mint fail contrast for small text on cream: darker shades for small labels, exact colours for logo and big shapes.
 - Do not claim device sync, prices or user counts the user did not supply.

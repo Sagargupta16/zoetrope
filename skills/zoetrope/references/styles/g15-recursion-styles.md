@@ -40,6 +40,14 @@ Each scene declares a portal (centre, scale s, rect or circle). During a zoom th
 ## Build notes
 This is the hardest style. Render each level as its own PIL layer (draw_level(n, t) returns an image), then compose the camera by scaling and cropping the parent image with the formulas above; use LANCZOS resize and render big enough that zoomed layers stay sharp (the portal zooms about x9 in places). Keep levels simple: a 3-5 level cut with 4 to 5 distinct styles is a realistic scope for the engine; keep the base case, the stack HUD, the unwind and the loop. Only simple additive synthesis in numpy is needed for the genre cues. Use only on-screen text, so no TTS.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults. Most levels are hand-built in their own style; the portal zoom maths stays the card's.
+
+- **Text:** `blocks_text.code_typing(code, lang="python", palette=<green phosphor tones>, panel=<terminal black>, mono=...)` for level 4, the green-phosphor terminal with the real Python `explain(topic, depth)`; the code shown must still run and print what the screen says.
+- **Transitions and camera:** `engine.motion_blur(draw, t, samples=4)` on the 0.83 s zoom in, as an answer to the 30 fps judder (60 fps stays the other); it draws the whole nested composition `samples` times a frame.
+- **Helpers:** `engine.stepped(t, 16)` for the silent-film clock at 16 fps (level 2); `grain.grain(img, t, std=1.6, hz=16)` and `engine.noise(t * 8, 0.37, seed="flicker")` for its grain and flicker (`noise` is 0 at whole-number triples, so keep `y` fractional).
+
 ## Pitfalls (from what went wrong in our build)
 - 30 fps made the fast log-space zooms judder; use 60 fps if size allows, or lengthen zooms.
 - Reading time is tight: main line 2 to 4 s, return line about 1 s. Terminal code (33 px) and the HUD (17 px) are hard to read on a phone.

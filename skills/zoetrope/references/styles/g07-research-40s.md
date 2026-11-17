@@ -33,6 +33,16 @@ Every chapter is one skill and one feature. Every cut is a designed hand-off bui
 ## Build notes
 Draw each chapter as a function of t in PIL with a SCHEDULE of the eight times above. Hand-offs need a shared shape: render the next scene full-frame and mask it with a growing circle or rounded rectangle. Odometer: draw each digit column with a vertical offset. The 3D wall and 3D card flip are hard: use a pseudo-3D horizontal squash (scale x by cos of angle) and skewed rows. Supersample 2x for thin construction lines. Only use features and sample content the user supplied; if no brand folder exists, ask the user or use clearly generic placeholder content. Notification apps stay generic (Group chat, Mail, Shop), never real brands. Recommend 30 fps.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.notification(title, body, t0=pop_time, ...)` for the 18 generic cards that pile up in chapter 04 (Group chat, Mail, Shop; never real brands).
+- **Data:** `blocks_data.counter(value=..., ...)` for the streak counter in chapter 06 (one ticker block per scene; the chapter 03 odometer stays hand-built, it rolls column by column with carry).
+- **Backgrounds and effects:** `blocks_fx.paper_texture(t, color=paper)` behind the drafting-paper construction in chapter 01.
+- **Transitions and camera:** `engine.motion_blur(draw, t, samples=6)` on the rush into the dot (x72, 3.9 s) and the other fast hand-offs; `engine.wobble(t, amp=..., hz=..., seed="pile")` for the jitter while notifications pile up, the only shake the card allows. No `FX_MENU` entry: each hand-off is built from the logo's own shapes.
+- **Gates:** `brand.json` (the brief says use the brand folder), then `python brand.py check`.
+
 ## Pitfalls (from what went wrong in our build)
 - 3D card flip around 24.9 s looked warped in stills (perspective stacked on the card y-offset). Keep flips simple and test mid-flip frames.
 - Mask-roll headline swaps and odometer rolls show half-cut words or digits in stills (about 11.4 s and 12.4 s). Judge them in motion, not in a single proof frame.

@@ -34,10 +34,19 @@ Expo and back eases with a single bounce; no shake or flash except the jitter in
 ## Build notes
 Template for any feature-per-scene launch: noise problem, reveal, one scene per real feature, payoff closing the opening. If the user has no screen images, draw device frames in PIL.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults. The kit already holds the noise pile-up, the zoom match cut and the streak tiles; reach for a block only where the kit has none.
+
+- **Text:** `blocks_text.notification(title, body, t0=pop_time, ...)` for the 22 notification cards of S1, generic copy only.
+- **Data:** `blocks_data.counter(value=6, start=1, ...)` for the streak counter in S6.
+- **Transitions and camera:** `engine.motion_blur(draw, t, samples=6)` for a new fast move; `engine.wobble(t, amp=..., hz=..., seed=...)` only for the S1 jitter (the card allows no shake or flash elsewhere).
+- **Gates:** `brand.json` with the product's palette and rounded sans, then `python brand.py check`.
+
 ## Pitfalls (from what went wrong in our build)
 - Rolling numbers sat above the label baseline: align roll boxes to the text baseline.
 - The panel looked empty after items left: add an "Add a task" row and footer.
-- Zoom and card collapse looked steppy at 30 fps: blend frames. No call to action, as nothing real existed to point to.
+- Zoom and card collapse looked steppy at 30 fps: blend frames (the kit does; `engine.motion_blur` is the engine's version). No call to action, as nothing real existed to point to.
 
 ## Style QA
 - Every feature claim is one the user confirmed.
