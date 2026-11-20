@@ -2,6 +2,20 @@
 
 Every change to this copy of the video-producer package it was adapted from. The version numbers are this copy's own; the package as received is 1.0.0. File and section names in 1.0.0 and 1.1.0 refer to the package's original layout (`references/01-producer-playbook.md` to `10-qa-and-house-rules.md`).
 
+## 2.9.0 - 2026-11-20
+
+Longer, more realistic videos: 60 to 180 s narrated deep dives over photo plates, with drawn graphics on top, a sense of place in the sound, and a hook that lands inside the first 3 s. Built and measured on six 63 to 77 s videos made with it on 2026-11-16.
+
+- **Deep-dive card.** `references/styles/deep-dive.md` (S-deep-dive, explainer family): one spoken line per scene over a photo plate, maps, gauges, counters and timelines drawn on top, a number or name revealed on its spoken word, two sources for every number. Its `## Blocks` section names the 2.8.0 blocks that fit (captions, a counter on its spoken word, `route_arc` with a halo over a plate) and `quiz.json`. 41 cards; the router, `families.md` and README follow.
+- **Photo plates.** `engine/plates.py`, shared by every build instead of a per-build copy: `load`, `load_rgba`, `cover`, `Shot` (eased Ken Burns, 1.0 to 1.3 zoom, a `ValueError` past it, an optional `fg` cutout shot), `view`, `window` (one box resize, about 17 ms at 1080x1920), `parallax` (a background-removed cutout drifting over its plate, depth-of-field blur in 0.5 px steps, haze, vignette) and `sequence` (shots dissolved with `transitions.crossfade`, guarded so frame 0 is never a blend). Pure: the same t gives the same pixels in any order and process.
+- **Ambience.** `synth.py` gains `wind`, `ocean`, `rumble`, `deep_water` and `space_hum` beds (seeded band noise, about -18 dBFS RMS, 0.5 s fades, a zero length returns silence, `ocean` refuses a period of 0) and a layered `impact` that Q804 counts.
+- **Voice polish.** `voice.polish()`, a zero-phase high-pass and presence lift plus a soft-knee 3:1 compressor with an instant attack and make-up to the input peak, and `duck_mix(..., polish=True)` to opt in; the default, `polish=False`, gives the same mix as before. A review found the first 3 ms attack let every word's onset set the make-up, so the voice came out 2.4 dB quieter against the bed; with the instant attack it sits 3.4 and 6.3 dB louder on two real narrations, at lag 0, and Q807 still finds the stem (z 277 and 547 against 40).
+- **Speech check.** `qa_speech.py` joins a number base.en writes in two pieces ("4" ",000", "7" ".4") and reads "km" as kilometers.
+- **Image plates.** `references/image-plates.md`: the `plates.py` section, full-bleed 9:16 FLUX plates at 1088x1920 in about 31 s, Bedrock background removal for cutouts (clean on a clear subject, empty on a landscape), and what made 11 of 65 plates fail (made-up lettering, a picture that contradicts the fact).
+- **Engine reference.** `references/engine.md` lists `plates.py` and the new synth and voice functions.
+- **SKILL.md stays under skillcheck's 5,000-token body budget** (SC203; 2.8.1 sat at 4,999). The new router row fits by dropping two sentences the skill already says elsewhere: the Mac-font substitution, which is the builder's own step in `agents/zoetrope-builder.md`, and the router's opening line, which repeats step 3. The body is now about 4,978 tokens.
+- **Kept general.** A new rule in CLAUDE.md: the skill stays a general video tool, so hooks, captions or an end card made for one account or platform live with that project, not here. The deep-dive card names no account (its end card is the channel's follow line) and fits Reels and Shorts alike.
+
 ## 2.8.1 - 2026-11-17
 
 The references that 2.8.0 did not touch now use its parts. Docs only; no engine file changed.

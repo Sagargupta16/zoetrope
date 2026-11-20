@@ -2,7 +2,7 @@
 name: zoetrope
 description: >-
   Plan, script, design, animate, score and render short videos (MP4, WebM,
-  GIF) end to end with Python, Pillow, numpy and ffmpeg. 40 style cards:
+  GIF) end to end with Python, Pillow, numpy and ffmpeg. 41 style cards:
   product ads and launches, logo stings and intros, beat-synced kinetic
   pieces, explainers, history and journey stories, characters (one in real
   3D) and game parodies, trailers, recipes and sketchbook looks. Use when someone asks to
@@ -40,7 +40,7 @@ Never:
 | 3D, image plates | A 3D card renders its picture in Blender as a plate (`references/plates.md`; generated: `references/image-plates.md`): run `python <skill>/engine/plate3d.py fetch` here once (324 MB); the builder cannot download. |
 | Viewer | Open the contact sheet or video in the OS default app. |
 | Fact checks | The agent's web search and fetch. |
-| Fonts | The 14 free families 24 cards name (SIL OFL) are cached by `engine/fonts.py` and drawn by name: `bold="Nunito:800"` in any text helper (`python fonts.py list`; `fetch` once on a new machine, 6.8 MB). For a Mac system font a card names, pick the closest installed one (on Windows `C:/Windows/Fonts`), put its path first in engine.py's font lists, and say which. |
+| Fonts | The 14 free families 24 cards name (SIL OFL) are cached by `engine/fonts.py` and drawn by name: `bold="Nunito:800"` in any text helper (`python fonts.py list`; `fetch` once on a new machine, 6.8 MB). |
 
 Save outputs to `outputs/<slug>/` under the current folder (never inside `<skill>`) unless the user names one. A batch of videos gets `outputs/<batch>/`: `videos/` for the finished files, `builds/<nn-slug>/` per working folder, plus its scenarios and notes.
 
@@ -50,7 +50,7 @@ Save outputs to `outputs/<slug>/` under the current folder (never inside `<skill
 - `engine/`: the Python engine as real files, `requirements.txt` (pinned, hashed) and `.python-version` (3.15); copy it with `cp -r <skill>/engine/. <working folder>/` per video (hidden pin and `qa_fixtures/` too); `uv run --no-project python envs.py` there makes its hash-checked `.venv`. `references/engine.md` says what each file does.
 - Agents (`../../agents/`): `zoetrope:zoetrope-builder` builds, renders and runs the gates; `zoetrope:zoetrope-reviewer` is the fresh-eyes review that returns REVIEW PASS or REVIEW FIX with findings ranked P0, P1 and P2.
 - `references/playbook.md` (workflow, timing math, composition, motion, directing, seam law), `references/blocks.md` (block library, brand kits, motion blur), `references/engine.md` (contract, file map, encode ladder), `references/formats.md` (sizes, fps, layout, file names), `references/voice.md` (intake, text-to-speech, writing for the ear), `references/music.md` (numpy synth, songs on a BPM grid), `references/instruments.md` (recorded CC0 instruments and their credits line), `references/plates.md` (3D plates), `references/mixing.md` (voice placement, duck, loudness), `references/beat-sync.md` (one grid, cuts on beats, SFX by landmark), `references/house-rules.md`, `references/qa-gates.md` (the Q codes), `references/pitfalls.md` (past problems, their fixes), `references/delivery-report.md` (the delivery message), `references/troubleshooting.md` (when a step fails)
-- `references/styles/`: one file per style card, plus `families.md` with what each family shares
+- `references/styles/`: one file per style card, plus `references/styles/families.md` with what each family shares
 - `kits/`: working code from finished builds for six cards (g04, g11, g17, g29, bonus-rectangle, toy-studio-3d); start from a card's kit
 
 This session reads the router below, the chosen card and its family intro for the pick and the storyboard. The `zoetrope-builder` agent reads `engine.md`, `house-rules.md`, `qa-gates.md`, `delivery-report.md`, the audio files the piece needs and the card before it builds, so those files and the render logs stay out of this chat.
@@ -97,7 +97,7 @@ Encode ladder: local ffmpeg H.264 MP4 first; if ffmpeg lacks libx264, AV1 MP4 or
 
 ## Style router
 
-Match the brief, offer the best 2 or 3, then read that card in full plus its family intro in `references/styles/families.md`. Cards with a kit in `kits/` (faster and safer to build): S-g04-best-launch, S-g11-movie-credits, S-g17-manim-derivative, S-g29-nes-rpg-battle, S-bonus-rectangle, S-toy-studio-3d.
+Cards with a kit in `kits/` (faster and safer to build): S-g04-best-launch, S-g11-movie-credits, S-g17-manim-derivative, S-g29-nes-rpg-battle, S-bonus-rectangle, S-toy-studio-3d.
 
 | Style card | Family | Use when |
 |---|---|---|
@@ -127,6 +127,7 @@ Match the brief, offer the best 2 or 3, then read that card in full plus its fam
 | [S-bonus-rectangle](references/styles/bonus-rectangle.md) | explainer | fun-fact vertical film with an honest counter; fun fact film for Reels or Shorts, everything is a shape/idea |
 | [S-blueprint](references/styles/blueprint.md) | explainer | technical explainer, a diagram that draws itself; how it works, architecture explainer |
 | [S-ledger](references/styles/ledger.md) | explainer | sourced data story, counters and charts on the beat; data story, numbers video |
+| [S-deep-dive](references/styles/deep-dive.md) | explainer | narrated deep dive over photo plates; documentary deep dive for Reels or Shorts, narrated vertical film over one minute |
 | [S-g16-dinosaurs-to-jomon](references/styles/g16-dinosaurs-to-jomon.md) | story and journey | deep-time globe and map explainer; educational motion graphics, how the Earth changed over millions of years |
 | [S-g24-new-york-5min](references/styles/g24-new-york-5min.md) | story and journey | narrated city tour over footage; travel promo, introduce a city or destination |
 | [S-g25-sand-us-history](references/styles/g25-sand-us-history.md) | story and journey | sand animation across 250 years; sand animation, history of country in 2 minutes |

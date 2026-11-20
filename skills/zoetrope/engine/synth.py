@@ -207,6 +207,153 @@ def duck(bus, times, depth_db=6, rel=0.12, dur=0.3):
     return bus * g
 
 
+# ---- ambience beds and the layered impact: a sense of place under narration ----
+
+
+def _band(name, n, seed, lo, hi, *args):
+    """n samples of seeded Gaussian noise limited to lo..hi Hz by an FFT mask (smooth edges, no scipy, no python
+    loop), scaled to unit RMS. A near-DC lo (0.05 Hz and under) is how the slow gust and swell envelopes are drawn.
+    n under 1 returns an empty array (a zero-length bed is silence, not an error)."""
+    if n < 1:
+        return np.zeros(0)
+    spec = np.fft.rfft(rng_for(name, n, seed, *args).standard_normal(n))
+    f = np.fft.rfftfreq(n, 1 / SR)
+    k = np.clip((f - lo) / max(lo * 0.5, 1e-3), 0, 1) * np.clip(
+        (hi - f) / (hi * 0.25), 0, 1
+    )
+    y = np.fft.irfft(spec * k, n)
+    return y / (np.sqrt(np.mean(y * y)) + 1e-12)
+
+
+def _slow(name, n, seed, lo, hi, *args):
+    """A positive 0..1 envelope that wanders at lo..hi Hz (the band noise, mapped through a logistic)."""
+    return 1 / (1 + np.exp(-1.6 * _band(name, n, seed, lo, hi, *args)))
+
+
+def _bed(x, dur, db=-18.0):
+    """Finish a bed: no DC, RMS at db dBFS (measured before the fades), 0.5 s raised-cosine fade in and out."""
+    if not len(x):
+        return x
+    x = x - np.mean(x)
+    x = x * 10 ** (db / 20) / (np.sqrt(np.mean(x * x)) + 1e-12)
+    f = min(int(0.5 * SR), len(x) // 2)
+    r = 0.5 - 0.5 * np.cos(np.pi * np.arange(f) / f)
+    x[:f] *= r
+    x[len(x) - f :] *= r[::-1]
+    return x
+
+
+def wind(dur, seed=0, gust=0.35):
+    """Airy wind, band-limited noise (200 to 2800 Hz, no tone) swelling with random gusts at 0.05 to 0.3 Hz; about
+    -18 dBFS RMS. Put it on the music bus (put(m, wind(d), 0, g)) from the scene's first second, never on sfx; not
+    heavy. gust 0..1 is how deep the gusts reach. Give it at least about 4 s: a shorter bed has no room for a gust
+    (the 0.05 to 0.3 Hz band is empty) and its 0.5 s fades pull the level under -18 dBFS."""
+    n = int(dur * SR)
+    air = _band("wind", n, seed, 200, 2800) + 0.5 * _band(
+        "wind-hi", n, seed, 2800, 7000
+    )
+    env = (1 - gust) + gust * 2 * _slow("wind-gust", n, seed, 0.05, 0.3)
+    return _bed(air * env, dur)
+
+
+def ocean(dur, seed=0, period=7.0):
+    """Surf, noise swells on a wave envelope about every period seconds (slightly random each wave) over a soft
+    low-passed hiss between waves; about -18 dBFS RMS. Put it on the music bus under the voice; not heavy.
+    period must be above 0 (a ValueError otherwise, never an endless loop)."""
+    if period <= 0:
+        raise ValueError(f"ocean: period must be above 0 s, got {period}")
+    n = int(dur * SR)
+    t = tt(n)
+    g = rng_for("ocean", n, seed, period)
+    env = np.zeros(n)
+    c = period * g.uniform(0.2, 0.8)
+    while c < dur + period:
+        a = g.uniform(0.7, 1.0)
+        rise, fall = period * g.uniform(0.18, 0.28), period * g.uniform(0.28, 0.42)
+        d = t - c
+        env = np.maximum(
+            env, a * np.exp(-0.5 * np.square(d / np.where(d < 0, rise, fall)))
+        )
+        c += period * g.uniform(0.85, 1.15)
+    body = _band("ocean-body", n, seed, 120, 2500, period) * (0.12 + env)
+    hiss = (
+        _band("ocean-hiss", n, seed, 1500, 6000, period)
+        * (0.05 + 0.35 * env)
+        * (1 - 0.6 * env)
+    )
+    return _bed(body + hiss, dur)
+
+
+def rumble(dur, seed=0):
+    """Deep earth or volcanic rumble, noise low-passed under about 120 Hz with slow amplitude movement; about
+    -18 dBFS RMS. Put it on the music bus for an eruption; felt more than heard, so keep it under a heavy hit
+    (sound='boom' only when it is the event itself, so Q804 counts it)."""
+    n = int(dur * SR)
+    low = _band("rumble", n, seed, 18, 120) * (
+        0.45 + 0.9 * _slow("rumble-am", n, seed, 0.1, 0.8)
+    )
+    grit = (
+        _band("rumble-grit", n, seed, 120, 260)
+        * 0.15
+        * _slow("rumble-g", n, seed, 0.2, 1.5)
+    )
+    return _bed(low + grit, dur)
+
+
+def deep_water(dur, seed=0):
+    """A dark underwater drone, very low noise plus slowly beating sines at 40 to 70 Hz, muffled; about -18 dBFS
+    RMS. Put it on the music bus under the voice; not heavy."""
+    n = int(dur * SR)
+    t = tt(n)
+    g = rng_for("deep_water", n, seed)
+    x = 0.8 * _band("deep-n", n, seed, 20, 220)
+    for f in (41.0, 41.7, 55.0, 55.9, 68.0):
+        x += 0.55 * np.sin(
+            2 * np.pi * f * g.uniform(0.99, 1.01) * t + g.uniform(0, 2 * np.pi)
+        )
+    x *= 0.7 + 0.3 * _slow("deep-am", n, seed, 0.05, 0.3)
+    return _bed(x, dur)
+
+
+def space_hum(dur, seed=0):
+    """A soft wide low hum, detuned sines (55 to 220 Hz) with a slow shimmer plus faint filtered noise, never
+    harsh; about -18 dBFS RMS. Put it on the music bus under the voice; not heavy."""
+    n = int(dur * SR)
+    t = tt(n)
+    g = rng_for("space_hum", n, seed)
+    x = np.zeros(n)
+    for f in (55.0, 82.5, 110.0, 164.8, 220.0):
+        for det in (-0.004, 0.0, 0.005):
+            sh = 1 + 0.3 * np.sin(
+                2 * np.pi * g.uniform(0.04, 0.2) * t + g.uniform(0, 2 * np.pi)
+            )
+            x += (
+                sh
+                * np.sin(2 * np.pi * f * (1 + det) * t + g.uniform(0, 2 * np.pi))
+                / (1 + f / 110)
+            )
+    x += 0.25 * _band("space-n", n, seed, 150, 1200) * 0.3
+    return _bed(x, dur)
+
+
+def impact(g=1.0, seed=0):
+    """A layered reveal hit, a sub drop (boom), a short noise crack and a 0.8 s dark tail, 1.6 s, peak 0.9 times g.
+    Place it with sound='impact' (heavy, Q804 counts it; align onset) on the sfx stem, one per reveal."""
+    n = int(1.6 * SR)
+    sub = np.zeros(n)
+    b = boom(1.2)
+    sub[: len(b)] = b
+    crack = hp(noise("impact-crack", n, seed), 1800) * ex(n, 0.035) * 0.55
+    tail = (
+        lp(noise("impact-tail", n, seed), 900)
+        * ex(n, 0.35)
+        * np.minimum(1, tt(n) / 0.02)
+        * 0.5
+    )
+    x = np.tanh(1.3 * (sub + crack + tail))
+    return x / np.abs(x).max() * 0.9 * g
+
+
 # ---- landmarks (Z02): which instant of a sound sits on its event time ----
 
 ALIGN = {  # the instant that lands on the event, per generator name; a name not listed aligns its onset

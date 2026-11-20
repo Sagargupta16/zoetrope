@@ -24,7 +24,7 @@ Cards: S-g06-go-crazy-30s, S-g12-beat-sync-spec, S-g13-steam-news-60s, S-g27-mos
 
 Pick a style from this family when the viewer must learn or understand something: a product walkthrough that doubles as a showreel, a beginner topic explained with metaphors, a concept told through contrasting visual styles, a maths idea with a voice-over, or a fun fact film for Reels and Shorts. Each card says how to build it inside the engine contract. For long originals we recommend a shorter cut of the same structure.
 
-Cards: S-g07-research-40s, S-g14-what-is-git, S-g15-recursion-styles, S-g17-manim-derivative, S-bonus-rectangle, S-ledger, S-blueprint.
+Cards: S-g07-research-40s, S-g14-what-is-git, S-g15-recursion-styles, S-g17-manim-derivative, S-bonus-rectangle, S-ledger, S-blueprint, S-deep-dive.
 
 ## Story, history and journeys
 

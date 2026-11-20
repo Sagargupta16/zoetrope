@@ -1,8 +1,8 @@
 {
   "name": "zoetrope",
   "displayName": "Zoetrope",
-  "version": "2.8.1",
-  "description": "Plan, script, design, animate, score and render short videos (MP4, WebM, GIF) end to end with Python, Pillow, numpy and ffmpeg. One skill with 40 style cards, a builder agent and a fresh-eyes reviewer agent, a frame-exact engine, a library of ready blocks, 62 coded QA checks proven by planted-fault self tests, and approval bound to the file's content hashes.",
+  "version": "2.9.0",
+  "description": "Plan, script, design, animate, score and render short videos (MP4, WebM, GIF) end to end with Python, Pillow, numpy and ffmpeg. One skill with 41 style cards, a builder agent and a fresh-eyes reviewer agent, a frame-exact engine, a library of ready blocks, 62 coded QA checks proven by planted-fault self tests, and approval bound to the file's content hashes.",
   "author": {
     "name": "Sagar Gupta",
     "url": "https://github.com/Sagargupta16"
