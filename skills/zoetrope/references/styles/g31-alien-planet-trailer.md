@@ -38,6 +38,15 @@ Two tempos: 104 BPM and 112 BPM sections of functional synth orchestration (saw 
 ## Build notes
 There is no WebGL or Three.js in the engine, so build a 2.5D version in PIL: layered parallax silhouettes (spires as simple triangles and cones), a gradient sky with a sun disc and ringed planet, dust and spore particles from seeded random, glow via blurred additive layers, grain and vignette as the last pass, and a black letterbox. Use simple vector characters (a faceted shell with orbiting word rings, a tall stilt-legged figure with a glowing bell head) and keep camera moves as scale and pan on those layers. Voices: use a text-to-speech engine (one calm voice for the lead, a second voice processed with a band-pass and saturation in numpy for the radio); the source's edge-tts needs network and is not available. Cut the full runtime to fit if the user wants shorter, keeping the order: hook line, hero object, arrival, reveal, contact, threat, turn, title, stinger. Write all supers and VO as one script first, then lay timings into SCHEDULE.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Backgrounds and effects:** `blocks_fx.starfield(t, sky=(...), warm=..., drift=...)` for the orbit shot's sky; `blocks_fx.light_leak(img, t, t0, dur, side="right")` for the backlit low sun at the landing (a slow bloom that cannot flash on its own); `blocks_fx.vignette` is the vignette pass.
+- **Transitions and camera:** `blocks_fx.pull_out(img, k, scale=1.2)` for the pull-back at 28.6 s and `push_in` for the descent; `FX_MENU["chromatic_split"]` for the radio breaking up at 47 s. `glitch_slices` is flash risk "check": run `qa.flash_window` over it, and the card allows one big luminance jump a second.
+- **Helpers:** `engine.wobble(t, amp=..., hz=..., seed=...)` for the shake at entry and landing only; `engine.motion_blur(draw, t, samples=4)` on the plasma bow-shock and streaks.
+- **Gates:** two voices: the calm narrator and the radio voice are lines of one `voice.synthesize` call, each with its own `"voice"` (`voice.md`, Two hosts on one timeline), and the radio filter goes on after; the montage cuts at 56.0, 57.4, 58.8 and 60.2 s are seams for Q1106, so keep one main direction across them.
+
 ## Pitfalls (from what went wrong in our build)
 - Full-frame black frames came from NaN values smeared by bloom (pow() on a base a hair below 0). Clamp every power base; in numpy use np.clip before np.power.
 - Title collided with the planet: reframe so the title sits in black space above a planetrise limb.

@@ -31,6 +31,15 @@ Cut wipe: slanted accent-colour panel sweeps across and holds full-frame for abo
 ## Build notes
 Fetch facts with web search and fetch (store pages and public APIs), keep a source list, and put the fetch date on every volatile number (review percentages drift). No third-party art: draw each hook in PIL with shapes. Pick items by objective criteria (most-reviewed or a platform "popular new" list) and say what you skipped and why (the build skipped mature-content and novelty titles). Keep one SCHEDULE for story starts so wipes, stings and text arrivals share it. Fictional show name only, and an explicit no-affiliation line.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.lower_third(title, role=kicker, style="kicker", accent=yellow)` for a story's kicker chip over its title (move it with `xy=` if the layout wants it elsewhere).
+- **Data:** `blocks_data.progress_bar(pct, label="Positive", t0=story_start + 5.75, color=<story accent>)` for the review meter, with its date on screen beside it; `blocks_data.counter(value=270, suffix="+ new games", ...)` for the intro headline count (label it a lower bound, as the card says). One ticker block per scene: the "JUST RELEASED" ticker is scrolling text, not a counter.
+- **Backgrounds and effects:** `blocks_fx.FX_MENU["glitch_slices"]` only for the glitch hits of the accretion-disk story; it is tagged "check", so run `qa.flash_window` over each hit.
+- **Gates:** write `quiz.json` (Q210) from the fetched facts (each title with its date and what it is) so each answer's keys sit on one frame. The slanted wipe stays one slant and one direction on every cut, so the seam law (Q1106) stays quiet.
+
 ## Pitfalls (from what went wrong in our build)
 - Review numbers were a 2 Oct snapshot and go stale within days: label them with the date.
 - One claim ("from the team behind ...") came from model knowledge, not the fetched page; only keep claims you can source.

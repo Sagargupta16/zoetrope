@@ -1,12 +1,14 @@
 # qa_scan.py : frame scans on the decoded file. Gate 6 flashes to WCAG 2.2 (Q601 general, Q602 red, Q603 the
 # extended band), the reviewer's pointers (Q1101 one-frame pops, Q1102 frozen runs, Q1103 unplanned hard cuts,
-# Q1104 stalls) and Q1105, the file against the drawn frames. Everything reads the decode contract.Ctx makes once;
+# Q1104 stalls, Q1106 seams that change the axis or direction of the motion) and Q1105, the file against the
+# drawn frames. Everything reads the decode contract.Ctx makes once;
 # scan_thumbs runs the pointers on thumbs.npy.
 import re
 from pathlib import Path
 
 import contract as C
 import numpy as np
+import qa_lint as L
 
 # ---- gate 6: flashes (WCAG 2.2 "general flash and red flash thresholds"; the run accumulator follows EA IRIS) ----
 
@@ -441,6 +443,16 @@ STALL_BACK = 0.5  # under this share of those pixels differing between f + 1 and
 # or a step whose mean change is under this (cinetic): an exact repeat on clean frames, where a hard-edged mover
 # leaves no pixel that changes on two steps in a row for the mask to hold
 STALL_EXACT = 0.05
+# seam (Q1106): motion is read by phase correlation over SEAM[0] steps either side of a cut. A step counts when its
+# peak stands SEAM[2] sigma over the rest of the correlation surface (film noise alone reaches 17.8 median, 57 at
+# most, over the 280 sides of 18 films; a real pan of a textured picture 36 to 59); a side moves when SEAM[3] of its
+# steps agree within SEAM_TOL px on a vector of SEAM[1] px a frame (on the 192 px wide grey frame) or more
+SEAM = (6, 2.0, 20.0, 0.7)
+SEAM_TOL = 1.0
+SEAM_MINOR = 0.5  # a vector is "on an axis" when its smaller part is under this share of its larger
+SEAM_REVERSE = (
+    -0.5
+)  # cosine between exit and entry vectors under this is a reversed direction
 MATCH = 4.0  # Q1105: a frame of the file whose mean grey differs from its drawn thumb by more than this is broken
 MAX_ROWS = 5  # NOTE rows per scan; the rest fold into one row so a busy film cannot bury the reviewer
 
@@ -451,6 +463,8 @@ SCAN_FIX = {
     "Q1103": "put the cut on a SCHEDULE start, or add its time to CUTS or CUES; list an intended one in ALLOW['Q1103']",
     "Q1104": "the frame repeats its neighbour inside a move: check stepped or rounded timing there; list a designed "
     "hold in ALLOW['Q1104']",
+    "Q1106": "let the scene that follows enter along the axis and direction the last one left on (a left exit wants a "
+    "left entry), or cut mid-motion at matched speed; list an intended break in ALLOW['Q1106']",
 }
 
 
@@ -669,9 +683,11 @@ def _holds(scenes, fps, n):
     else:
         import qa  # here, not at the top: qa imports this module
 
-        try:  # a registry older than 2.2 (no "s" key) must not stop the other scans
+        # a registry older than 2.2 (no "s" key) must not stop the other scans, nor a text_items that raises
+        # anything else scenes.py code can (a ValueError)
+        try:
             spans = qa.text_spans(qa.text_frames(scenes, fps))
-        except (KeyError, TypeError, AttributeError, IndexError) as e:
+        except L.USER_ERRORS as e:
             spans = {}
             why.append(f"text registry unreadable ({type(e).__name__} {e})")
         for sp in spans.values():
@@ -938,8 +954,151 @@ def _stalls(st, g, n, fps, scenes):
     return _fold(rows, "Q1104", "stalls", fps, n - 1, scenes)
 
 
+def _shifts(fr):
+    """Global translation between consecutive grey frames by phase correlation (a Hann window, whitened cross
+    power, a parabola through the peak): an (steps, 3) array of dx, dy in px a step (content moving right or down
+    is positive) and the peak's height over the rest of the correlation surface in sigma. The zero shift and its
+    neighbours are left out and a peak must be a local maximum of the surface, so a static caption, a vignette or
+    the tail of their zero peak never reads as a move."""
+    _, h, w = fr.shape
+    x = fr.astype(np.float32)
+    x -= x.mean((1, 2), keepdims=True)
+    x *= np.hanning(h)[None, :, None] * np.hanning(w)[None, None, :]
+    f = np.fft.rfft2(x)
+    cross = f[1:] * np.conj(f[:-1])
+    cross /= np.abs(cross).max((1, 2), keepdims=True) * 1e-3 + 1e-9 + np.abs(cross)
+    r = np.fft.irfft2(cross, s=(h, w))
+    out = np.zeros((len(r), 3))
+    for k, m in enumerate(r):
+        near = np.maximum.reduce(
+            [
+                np.roll(m, (a, b), (0, 1))
+                for a in (-1, 0, 1)
+                for b in (-1, 0, 1)
+                if (a, b) != (0, 0)
+            ]
+        )
+        cand = np.where(m > near, m, -1.0)
+        cand[np.ix_([-1, 0, 1], [-1, 0, 1])] = -1.0  # the zero shift and its ring
+        iy, ix = np.unravel_index(int(np.argmax(cand)), m.shape)
+        peak = float(m[iy, ix])
+        rest = m[
+            ~np.isin(np.arange(h)[:, None], (np.arange(iy - 2, iy + 3) % h))
+            | ~np.isin(np.arange(w)[None, :], (np.arange(ix - 2, ix + 3) % w))
+        ]
+        sigma = (peak - rest.mean()) / (rest.std() + 1e-12)
+        off = []
+        for i, size, a, b in (
+            (ix, w, m[iy, (ix - 1) % w], m[iy, (ix + 1) % w]),
+            (iy, h, m[(iy - 1) % h, ix], m[(iy + 1) % h, ix]),
+        ):
+            den = a - 2 * peak + b
+            sub = 0.5 * (a - b) / den if den < 0 else 0.0
+            i = i - size if i > size // 2 else i
+            off.append(i + float(np.clip(sub, -0.5, 0.5)))
+        out[k] = off[0], off[1], sigma
+    return out
+
+
+def _side(g, lo, hi):
+    """(dx, dy, agree, steps) for frames lo..hi: the median shift of the steps whose peak stands SEAM[2] sigma up,
+    and the share of all the steps that sit within SEAM_TOL px of it (0 when none stands up); None under 2 steps."""
+    lo = max(lo, 0)
+    if hi - lo < 2:
+        return None
+    s = _shifts(np.asarray(g[lo : hi + 1]))
+    good = s[s[:, 2] >= SEAM[2], :2]
+    if not len(good):
+        return (0.0, 0.0, 0.0, len(s))
+    med = np.median(good, axis=0)
+    agree = (np.abs(good - med).max(1) <= SEAM_TOL).sum() / len(s)
+    return (float(med[0]), float(med[1]), float(agree), len(s))
+
+
+def _axis(dx, dy):
+    """('x' or 'y', sign, on_axis): the larger part of a vector, and whether the smaller is under SEAM_MINOR of it."""
+    a, b = (dx, dy) if abs(dx) >= abs(dy) else (dy, dx)
+    return (
+        ("x" if abs(dx) >= abs(dy) else "y"),
+        ("+" if a > 0 else "-"),
+        abs(b) < SEAM_MINOR * abs(a),
+    )
+
+
+def _seam_events(st, g, n, fps, scenes):
+    """[(e, s)]: the last frame of the outgoing picture and the first of the incoming one at each seam. A hard
+    cut c (found by _cut_frames, or a SCHEDULE start or CUTS time) is (c - 1, c), cut frames within CUT_GROUP of
+    each other are one seam, and a transition window (WINDOWS) is (its first frame, its last) with the cuts inside
+    it dropped."""
+    cuts, _, wins = _planned(scenes, fps)
+    frames = sorted(
+        f
+        for f in cuts | set(_cut_frames(st, g))
+        if 1 <= f < n and not _in_window(f, wins)
+    )
+    ev = [(fs[0] - 1, fs[-1]) for fs in _groups(frames, CUT_GROUP)]
+    ev += [(a, b) for a, b in wins if 0 <= a < b < n]
+    return sorted(set(ev))
+
+
+def _seams(st, g, n, fps, scenes):
+    """Q1106: how the outgoing picture moves at the end decides how the next must start. On each side of a seam
+    (the last SEAM[0] frames before it, the first SEAM[0] after it, stopping at the next seam) the global translation
+    is read by phase correlation; a side that moves at SEAM[1] px a frame or more, SEAM[3] of its steps agreeing, is
+    moving, and when both sides move and the entry runs along the other axis (x for y) or against the exit (left
+    out, right in) the cut is a NOTE. A side that is still, or too unsure, never flags. Returns (rows, seams read)."""
+    ev = _seam_events(st, g, n, fps, scenes)
+    k, speed, _, agree = SEAM
+    rows = []
+    for i, (e, s) in enumerate(ev):
+        prev_s = ev[i - 1][1] if i else 0
+        next_e = ev[i + 1][0] if i + 1 < len(ev) else n - 1
+        out = _side(g, max(e - k, prev_s), e)
+        inn = _side(g, s, min(s + k, next_e))
+        if out is None or inn is None:
+            continue
+        (ox, oy, op, _), (ix, iy, ip, _) = (
+            out,
+            inn,
+        )  # op, ip: the share of steps that agree
+        if (
+            np.hypot(ox, oy) < speed
+            or np.hypot(ix, iy) < speed
+            or op < agree
+            or ip < agree
+        ):
+            continue
+        ao, ai = _axis(ox, oy), _axis(ix, iy)
+        cos = (ox * ix + oy * iy) / (np.hypot(ox, oy) * np.hypot(ix, iy))
+        trade = ao[0] != ai[0] and ao[2] and ai[2]
+        reverse = cos < SEAM_REVERSE
+        t = round(s / fps, 3)
+        if not (trade or reverse) or C.allowed(scenes, "Q1106", t, 1 / fps):
+            continue
+        so, si = np.hypot(ox, oy), np.hypot(ix, iy)
+        look = f"cut {t:.2f} s: exit {ao[0]}{ao[1]} {so:.0f} px/f, entry {ai[0]}{ai[1]} {si:.0f} px/f"
+        rows.append(
+            C.row(
+                False,
+                "Q1106",
+                f"seam at {t:.2f} s changes {'axis' if trade else 'direction'} ({look}; px on a 192 px wide frame)",
+                SCAN_FIX["Q1106"],
+                note=True,
+                t0=t,
+                t1=t,
+                worst_t=t,
+                item=_scene(scenes, t, fps),
+                metric=round(float(min(so, si)), 1),
+                limit=speed,
+                spans=[(t, t)],
+                considered=len(ev),
+            )
+        )
+    return _fold(rows, "Q1106", "seams", fps, len(ev), scenes), len(ev)
+
+
 def scan_rows(g, fps, scenes=None):
-    """Q1101 to Q1104 (all NOTE, all honour ALLOW) on uint8 (n, h, w) grey frames: ctx.grey() of the file, or
+    """Q1101 to Q1104 and Q1106 (all NOTE, all honour ALLOW) on uint8 (n, h, w) grey frames: ctx.grey() of the file, or
     thumbs.npy. A scan with nothing to report gives one PASS row that says how much it looked at. Q1103 needs a
     scenes.py to compare with, so without one it gives no row (as Q901)."""
     g, fps = np.asarray(g), round(fps)
@@ -947,13 +1106,14 @@ def scan_rows(g, fps, scenes=None):
     if n < 3:
         return [
             C.not_checked(code, f"{n} frame(s): too few to scan", "check the decode")
-            for code in ("Q1101", "Q1102", "Q1103", "Q1104")
+            for code in ("Q1101", "Q1102", "Q1103", "Q1104", "Q1106")
         ]
     st = _stats(g)
     pops, allowed = _pops(st, n, fps, scenes)
     frozen = _frozen(st, g, n, fps, scenes)
     cuts, ncut = _cuts(st, g, n, fps, scenes)
     stalls = _stalls(st, g, n, fps, scenes)
+    seams, nseam = _seams(st, g, n, fps, scenes)
     rows = pops or [
         C.row(
             True,
@@ -984,6 +1144,15 @@ def scan_rows(g, fps, scenes=None):
         ]
     rows += stalls or [
         C.row(True, "Q1104", "no repeated frame inside motion", "", considered=n - 1)
+    ]
+    rows += seams or [
+        C.row(
+            True,
+            "Q1106",
+            f"{nseam} seams read, none changes the axis or direction of the motion",
+            "",
+            considered=nseam,
+        )
     ]
     return rows
 
@@ -1059,6 +1228,7 @@ WHY = {  # what a finding says in review_times.json (after its code and status)
     "Q1103": "unplanned hard cut",
     "Q1104": "stall: a repeated frame inside motion",
     "Q1105": "the file does not match the drawn frames",
+    "Q1106": "seam: the motion across a cut changes axis or direction",
 }
 
 
@@ -1106,7 +1276,7 @@ def add_review(rows, folder):
 
 
 def scan_thumbs(folder=".", scenes=None, fps=None):
-    """Q1101 to Q1104 on thumbs.npy, every drawn frame before the encode, so a pop or freeze shows up before the
+    """Q1101 to Q1104 and Q1106 on thumbs.npy, every drawn frame before the encode, so a pop or freeze shows up before the
     file exists; findings go into review_times.json like check_rows. fps comes from frames.hash when not given."""
     folder = Path(folder)
     p = folder / C.THUMBS
@@ -1123,20 +1293,55 @@ def scan_thumbs(folder=".", scenes=None, fps=None):
                 f"{why}: the frame scans did not run",
                 "render the frames first (they write thumbs.npy and frames.hash), or pass fps",
             )
-            for code in ("Q1101", "Q1102", "Q1103", "Q1104")
+            for code in ("Q1101", "Q1102", "Q1103", "Q1104", "Q1106")
         ]
     rows = scan_rows(np.load(p), round(fps), scenes)
     add_review(rows, folder)
     return rows
 
 
+def _part(codes, what, fix, run):
+    """run(), or one NOT CHECKED row per code naming what it raised: each part of check_rows stands alone, so a
+    truncated thumbs.npy (np.load raises ValueError, an empty one EOFError) no longer takes the measured flash rows
+    with it into one Q100."""
+    try:
+        return run()
+    except L.USER_ERRORS + (EOFError,) as e:
+        return [
+            C.not_checked(
+                code,
+                f"{what} raised {type(e).__name__}: {str(e)[:200]}, so it did not run",
+                fix,
+            )
+            for code in codes
+        ]
+
+
 def check_rows(ctx):
-    """Gate 6 on the linear-light decode, the frame scans on the grey one, and Q1105 against thumbs.npy; when the
-    check names a build folder (ctx.record), each finding's moment also goes into its review_times.json."""
-    rows = flash_rows(None, ctx.fps, ctx.w / ctx.h, scenes=ctx.scenes, lin=ctx.lin())
-    g = ctx.grey()
-    rows += scan_rows(g, ctx.fps, ctx.scenes)
-    rows += match_rows(g, ctx.workdir, ctx.fps)
+    """Gate 6 on the linear-light decode, the frame scans on the grey one, and Q1105 against thumbs.npy, each part on
+    its own (one that raises is NOT CHECKED for its codes only); when the check names a build folder (ctx.record),
+    each finding's moment also goes into its review_times.json."""
+    again = "check the decode (ffmpeg -i <file>) and scenes.py's ALLOW, SCHEDULE, CUTS and CUES, then run it again"
+    rows = _part(
+        ("Q601", "Q602", "Q603"),
+        "the flash gate",
+        again,
+        lambda: flash_rows(
+            None, ctx.fps, ctx.w / ctx.h, scenes=ctx.scenes, lin=ctx.lin()
+        ),
+    )
+    rows += _part(
+        ("Q1101", "Q1102", "Q1103", "Q1104", "Q1106"),
+        "the frame scans",
+        again,
+        lambda: scan_rows(ctx.grey(), ctx.fps, ctx.scenes),
+    )
+    rows += _part(
+        ("Q1105",),
+        f"the {C.THUMBS} match",
+        f"render the frames again (run_all.py full writes {C.THUMBS} and frames.hash together)",
+        lambda: match_rows(ctx.grey(), ctx.workdir, ctx.fps),
+    )
     if ctx.record:
         add_review(rows, ctx.workdir)
     return rows

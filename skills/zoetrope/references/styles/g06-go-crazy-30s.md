@@ -34,6 +34,16 @@ Every sound has a visible cause. Squash/stretch bounces on the count-in; the dot
 ## Build notes
 Write one SCHEDULE (hop times, pill spawn times and pitches) and feed both the numpy score and the PIL draw(t). Use numpy for all sounds (sine/FM for marimba and e-piano, filtered noise for whooshes, short decaying sines for kalimba). Fake the 3D-tilting ring by scaling the ellipse's vertical axis and skewing text. Draw pills, glitch bars and RGB split as per-frame channel offsets. Hard-mute by zeroing the mix buffer from the exact sample of 24.000 s. Only real features may appear; no invented metrics.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.notification(title, body, t0=spawn_time, ...)` for the generic pills of the 19.5-24 s noise section, one call per pill from the SCHEDULE, generic copy only.
+- **Data:** `blocks_data.counter(value=..., color=...)` for the badge counter (one ticker block in that scene).
+- **Backgrounds and effects:** the noise section asks for RGB split and glitch bars: `blocks_fx.FX_MENU["chromatic_split"]` and `FX_MENU["glitch_slices"]` (`glitch_slices` is tagged "check": run `qa.flash_window` over it) as the card's own glitch hits.
+- **Transitions and camera:** `engine.wobble(t, amp=..., hz=..., seed=...)` for the screen shake there; `engine.motion_blur(draw, t, samples=6)` on the dot flying at the camera (1-2 s). The mute and the plum to cream cuts stay hard cuts, never `FX_MENU`.
+- **Gates:** `brand.json` (the brief says use only the brand folder), then `python brand.py check`. The match cuts (ring into checkbox, cards into tiles) are cuts on motion: keep exit and entry on the same axis and direction (the seam law, Q1106).
+
 ## Pitfalls (from what went wrong in our build)
 - The mix was balanced by meters, not by ear; the chaos section was denser but not louder than the groove. Push the noise section harder with a final listening pass if the user can listen.
 - Busy 1-2 frame transitions look messy as stills (cards overlapping mid-drop, the reorder, the mute frame); judge them at speed, not as stills.

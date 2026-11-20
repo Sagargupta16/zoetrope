@@ -12,14 +12,14 @@
 import math
 from dataclasses import dataclass
 from functools import lru_cache
+from itertools import pairwise
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
-from PIL import Image, ImageFilter
-
 import engine as E
+import numpy as np
 import transitions as T
+from PIL import Image, ImageFilter
 
 HERE = Path(__file__).resolve().parent
 
@@ -246,7 +246,7 @@ def sequence(shots, t, win, xf, dof=0.0, haze=None, vignette=0.0):
             f"the first cut at {cuts[0]} is within half the crossfade ({xf / 2} s) of the first shot's start "
             f"({shots[0].t0})"
         )
-    for a, b in zip(cuts, cuts[1:]):
+    for a, b in pairwise(cuts):
         if b - a < xf:
             raise ValueError(
                 f"cuts at {a} and {b} are closer than the crossfade ({xf} s)"

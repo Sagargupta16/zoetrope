@@ -98,6 +98,7 @@ A piece is judged in this order: sound, rhythm, camera, performance. A good-look
 - **Pace changes.** One clear speed-up or slow-down and one breath (a held shot). Fast means fewer words on screen, never a line cut before it is read.
 - **Performance.** Eyes first, then the body. Anticipation, the action, follow-through. Blend between poses with an ease; never switch one inside an `if`. Check faces at final size: worried and angry are one eyebrow apart.
 - **What follows a subject uses one world-to-screen function** (a 3D plate's `PLATE.at`, or the scene's own layout function), never coordinates typed by hand, so a label stays on its subject when the camera moves.
+- **Seam law.** How a scene leaves decides how the next enters (hyperframes motion-doctrine, Apache-2.0, ideas only, read 2026-11-17). Same axis, same direction, matched speed: a shot that exits to the right is followed by one that enters moving right, at about the same pace. Cut mid-motion, not at rest. One main direction per film. A reversal needs a visible cause (a bounce, a turn, a new subject). Q1106 NOTEs a cut where exit and entry trade axis or point opposite; look at it as a seam.
 - **One fix round.** Fix everything a review found in one round, then check once. Notes after delivery are new rounds: change only what was asked.
 
 Seen most often: the subject too small or against an edge; a colour on the same colour; a caption over the subject; a gag too quick to read; an empty frame inside a transition.

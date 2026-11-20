@@ -30,6 +30,16 @@ Heartbeat lub-dub on every beat (72 to 168 BPM), clock ticks on half-beats, key 
 ## Build notes
 Fully doable with PIL plus numpy; no footage needed. Draw each chapter as a function of local time and share one beat-time table between picture and audio. Supersample 2x for thin lines and type. The tree, rings and scribble are the heaviest parts: precompute their geometry once with a seeded RNG, then draw by progress. Karplus-Strong and the Shepard riser are short numpy loops. Use the engine's mac system fonts as listed. For 30 fps keep the same beat grid and snap cuts to the nearest frame.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.chat_thread(img, t, [("me", "..."), ("them", "...")], step=...)` with paper, ink and red passed in for the chat bubbles of chapters 01 and 04 (the card's own "DELIVERED" roll stays hand-drawn).
+- **Data:** `blocks_data.counter(..., sep=",", ease=engine.ease_out_expo)` for the THOUGHTS counter run to 9,999; it has no zero padding, so the "0001" reset stays hand-drawn.
+- **Transitions and camera:** `blocks_fx.FX_MENU["zoom_through"](a, b, p, focus=(x, y))` is the whip-zoom into the dot of the "?" (set `focus` to the dot); keep `glitch_slices` out of chapter 04 unless it is checked with `qa.flash_window`, since that chapter already strobes.
+- **Helpers:** `engine.motion_blur(draw, t, samples=4)` on the x30 zoom and the word slams (fast moves only, it costs `samples` times a frame); `engine.wobble` for the rising shake; `engine.wiggle(k, wiggles=...)` for the plucked line, since it is 0 at both ends.
+- **Gates:** the hard cut to silence at 10.0 s is a seam (Q1106): the incoming line should move along the axis the knot left on.
+
 ## Pitfalls (from what went wrong in our build)
 - The zoom into the "?" did not centre the dot at first and a translucent disc showed off-centre: make the tree root start at exactly the dot's final size.
 - Two HUD chapter labels overlapped mid-roll: mask the roll tightly.

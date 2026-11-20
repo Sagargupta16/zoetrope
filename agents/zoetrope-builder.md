@@ -69,18 +69,23 @@ voice-led piece with no narration files), and say so under `blocked`.
    never pip install anything.
 2. Copy the whole `engine/` folder into the working folder
    (`cp -r <skill>/engine/. <working folder>/`, so
-   `qa_fixtures/` comes along). If the card has a kit (`<skill>/kits/<card-id>/`,
+   `qa_fixtures/` comes along), then run `uv run --no-project python envs.py`
+   there: it must print `ENV: OK` (the folder's `.venv`, each wheel checked
+   against its sha256 in `requirements.txt`; the `uv run` line above runs in
+   it). `ENV: FIX` with a hash mismatch goes under `blocked`; never edit a
+   hash. If the card has a kit (`<skill>/kits/<card-id>/`,
    the router and the card say so), read its README and copy the modules it
    lists: they are working code from an approved build of that style;
    replace the content, keep the machinery. A kit's scenes.py predates the
    registry: add `text_items(t)`, `CUES` (that name) and `KEY_TIMES`, or the
    proof fails (Q204 FIX for text no registry reports, Q200 NOT CHECKED).
-3. Before writing a helper, read the index:
+3. Before writing a helper or an effect, search the blocks and read the index. The block library (`references/blocks.md`: text, data and fx blocks, brand kits, easings) has a gallery (`python <skill>/engine/blocks_preview.py <folder>` writes sheets of every block). Then the index:
    `python <skill>/engine/kit_index.py` lists every public
    function and class in the engine and the kits with its signature, first
    docstring line and file:line, and `kit_index.py show <name>` prints one
    (`show g04:text` picks a file). Run the skill's copy: the one in the
-   working folder finds no kits. Reuse what exists.
+   working folder finds no kits. Reuse what exists. A block `name(img, t, ...)` goes with its `name_items(t, ...)` twin in `text_items(t)`.
+   When the brief gives a `brand.json`, run `python brand.py check` and draw with its palette, fonts and logo. Wrap a fast move (a zoom, a scroll near 1,200 px/s) in `engine.motion_blur`. At every cut keep the seam rule: same axis, same direction, matched speed, cut mid-motion (`playbook.md`). A clip the brief lists is `footage.Clip(name)` after `python footage.py prepare <name>`; never fetch one.
 4. Write scenes.py for this video: a `TIMELINE` of `Scene` and `Transition`
    compiled with `compile_schedule` (the template shows it), one function per
    scene (`scene_<name>`) with shared helpers kept apart, so a finding routes
@@ -106,7 +111,8 @@ voice-led piece with no narration files), and say so under `blocked`.
    with it by name: `bold="Nunito:800"` (family, weight, and `:italic` when
    asked) in every text helper, and the same value in the registry item's
    `bold`, which Q301 reads as bold from weight 700 up. If `list` shows a file
-   missing, run `python fonts.py fetch`. For any other font the style names
+   missing, stop under `blocked`: the parent runs `fonts.py fetch`, you cannot
+   download. For any other font the style names
    (most are Mac system fonts), pick the closest installed one (on Windows
    `C:/Windows/Fonts`), put its path first in FONT_BOLD or FONT_REG, and record
    the substitution. A missing font raises; never fall back to the Pillow
@@ -145,7 +151,15 @@ voice-led piece with no narration files), and say so under `blocked`.
    strobe for flashes:
    `python -c "import run_all, qa, scenes, contract as C; print(*map(C.line, qa.flash_window(scenes.draw, T0, T1, N)), sep='\n')" --size WxH --fps N`
    prints its Q601, Q602 and Q603 rows. Open nothing; the parent shows the
-   sheets.
+   sheets. For a quick look at motion between proof and render,
+   `python run_all.py draft --size WxH --fps N` writes a small draft.mp4 and
+   touches no build file; it is no gate and no proof.
+   Q1106 (NOTE: a cut whose exit and entry trade axis or point opposite):
+   look at the cut and fix the move, or keep it for a stated reason; do not
+   mute it. Q210 (FIX: a `quiz.json` key is on no frame and in no narration
+   line): put the fact on screen, or tell the parent the key is wrong; a NOTE
+   means it is only in the narration. Q210 reads the quiz the parent wrote;
+   never edit it.
 8. Report and stop. Do not render all frames.
 
 A follow-up message with fixes is still proof mode: apply them, run the

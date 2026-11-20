@@ -29,6 +29,15 @@ Music synthesised in numpy; mastered to -14.0 LUFS integrated. No other audio de
 ## Build notes
 The engine cannot run WebGL or Three.js, and we download nothing. A real 3D scene is out of reach. Workable substitute: use the user's own photo (never download one), make the stylised version in PIL by colour quantisation (posterise to 5 to 8 levels), edge-preserving smoothing with numpy, and ink outlines from a gradient threshold, then fake the camera move with a layered parallax: split the image into sky, far, mid and near bands by hand-tuned masks, scale and shift each band at different rates (near fastest). Keep the 4-beat structure above. Say plainly that this is a 2.5D approximation, not a true 3D scene. Credit the photo and licence on screen if it is not the user's own.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.lower_third(name="{title}", role="Photo: {author}, {licence}", style="soft_pill", t0=..., dur=...)` for the credit and licence on the opening label and again on the end card.
+- **Backgrounds and effects:** `blocks_fx.vignette(img, strength=...)` over the stylised side only, so the wipe's two halves still match at the seam.
+- **Transitions and camera:** `blocks_fx.push_in(img, k, scale=1.2)` for the Ken Burns push on the photo (it only scales up, so no empty edge); `blocks_fx.dolly_zoom(fg_rgba, bg, k)` for a near band over a far one in the flight. The slider wipe stays hand-built: no menu transition is a half-and-half hold.
+- **Gates:** none beyond the card's own; the photo is the user's, so no `footage.Clip` unless they supply a video.
+
 ## Pitfalls (from what went wrong in our build)
 - The summit stayed a broad rocky wall instead of the photo's sharp peak: check key silhouettes against the photo side by side.
 - Rock shading was too realistic for cel style and noisy: flatten into few tones.

@@ -1,6 +1,6 @@
-# S-deep-dive · Narrated documentary deep-dive over photo plates
+# S-deep-dive · Narrated deep dive over photo plates
 **Source:** our own card, written 2026-11-16 from the facts.in.motion Reel batches · no kit yet
-**Use when:** "documentary deep dive for Reels", "long narrated fact Reel with real-looking pictures", "explain one big fact over photos and maps", "narrated vertical film over one minute", "realistic pictures with drawn graphics on top"
+**Use when:** "documentary deep dive for Reels", "narrated vertical film over one minute", "long narrated fact Reel with real-looking pictures", "explain one big fact over photos and maps", "realistic pictures with drawn graphics on top"
 **Defaults:** 60 to 90 s for a first cut, up to 180 s · 9:16 1080x1920 · 30 fps · Kokoro narration over a recorded-instrument score and ambience
 **Spec:** family=explainer length=60-180 size=1080x1920 fps=30 audio=voice kit=-
 
@@ -49,6 +49,15 @@ A caption per spoken line in the caption band. A number or name reveals on its s
 - Import the module (`import plates as PL`), not `from plates import *`: a build that also defines its own `view`, `window`, `load`, `cover` or `sequence` trips Q1204.
 - Q806 tips: write numbers as words, "one thousand" and not "a thousand", and put hard names on screen rather than in the voice.
 - Measure each plate's lit share before giving it to the builder (`image-plates.md`).
+
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.captions(img, t, N, style="pill")` for the caption band, `N` the loaded narration (`caption_words(N, line="L03")` for one line), with `HOLD_PROFILE = "caption"`; `blocks_text.lower_third(name, role=..., style="kicker")` for a place or name label in a corner; `blocks_text.end_card(img, t, title, nudge="Follow Facts in Motion.")` for the end card, held at least 3 s.
+- **Data:** `blocks_data.counter(value, start=0, suffix=..., t0=<the word's cue>, dur=1.6)` for a number that counts up on its spoken word (`voice.word_cue`, snapped to a frame), the one ticker in its scene; `blocks_data.stat_ring(pct, label=...)` for a share; `blocks_data.route_arc(a, b, labels, halo=<the plate's dark>)` for a route or a distance over a plate, where `halo` keeps its labels readable on the photo; `blocks_data.line_draw(values, xlabels)` for a change over time, held 1 s after it lands.
+- **Transitions and camera:** none from `blocks_fx`. The plate moves with its own `plates.Shot` and `parallax`, and shots dissolve with `plates.sequence(..., xf=0.5)`; a `push_in` or `rack_focus` on the whole frame would move or blur the drawn type with it, and `parallax` already has its own vignette.
+- **Gates:** write `quiz.json` (Q210) from the two-source facts list, each answer's keys on one frame and in its narration line.
 
 ## Style QA
 - Every number on screen and in the voice is in the facts list with two sources.

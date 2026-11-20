@@ -27,16 +27,16 @@ The music-only version skips the duck and uses the sidechain-on-kick helper `duc
 
 Stacks: one sound per visible event. `qa.py check` notes heavy sounds (kick, hit, boom, impact, drop) within 3 frames of each other, anything else on a payoff cue, and more than 2 sounds in any 100 ms (Q804). A riser or whoosh that lands on its heavy sound is one gesture with it, and the bed's own kick under a cut hit is not a stack: the template leaves out any kick within 3 frames of a cut, so the hit carries that beat.
 
-### Loudness: -14 LUFS integrated, true peak <= -1 dBTP
+### Loudness: -14 LUFS integrated by default, true peak <= -1 dBTP
 
 `audio.master(src, dst)` does the whole master in one call (`run_all.py` runs it on `mix_raw.wav` into `mix.wav`):
 
 1. Decode src to float, 48 kHz stereo, and measure it with ffmpeg ebur128 (the meter `qa.loud` reads; `audio.measure` takes its values at 3 decimals from the filter's metadata).
-2. Apply one static gain to -14 LUFS.
+2. Apply one static gain to the target, -14 LUFS unless the build names another (below).
 3. Limit the true peak to the ceiling, default -2.0 dBTP (`audio.CEILING`): 4x oversampled (a 129-tap Kaiser-windowed sinc, so phase 0 is the samples themselves), 3 ms lookahead, 100 ms release, and no delay added. Our true peak agrees with ffmpeg's to 0.006 dB on 18 signals, EBU Tech 3341 signals 15 to 19 included (2026-10-28).
-4. Measure again and nudge the gain until it is within 0.05 LU, at most 6 passes; write 16-bit stereo 48 kHz.
+4. Measure again and nudge the gain until it is within 0.05 LU of the target, at most 6 passes; write 16-bit stereo 48 kHz.
 
-It returns I, LRA, the true peak measured on dst, the gain, the passes, how deep and when the limiter cut, and its Q805 row. Q805 is a FIX when the master missed -14 by over 0.1 LU or the ceiling by over 0.05 dB, or when it could not stay linear: the limiter took over 0.5 LU of loudness or over 6 dB at one moment. Then lower the hits at the time it names in the raw mix, not the ceiling (on the five approved samples the limiter took 0.00 to 0.02 LU and at most 1.5 dB; the 2.1.0 template bed took 1.43 LU, 6.2 dB). The template and five sample mixes land within 0.05 LU of -14 at or under -2.0 dBTP in 1 or 2 passes.
+It returns I, LRA, the true peak measured on dst, the gain, the passes, how deep and when the limiter cut, and its Q805 row. Q805 is a FIX when the master missed its target by over 0.1 LU or the ceiling by over 0.05 dB, or when it could not stay linear: the limiter took over 0.5 LU of loudness or over 6 dB at one moment. Then lower the hits at the time it names in the raw mix, not the ceiling (on the five approved samples the limiter took 0.00 to 0.02 LU and at most 1.5 dB; the 2.1.0 template bed took 1.43 LU, 6.2 dB). The template and five sample mixes land within 0.05 LU of -14 at or under -2.0 dBTP in 1 or 2 passes.
 
 Why -2.0: the AAC encode raises the true peak. Over 9 mixes it added up to 1.23 dB at 192k and at most 0.45 dB at 320k (2026-10-28), so the mux encodes AAC at 320k (`contract.AAC_ARGS`) and -2.0 keeps 0.55 dB under the -1 dBTP gate. `run_all.py` then measures the decoded mp4; while it reads over -1.3 dBTP (the gate less the 0.3 dB EBU R128 meter tolerance) it re-masters at most 3 times, each ceiling min(ceiling, the mix's own true peak) minus (excess + 0.2 dB) over the measured slope, and stops when the peak does not follow the ceiling. It keeps the cleanest master (Q805 clean, file inside -1 dBTP), so a lower ceiling that fails Q805 never turns a passing file into a reject. One line per master goes into the delivery report.
 
@@ -48,6 +48,18 @@ ffmpeg -nostdin -hide_banner -i out.mp4 -af ebur128=peak=true -f null - 2>&1 | g
 ```
 Report I and true peak in the delivery line (the DELIVERED line carries both); LRA is in `qa.loud` and on `review/audio.png`.
 
+### Loudness targets (`--loudness`, 2.8.0)
+
+`run_all.py full` and `run_all.py audio` take `--loudness <preset or LUFS>`. A number is LUFS and must be from -40 to -6 (`qa.LOUDNESS_RANGE`; a value outside it is refused as a typo: `--loudness 99 LUFS is outside -40 to -6`, exit 2). A preset is a name for one of three numbers (`qa.LOUDNESS_PRESETS`):
+
+| Preset | LUFS | Note in the code |
+|---|---|---|
+| `youtube` (the default), `spotify` | -14 | the engine's own target until 2.8.0 |
+| `podcast`, `apple` | -16 | |
+| `broadcast` | -23 | EBU R128 |
+
+The target is passed to `audio.master(target=...)`, recorded as `"loudness"` in `build.json` and read back by Q801 (`qa.build_loudness`), which names it in its row. `audio` without the flag keeps the target the last build recorded, and a `proof` run does not reset it; `full` without the flag masters to -14. `qa.py check --loudness X` overrides the recorded target for one check. The true-peak ceiling is the same at every target: -2.0 dBTP for the first master, then the re-master loop. Read on the template (2026-11-17): `--loudness podcast` gave `mix.wav -16.0 LUFS at -2.99 dBTP` and `PASS Q801 loudness -16.0 LUFS (want -16 +/- 1)`; `--loudness broadcast` gave -23.0 LUFS and `want -23 +/- 1`; a later `audio` with no flag stayed at -23.0. The preset names are labels for those numbers: this reference has not checked what a given platform asks for today, so ask where the file goes and say the number used in the delivery report.
+
 ### Levels, stacks and the master in detail
 
 - **Levels.** The master brings the mix to -14 LUFS whatever its level, so a bus's absolute gain does not decide loudness: it decides the balance and how hard the limiter must work on the peaks, which Q805 judges. The template's gains are in `music.md`; each style card gives its own. A whoosh at 0.4 instead of 0.2 over a quiet bed failed Q805 on the clean-room template (2026-11-01): the limiter took 0.90 LU, at most 2.8 dB, at the second whoosh's apex. Q805's fix names the moment to lower.
@@ -55,14 +67,14 @@ Report I and true peak in the delivery line (the DELIVERED line carries both); L
 - **When the peak is over (Q802).** A FIX names every sheet sound sounding within 50 ms of the loudest moment, the bed and SFX levels there, and the order to cut the designed sounds: impact (impact, hit, boom, kick, slam, thud, crash), then chime or bell, then press or drop (`qa_stack.CUT_ORDER`, a house heuristic).
 - **Pumping.** `synth.duck(bus, times, ...)` dips a whole bus under a list of times; `synth.build` ducks its music 3 dB under each kick. Keep it on the music bus.
 - **Under narration.** `voice.duck_mix(bed, voice, sr=SR, depth_db=8)` pads both to the longer one, sets the bed to -18 dBFS RMS over the whole bed, pulls it down depth_db while the voice speaks and lays the voice on top at a peak of 0.89, times 1.26. The voice peaks above 1.0 afterwards, so the sum goes through a shared `write_wav` scale like any mix (2026-11-01 probe: voice peak 1.121, sum 1.196). `audio.bed(..., voice_spans=[(a, b), ...])` steps the template's music bus down 8 dB (times 0.398) inside each span with no ramp and leaves the SFX bus alone. The voice goes into `mix_raw.wav`, never into `sfx.wav`: Q902 searches `sfx.wav` for each cue's own sound, and speech there would bury it.
-- **Master return and edge cases.** `audio.master(src, dst, ff="ffmpeg", I=-14, TP=CEILING, passes=6, tol=0.05)` returns `I`, `LRA`, `tp` (measured on `dst`), `gain_db`, `passes`, `ceiling`, `limit_db` (deepest gain reduction), `limit_t`, `limited_s` (seconds under more than 1 dB of it), `cost_db`, `input` (the source measured) and `rows` (its one Q805 row). A mix under -60 LUFS is written out as it is, with a Q805 FIX that calls it silent. `audio.tp_limit(mix, ceiling_db, sr=SR_MASTER, look=0.003, release=0.1)` is the same limiter for a buffer of your own; it returns the limited mix and the gain per sample.
+- **Master return and edge cases.** `audio.master(src, dst, ff="ffmpeg", target=-14, TP=CEILING, passes=6, tol=0.05)` (`target` was `I` before 2.8.0; the default master is byte for byte what it was) returns `I`, `LRA`, `tp` (measured on `dst`), `gain_db`, `passes`, `ceiling`, `limit_db` (deepest gain reduction), `limit_t`, `limited_s` (seconds under more than 1 dB of it), `cost_db`, `input` (the source measured) and `rows` (its one Q805 row). A mix under -60 LUFS is written out as it is, with a Q805 FIX that calls it silent. `audio.tp_limit(mix, ceiling_db, sr=SR_MASTER, look=0.003, release=0.1)` is the same limiter for a buffer of your own; it returns the limited mix and the gain per sample.
 - **After the encode.** `run_all.master_and_mux` re-masters while the muxed file's true peak is over -1.3 dBTP (`TP_MAX` -1.0 less `TP_TOL` 0.3), at most `RETRIES` (3) times, and stops early when the peak does not follow the ceiling (a slope under 0.1). The slope is held between 0.25 and 1. It then keeps the clean try (Q805 clean and the file inside -1 dBTP) with the lowest peak, else the try with the lowest peak, and masters and muxes again if that was not the last. If the peak is still over -1 it prints `true peak still over -1 dBTP after N re-masters: lower the hits Q802 names`.
 
 The gates on the finished file, besides Q805 (which comes from the build's master; `qa.py check` alone does not make it):
 
 | Code | Checks |
 |---|---|
-| Q801 | integrated loudness within -14 +/- 1 LUFS (`qa.loud`) |
+| Q801 | integrated loudness within the build's target +/- 1 LUFS, -14 by default (`qa.loud`; the row says the target) |
 | Q802 | true peak at or under -1 dBTP, read channel by channel |
 | Q903 | audio and video streams start together; the decoded audio lines up with `mix.wav` and `mix_raw.wav` within 1 ms |
 
@@ -89,10 +101,22 @@ The gates measure loudness, peaks, the limiter's work, the timing of the sheet's
 
 The reviewer cannot hear either. `python qa.py audiostrip mix.wav --scenes .` (at the proof) or `python qa.py audiostrip out.mp4 --scenes .` (after the render) draws the sound on one time axis into `review/audio.png`, 1600 px wide: the scenes, a log-frequency spectrogram, one tick per cue coloured by its measured offset, momentary and short-term loudness with the integrated level, the true peak per 100 ms with every frame over -1 dBTP in red, and the numbered cells of the key sheet. A gap shows as a dark column no row names. It exits 2 on a file with no audio stream, and 0 when the piece declares `SILENT`.
 
+### A score made elsewhere: `audio.music_file` (2.8.0)
+
+For a bed the synth kit did not make (a generated score, or any licensed WAV or MP3 the user put in the folder), `audio.music_file(path, start=0.0, gain_db=0.0, fade_in=0.5, fade_out=1.0, duration=None, ff=None)` decodes it with ffmpeg (`-nostdin`) to one mono float buffer at 44.1 kHz: `start` seconds of zeros, then the clip with `gain_db` applied, faded in and out (both shortened to fit a short clip) and cut to `duration` seconds when given. It raises `ValueError` for a file that is missing, does not decode, decodes to nothing, or whose decoded length is more than 50 ms off the length its header gives (a cut file). Call it inside `with synth.recording() as sheet:` in a `score.py` of your own (`engine.md`, Your own score) and add the buffer into the music bus (a buffer longer than the bus will not add: cut it with `duration`). It then lands on the cue sheet as sound `music` on the `music` bus, aligned by its start, so Q802 names it among the sounds sounding at a true-peak moment and its level is part of the bed Q802 reports. Q804 counts a music-bus row only when it serves a `CUES` label, and `music_file` gives none, so a bed made this way is not counted in a stack by itself. It reaches the master like any mix, so the loudness target holds whatever the file's own level.
+
+The builder never fetches a score. The parent session puts the file in the working folder and lists it in the brief with its licence. Ways to make one (nothing here was installed or downloaded for 2.8.0):
+
+- **ACE-Step through its Hugging Face Space**, with no download: generate in the parent session, save the file, hand it over.
+- **A later local install of ACE-Step**, about 6 to 7 GB, not installed; ask the user before downloading.
+- **Any licensed track**, with its licence line in the delivery report (`delivery-report.md`).
+
+The engine does not read a file's tempo: Q901 and Q905 judge the cuts against `BPM` in scenes.py, so set it from the track's own tempo yourself.
+
 ### Silent pieces
 
 A piece with no sound on purpose says `SILENT = True` in `scenes.py` (or `--silent` on `qa.py check`). `run_all.deliver` then makes no score and no master and muxes the picture alone (`contract.mux_cmd` with no mix). Q706, Q801, Q803, Q805 and Q903 give no rows, Q802 and Q804 pass with `no audio by design (SILENT)`, Q902 measures only the picture side of each cue, and a size budget counts no audio bitrate (`run_all.caps`). Declare it only when the storyboard has no sound; it is not a way to quiet a fault.
 
 ### Narrated pieces
 
-A voiced piece runs `voice.synthesize` once before the proof and takes each scene's length from its line's slot (`voice.md`). `render_audio` takes no voice, so a voiced piece has a `score.py` of its own: it decodes `narration/narration.wav` with `voice.dec`, ducks the bed under it, adds it into `mix_raw.wav` and keeps it out of `sfx.wav` (`engine.md`). `audio.write_wav(path, mono, voice=v, scale=...)` adds the voice as it writes and keeps the mix's length, so a longer voice is cut at the end of the mix. A sound on a spoken word goes on the frame of `C.snap(voice.word_cue(N, word), FPS)`, as a frame cue that carries the word's CUES label.
+A voiced piece runs `voice.synthesize` once before the proof and takes each scene's length from its line's slot (`voice.md`). `render_audio` takes no voice, so a voiced piece has a `score.py` of its own: it decodes `narration/narration.wav` with `voice.dec`, ducks the bed under it, adds it into `mix_raw.wav` and keeps it out of `sfx.wav` (`engine.md`). `audio.write_wav(path, mono, voice=v, scale=...)` adds the voice as it writes, clipped at full scale, and keeps the mix's length, so a longer voice is cut at the end of the mix. A sound on a spoken word goes on the frame of `C.snap(voice.word_cue(N, word), FPS)`, as a frame cue that carries the word's CUES label.

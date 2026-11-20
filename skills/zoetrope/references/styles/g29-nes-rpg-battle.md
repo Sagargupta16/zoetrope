@@ -34,6 +34,14 @@ Original piece "Clash at the Ember Gate", 150 BPM, 4/4, A minor, with a victory 
 ## Build notes
 Write a small numpy chip synth: pulse (with duty), triangle (32-step), noise (LFSR) voices, rendered per note with simple volume envelopes and vibrato, mixed to 48 kHz. Compose from a token list per bar like the source. Draw the 320x180 PIL frame with ImageDraw and sprite arrays, then resize x6 nearest. Render at 30 fps to keep the frame count near 2,256 (75.2 s); the source rendered 4,512 frames at 60 fps. Use the same SCHEDULE for note events and visuals so hits stay frame-exact. Keep the world original (no existing game characters, music or fonts).
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+None of the blocks fits; the look is hand-built (see the kit). They draw anti-aliased type, soft glows and gradients, which break the strict palette and the no-smooth-gradient rule, and the 5x7 pixel font is the card's only type.
+
+- **Helpers:** `engine.wobble(t, amp=..., hz=..., seed=...)` for the 1 to 3 px boss-attack shakes, rounded to whole pixels on the 320x180 canvas before use.
+
 ## Pitfalls (from what went wrong in our build)
 - The first agent hit its context limit mid-build: split the song, sprites and renderer into separate modules and verify early.
 - Sprite and layout needed three rounds of stills before they were right; review proof frames at scene boundaries first.

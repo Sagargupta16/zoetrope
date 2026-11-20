@@ -40,9 +40,15 @@ jobs:
           sudo apt-get install -y --no-install-recommends fonts-liberation fonts-dejavu-core
           # ffmpeg 9.0, as on the author's machine: Ubuntu's older ffmpeg AAC encode overshoots the true peak more,
           # the master ceiling drops to -2.9 dBTP and the template's limiter gate (Q805) fails
-          curl -sSL --proto '=https' -o /tmp/ff.tar.xz https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-linux64-gpl-9.0.tar.xz
+          # pinned to one dated autobuild and checked against the sha256 that release publishes (not the moving `latest`);
+          # a month's last build, which BtbN keeps for two years (daily builds go after 14 days)
+          FF_TAG=autobuild-2026-10-31-12-59
+          FF_FILE=ffmpeg-n9.0.2-39-g7adfbe40dc-linux64-gpl-9.0.tar.xz
+          echo "73e29a56974ae5a651133a04584c7483b21afe941e17dc91d79814a758b608d3  $FF_FILE" > /tmp/ff.sha256
+          curl -fsSL --proto '=https' -o "/tmp/$FF_FILE" "https://github.com/BtbN/FFmpeg-Builds/releases/download/$FF_TAG/$FF_FILE"
+          (cd /tmp && sha256sum -c ff.sha256)
           mkdir -p /tmp/ff
-          tar -xJf /tmp/ff.tar.xz -C /tmp/ff --strip-components=1
+          tar -xJf "/tmp/$FF_FILE" -C /tmp/ff --strip-components=1
           echo "/tmp/ff/bin" >> "$GITHUB_PATH"
           /tmp/ff/bin/ffmpeg -version | head -1
 
@@ -51,6 +57,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/selftest"
           cp -r skills/zoetrope/engine/. "$RUNNER_TEMP/selftest/"
           cd "$RUNNER_TEMP/selftest"
+          # the folder's .venv, each wheel checked against its sha256 in requirements.txt; the next line runs in it
+          uv run --no-project python envs.py
           uv run --no-project --with-requirements requirements.txt python qa.py selftest
 
       - name: Show the template QA findings on failure

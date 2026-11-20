@@ -12,6 +12,7 @@ MODULES = (
     "speech",
     "scans",
     "approval",
+    "quiz",
 )
 
 

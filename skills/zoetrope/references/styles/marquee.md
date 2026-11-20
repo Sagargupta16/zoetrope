@@ -72,6 +72,16 @@ Brand colours supplied with the mark replace MARK and TYPE only after `qa.contra
 - CUES: the three landings (0.5, 1.0, 1.5), the lock as `{"t": 2.0, "label": "lock", "payoff": True}`, the word (3.0). KEY_TIMES: 2.0, 3.0, 5.5. `STATIC = [(5.0, 6.0)]`.
 - Grain is off by default; if the dark gradient bands, add `grain.grain(img, t, std=1.2)` last and drop STATIC (grain moves every 2 frames).
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+The sting is flat parts on a still gradient, so no background, transition or camera block applies (the shot is continuous and the canvas does not drift).
+
+- **Text:** `blocks_text.end_card(title="{brand}", handle="@name", nudge="{call to action}", ink=TYPE, accent=SPARK, dark=STAGE_LOW)` for the outro-card use of this style, with the card's colours.
+- **Helpers:** `engine.spring` and `engine.ease_out_back` are already the card's moves.
+- **Gates:** for a brand piece write `brand.json` (the user's palette, fonts and logo file) and run `python brand.py check`; it holds the contrast pairs to 4.5:1 and a missing logo or an uncached font family fails. In scenes.py `brand.load()` returns them; the logo is only the file the user supplied.
+
 ## QA watch-outs
 
 - Q501: frame 0 is the scattered parts on the stage (grey 46 to 29, mean about 37), never black. Offer the user a poster PNG of the final frame for platforms that pick their own thumbnail.

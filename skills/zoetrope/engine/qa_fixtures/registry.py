@@ -61,7 +61,7 @@ CASES = [
     case(
         "registry.paste",
         rows("reg_paste.py"),
-        [want("Q208", "NOT CHECKED")],
+        [want("Q208", "NOT CHECKED", msg="saw no ImageDraw.text call")],
         files=["reg_paste.py"],
     ),
     case(

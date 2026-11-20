@@ -32,6 +32,16 @@ Every step change lands on a beat. Each measurement is shown three ways at once:
 ## Build notes
 Draw with PIL: glass as polygons with alpha, liquid as a clipped rectangle whose top is `base - ml * px_per_ml * ease(t)`, grenadine as a vertical gradient layer growing from the bottom, ice as rounded rectangles with a light stroke. Put all cue times in one SCHEDULE dict and generate the audio from the same dict so picture and sound cannot drift. Check the recipe against a reliable spec before drawing it (our build used the IBA specification: 45 ml tequila, 90 ml fresh orange juice, 15 ml grenadine poured last and not stirred, half orange slice). Show imperial conversions with "approx": 45 ml is about 1.5 oz, 90 ml about 3 oz, 15 ml about 0.5 oz. Supersample 2x for glass edges.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.marker("underline", box, t0=..., colour=...)` under the handwritten "don't stir!" in step 4; its twin `marker_items` returns `[]`, the note itself stays a Caveat text item.
+- **Data:** `blocks_data.counter(..., suffix=" ml", t0=..., dur=..., ease=...)` for each step card's count-up (0 to 45, 0 to 90, 0 to 15), with the same `ease=` as the liquid so they stay in sync; `blocks_data.progress_bar(pct, label=...)` for the measuring bar under it. One ticker block per scene is the safe count: each step is its own scene.
+- **Backgrounds and effects:** `blocks_fx.mesh_gradient(t, colors=(...))` for the night-to-dawn sky behind the bar top, with the card's indigo, gold and amber; `blocks_fx.vignette(img, strength=...)` as the last pass.
+- **Helpers:** `engine.ease_out_bounce` is a ready drop-and-settle for the ice cubes (the card's own k ** 2 fall with a 14 px rebound stays the default).
+- **Gates:** write `quiz.json` (Q210) from the recipe: each ingredient and its amount as a question, so the gate proves every amount is on a frame.
+
 ## Pitfalls (from what went wrong in our build)
 - Title-to-header morph showed a 3-4 frame soft double image near 2.85 s because the two sizes differ in width: crossfade over more frames or match widths.
 - Final title crossfaded over the fading header at 25.0-25.5 s: clear the header first.

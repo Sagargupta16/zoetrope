@@ -48,6 +48,15 @@ No linear motion anywhere: expo-out, cubic or back easing, or damped springs. Ma
 - Output English on-screen text unless the user supplies a font that has the glyphs (a font limit of two blocked Japanese text in the build).
 - Any maker line (for example "made by {maker}") must be a true statement the user supplied.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Data:** `blocks_data.counter(120, start=0, suffix=" BPM", ease=engine.ease_out_expo, t0=8.0, dur=1.0)` for the 8.0 to 9.0 s count; it shows `0`, not `000` (no zero padding), so keep the hand-drawn odometer if the leading zeros matter.
+- **Text:** `blocks_text.lower_third(name, role, style="accent_underline", ink=..., accent=...)` for the closing role line in Clay on Ink.
+- **Helpers:** `engine.spring(t, stiffness, damping)` and `engine.ease_out_back` for the damped springs and back-eases the card names; `engine.motion_blur(draw, t, samples=4)` on the 1,700-particle burst at 10.0 s only (it costs `samples` times a frame); `engine.wobble` for the camera shake spring.
+- **Gates:** none; this card has no facts to quiz and no voice. Add `brand.json` only if the user supplies a palette instead of Ink, Paper and Clay.
+
 ## Pitfalls (from what went wrong in our build)
 - Mid-transition stills show partial or edge-on glyphs (flips, masked rises, odometer, decompose), so not every frame is a finished picture.
 - About 3.9 s was a nearly blank paper frame for roughly 0.1 s between the triangle wipe and the first card: start the first card earlier.

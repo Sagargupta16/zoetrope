@@ -1,6 +1,8 @@
 # render.py : draw every frame in a pool of processes into a shared-memory ring and pipe it, in order, into one ffmpeg
 # H.264 encode (video.mp4), writing each frame's digest and grey thumb on the way (frames.hash, thumbs.npy). PNG
-# frames only on request. scenes is imported inside the functions: each worker must set the frame size first.
+# frames only on request. scenes is imported inside the functions: each worker must set the frame size first. The same
+# pool also draws a draft (draft=True: small, fast, no frames.hash or thumbs.npy) and the RGBA frames of the alpha stage
+# (alpha="webm" or "mov", from scenes.draw_rgba(t)); both are delivery variants, never the approved picture.
 import os
 import shutil
 import subprocess
@@ -41,6 +43,47 @@ def png_path(i, folder=FRAMES):
     return Path(folder, f"f{i:05d}.png")
 
 
+def empty(folder):
+    """Everything inside folder removed, the folder itself kept when it exists. Windows cannot remove a folder that is
+    a process's working folder (a shell left in frames/), while its contents can go; a file that cannot be removed
+    (open in a viewer) raises with its path, so no old frame is ever left among the new ones."""
+    p = Path(folder)
+    if p.is_dir():
+        for c in p.iterdir():
+            if c.is_dir() and not c.is_symlink():
+                shutil.rmtree(c)
+            else:
+                c.unlink()
+
+
+def reuse_check(n, fps, redraw):
+    """(the frames a --redraw run reads back from frames/, why it cannot or None): every frame of the n that no
+    (t0, t1) span of redraw covers must be there as PNG. run_all asks before it clears the last build;
+    render_to_ffmpeg asks again."""
+    fresh = {
+        i
+        for t0, t1 in redraw
+        for i in range(max(0, C.frame_of(t0, fps)), min(n, C.frame_of(t1, fps)))
+    }
+    read = frozenset(i for i in range(n) if i not in fresh)
+    missing = [i for i in sorted(read) if not png_path(i).exists()]
+    if missing:
+        return read, (
+            f"{FRAMES}/ lacks {len(missing)} of the frames to reuse (first {png_path(missing[0])}): "
+            "run once with keep_frames and no redraw"
+        )
+    # frames/ from another --size passes the count; one frame read back says so before anything is cleared
+    first = png_path(min(read)) if read else None
+    if first:
+        with Image.open(first) as im:
+            if im.size != (E.W, E.H):
+                return read, (
+                    f"{FRAMES}/ holds {im.size[0]}x{im.size[1]} frames ({first}); the build is {E.W}x{E.H}: "
+                    "run once with keep_frames and no redraw"
+                )
+    return read, None
+
+
 def checked(img, i):
     """img as RGB once it is the build's size: one frame of the wrong size would shear every frame after it."""
     if img.size != (E.W, E.H):
@@ -50,12 +93,21 @@ def checked(img, i):
     return img if img.mode == "RGB" else img.convert("RGB")
 
 
+def checked_rgba(img, i):
+    """img as RGBA once it is the build's size (the alpha stage's frames: scenes.draw_rgba)."""
+    if img.size != (E.W, E.H):
+        raise ValueError(
+            f"draw_rgba frame {i} (t {i / E.FPS:.3f} s) is {img.size[0]}x{img.size[1]}; the build is {E.W}x{E.H}"
+        )
+    return img if img.mode == "RGBA" else img.convert("RGBA")
+
+
 def render_frames(outdir=FRAMES):
     """Every frame as PNG in one process (slow; for a machine where the pool cannot start)."""
     import scenes
 
-    shutil.rmtree(outdir, ignore_errors=True)
-    Path(outdir).mkdir()
+    empty(outdir)
+    Path(outdir).mkdir(exist_ok=True)
     n = frame_count(scenes)
     for i in range(n):
         checked(scenes.draw(i / E.FPS), i).save(png_path(i, outdir), compress_level=1)
@@ -65,12 +117,13 @@ def render_frames(outdir=FRAMES):
 _w = {}  # this worker's scenes module, job settings and frame ring, set once by _start
 
 
-def _start(size, keep=None, read=frozenset(), ring=None):
-    """Pool initializer: set the frame size, then import scenes (every worker starts fresh), and open the ring."""
+def _start(size, keep=None, read=frozenset(), ring=None, lite=False):
+    """Pool initializer: set the frame size, then import scenes (every worker starts fresh), and open the ring. lite:
+    a draft or alpha run, which makes no digest or thumb."""
     E.W, E.H, E.FPS, E.SS = size
     import scenes
 
-    _w.update(scenes=scenes, keep=keep, read=read)
+    _w.update(scenes=scenes, keep=keep, read=read, lite=lite)
     if ring:
         _w["ring"] = shared_memory.SharedMemory(name=ring, track=False)
 
@@ -96,7 +149,7 @@ def render_parallel(outdir=FRAMES, procs=None, skip_existing=False, frames=None)
 
     idx = list(frames) if frames is not None else list(range(frame_count(scenes)))
     if frames is None and not skip_existing:
-        shutil.rmtree(outdir, ignore_errors=True)
+        empty(outdir)
     Path(outdir).mkdir(parents=True, exist_ok=True)
     procs = procs or default_procs()
     size = (E.W, E.H, E.FPS, E.SS)
@@ -122,14 +175,26 @@ def _frame(job):
             img.save(png_path(i, keep), compress_level=1)
     raw = img.tobytes()
     _w["ring"].buf[slot * len(raw) : (slot + 1) * len(raw)] = raw
+    if _w["lite"]:
+        return None, None
     return C.frame_digest(img, raw), C.thumb(img)
+
+
+def _frame_rgba(job):
+    """Frame i of scenes.draw_rgba into ring slot `slot`, four bytes a pixel; nothing to digest or thumb."""
+    i, slot = job
+    raw = checked_rgba(_w["scenes"].draw_rgba(i / E.FPS), i).tobytes()
+    _w["ring"].buf[slot * len(raw) : (slot + 1) * len(raw)] = raw
+    return None, None
 
 
 def _digest(i):
     return C.frame_digest(_draw(i))
 
 
-def encode_cmd(ff, out, w, h, fps, crf=CRF, maxrate=None, bufsize=None):
+def encode_cmd(
+    ff, out, w, h, fps, crf=CRF, maxrate=None, bufsize=None, preset="medium"
+):
     """ffmpeg argv: raw RGB frames on stdin to H.264 at out, BT.709 limited range converted and tagged (Z16), and
     a VBV cap in kb/s when maxrate is set (always with a bufsize: x264 ignores maxrate without one)."""
     cap = []
@@ -159,7 +224,7 @@ def encode_cmd(ff, out, w, h, fps, crf=CRF, maxrate=None, bufsize=None):
         "-c:v",
         "libx264",
         "-preset",
-        "medium",
+        preset,
         "-crf",
         str(crf),
         "-vf",
@@ -168,6 +233,57 @@ def encode_cmd(ff, out, w, h, fps, crf=CRF, maxrate=None, bufsize=None):
         "-pix_fmt",
         "yuv420p",
         *cap,
+        str(out),
+    ]
+
+
+ALPHA = {  # format -> (file extension, picture encode flags, pixel format, audio encode flags)
+    "webm": (
+        "webm",
+        ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "26", "-auto-alt-ref", "0"]
+        + ["-deadline", "good", "-cpu-used", "2", "-row-mt", "1"],
+        "yuva420p",
+        ["-c:a", "libopus", "-b:a", "192k"],
+    ),
+    "mov": (
+        "mov",
+        ["-c:v", "prores_ks", "-profile:v", "4444", "-vendor", "apl0"],
+        "yuva444p10le",
+        ["-c:a", "pcm_s16le"],
+    ),
+}
+
+
+def alpha_cmd(ff, out, w, h, fps, fmt, mix=None):
+    """ffmpeg argv: raw RGBA frames on stdin (and mix, a WAV, as the sound when given) to a picture with an alpha
+    channel at out: VP9 yuva420p in WebM, or ProRes 4444 yuva444p10le in MOV. BT.709 limited range, converted and
+    tagged like the H.264 picture; the colour never touches the alpha. -nostdin: the picture comes in as `-i -`, the
+    flag only stops the console reading keys."""
+    _, video, pix, audio = ALPHA[fmt]
+    sound = ["-i", str(mix), "-map", "0:v", "-map", "1:a", *audio, "-shortest"]
+    return [
+        ff,
+        "-nostdin",
+        "-y",
+        "-v",
+        "error",
+        "-f",
+        "rawvideo",
+        "-pixel_format",
+        "rgba",
+        "-video_size",
+        f"{w}x{h}",
+        "-framerate",
+        str(fps),
+        "-i",
+        "-",
+        *(sound if mix else ["-map", "0:v", "-an"]),
+        *video,
+        "-vf",
+        f"scale=out_color_matrix=bt709:out_range=tv,format={pix}",
+        *C.COLOR_FLAGS,
+        "-pix_fmt",
+        pix,
         str(out),
     ]
 
@@ -203,7 +319,7 @@ def static_reuse(scenes, n, fps, ex):
     return reuse
 
 
-def _result(ex, job, fut):
+def _result(ex, job, fut, fn=_frame):
     """(digest, thumb) of one frame. When several builds share the machine, Windows can refuse a pipe message
     (WinError 1450, insufficient system resources) or a worker can run out of memory for a moment; draw is pure, so
     the frame is drawn again after a pause, up to POOL_TRIES times. Any other error is the frame's own."""
@@ -218,10 +334,10 @@ def _result(ex, job, fut):
             print(f"note: frame {job[0]} drawn again after {type(e).__name__}: {e}")
         time.sleep(0.5 * attempt)
         attempt += 1
-        fut = ex.submit(_frame, job)
+        fut = ex.submit(fn, job)
 
 
-def _in_order(ex, n, slots, reuse, ring, fb):
+def _in_order(ex, n, slots, reuse, ring, fb, fn=_frame):
     """Frames 0 to n - 1 in order as (bytes, digest, thumb), `slots` in flight: the pool draws each into its own ring
     slot (submission k uses slot k % slots, free again once the parent has copied it out); a frame inside a static
     span is its span's first frame again. An explicit queue of futures, so it runs on Python 3.13 too."""
@@ -232,7 +348,7 @@ def _in_order(ex, n, slots, reuse, ring, fb):
         nonlocal k
         if (i := next(todo, None)) is not None:
             job = (i, k % slots)
-            pending.append((job, ex.submit(_frame, job)))
+            pending.append((job, ex.submit(fn, job)))
             k += 1
 
     for _ in range(slots):
@@ -246,7 +362,7 @@ def _in_order(ex, n, slots, reuse, ring, fb):
             r = held[reuse[i]]
         else:
             job, fut = pending.popleft()
-            dig, th = _result(ex, job, fut)
+            dig, th = _result(ex, job, fut, fn)
             s = job[1]
             r = (bytes(ring.buf[s * fb : (s + 1) * fb]), dig, th)
             submit()  # the slot is copied out, so the next frame may take it
@@ -306,6 +422,9 @@ def render_to_ffmpeg(
     keep_frames=False,
     redraw=None,
     ff="ffmpeg",
+    draft=False,
+    alpha=None,
+    mix=None,
 ):
     """Draw every frame across processes and pipe it raw, in order, into one H.264 encode at out: the silent
     picture, which run_all muxes with mix.wav. The same frames give frames.hash and thumbs.npy. maxrate and
@@ -313,31 +432,29 @@ def render_to_ffmpeg(
     frames/; with redraw=[(t0, t1), ...] it draws only those passages again and reads the rest back from frames/.
     scenes.STATIC holds are drawn once (not with keep_frames). Any failure, including errors ffmpeg logs on a clean
     exit, kills ffmpeg, deletes the partial file and raises with ffmpeg's own log lines. Returns the frame count.
+    draft: a quick H.264 preview (preset veryfast, the caller's crf and size); alpha: "webm" or "mov", every frame
+    from scenes.draw_rgba into a picture with an alpha channel, with mix (a WAV) as its sound when given. Neither
+    writes frames.hash or thumbs.npy, and neither uses STATIC or keep_frames: they are not the approved picture.
     Call it from under `if __name__ == "__main__":`."""
     import scenes
 
+    lite = draft or bool(alpha)
+    if lite and (keep_frames or redraw):
+        raise ValueError("a draft or alpha run takes no keep_frames or redraw")
     n, w, h, fps = frame_count(scenes), E.W, E.H, E.FPS
     procs = procs or default_procs()
     keep, read = (FRAMES if keep_frames else None), frozenset()
     if keep_frames and redraw:
-        fresh = {
-            i
-            for t0, t1 in redraw
-            for i in range(max(0, C.frame_of(t0, fps)), min(n, C.frame_of(t1, fps)))
-        }
-        read = frozenset(i for i in range(n) if i not in fresh)
-        missing = [i for i in sorted(read) if not png_path(i).exists()]
-        if missing:
-            raise FileNotFoundError(
-                f"{FRAMES}/ lacks {len(missing)} of the frames to reuse (first {png_path(missing[0])}): "
-                "run once with keep_frames and no redraw"
-            )
+        read, why = reuse_check(n, fps, redraw)
+        if why:
+            raise FileNotFoundError(why)
     elif keep_frames:
-        shutil.rmtree(FRAMES, ignore_errors=True)
-        Path(FRAMES).mkdir()
+        empty(FRAMES)
+        Path(FRAMES).mkdir(exist_ok=True)
     if keep_frames and getattr(scenes, "STATIC", None):
         print("note: STATIC is not used with keep_frames: every frame is drawn or read")
-    slots, fb = 2 * procs, w * h * 3
+    slots, fb = 2 * procs, w * h * (4 if alpha else 3)
+    fn = _frame_rgba if alpha else _frame
     log = Path(f"{out}.log")
     digests, thumbs, ok = [], [], False
     ring = shared_memory.SharedMemory(create=True, size=slots * fb)
@@ -346,18 +463,30 @@ def render_to_ffmpeg(
             procs,
             mp_context=SPAWN,
             initializer=_start,
-            initargs=((w, h, fps, E.SS), keep, read, ring.name),
+            initargs=((w, h, fps, E.SS), keep, read, ring.name, lite),
         ) as ex:
-            reuse = {} if keep_frames else static_reuse(scenes, n, fps, ex)
+            reuse = {} if keep_frames or alpha else static_reuse(scenes, n, fps, ex)
             with log.open("wb") as err:
                 proc = subprocess.Popen(
-                    encode_cmd(ff, out, w, h, fps, crf, maxrate, bufsize),
+                    alpha_cmd(ff, out, w, h, fps, alpha, mix)
+                    if alpha
+                    else encode_cmd(
+                        ff,
+                        out,
+                        w,
+                        h,
+                        fps,
+                        crf,
+                        maxrate,
+                        bufsize,
+                        "veryfast" if draft else "medium",
+                    ),
                     stdin=subprocess.PIPE,
                     stdout=subprocess.DEVNULL,
                     stderr=err,  # a file, not a PIPE: an unread stderr PIPE can hang ffmpeg on Windows
                 )
                 try:
-                    for raw, dig, th in _in_order(ex, n, slots, reuse, ring, fb):
+                    for raw, dig, th in _in_order(ex, n, slots, reuse, ring, fb, fn):
                         _send(proc, raw, log, len(digests), n)
                         digests.append(dig)
                         thumbs.append(th)
@@ -387,6 +516,8 @@ def render_to_ffmpeg(
         ring.close()
         ring.unlink()
     log.unlink()
+    if lite:
+        return n
     C.write_frame_manifest(digests, w, h, fps, ss=E.SS)
     np.save(C.THUMBS, np.stack(thumbs))
     return n

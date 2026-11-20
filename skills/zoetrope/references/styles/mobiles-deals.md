@@ -35,6 +35,16 @@ Hook: scale 2.2 to 1 with 4 degree rotation over 0.4 beat (ease-out quart: 1 - (
 ## Build notes
 Order: schedule first (clip length to section length), then music, then pictures. Product images come from the user, never scraped. Mark offer-inclusive prices with a star and footnote; use the live page price and M.R.P, and record any tile/page mismatch.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.captions(words="narration/narration.json", style="pop", per_page=4)` for the voiceover on each product, sized for portrait; `blocks_text.marker("strike", box, colour=...)` to strike the M.R.P as it draws on; `blocks_text.end_card(title="Shop now, before they're gone!", nudge=...)` for the last card.
+- **Data:** `blocks_data.stat_ring(pct, label="off")` for the percent off. `counter` and `format_number` group by thousands only, so Indian grouping (1,29,999) is not available: draw prices as text, and pre-draw the "03 / 10" counters as text too (a number loses its leading zeros).
+- **Backgrounds and effects:** `blocks_fx.diagonal_stripes(t, a=..., b=..., speed=...)` in the sun yellow and ink for the sale lockup.
+- **Helpers:** `engine.motion_blur(draw, t, samples=4)` on the hook's 2.2 to 1 scale-in.
+- **Gates:** write `quiz.json` (Q210) with each product's deal price as the answer, so every price is proved on a frame; one voice for all lines.
+
 ## Pitfalls (from what went wrong in our build)
 - Tile prices differ from product-page prices and change during a sale: re-check before posting and say prices are time-limited.
 - Counter leading zeros were dropped ("03" became "3"): pre-draw the card counters as text.

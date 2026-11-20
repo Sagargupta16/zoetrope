@@ -2,7 +2,6 @@
 # Q902 finds each cue's own sound on the lossless SFX stem by cross-correlation, so peak, end and pad cues are measured
 # where they sit, not taken from the sheet; Q903 holds the decoded mp4 audio against mix.wav; `qa.py calib` sends one
 # white frame and a one-frame 1 kHz blip through audio.master and contract.mux_cmd and reads both back.
-import json
 import math
 import subprocess
 import wave
@@ -43,16 +42,11 @@ MUX_WIDE, MUX_WIDE_MATCH = 1.0, 0.8
 
 def read_wav(path):
     """(mono float64, sr) of a PCM (8 to 32 bit) or float WAV, channels averaged, full scale 1.0. The stdlib wave
-    module cannot read float files, and an ffmpeg decode could resample."""
-    b = Path(path).read_bytes()
-    i, fmt, data = 12, b"", b""
-    while i + 8 <= len(b):
-        cid, size = b[i : i + 4], int.from_bytes(b[i + 4 : i + 8], "little")
-        if cid == b"fmt ":
-            fmt = b[i + 8 : i + 8 + size]
-        elif cid == b"data":
-            data = b[i + 8 : i + 8 + size]
-        i += 8 + size + (size & 1)
+    module cannot read float files, and an ffmpeg decode could resample. Raises ValueError naming the file when it
+    has no fmt chunk (an empty or cut file)."""
+    # an empty or cut file has no fmt chunk: without the check, a 0-byte stem divided by its 0 channels and 0 bits
+    fmt, data = C.read_wav_chunks(path)
+    data = data or b""
     tag, ch, sr = (
         int.from_bytes(fmt[a:z], "little") for a, z in ((0, 2), (2, 4), (4, 8))
     )
@@ -154,8 +148,11 @@ def peak(r, centre, guard, tie=1e-9):
 def correlate(x, sr, buf, start, search, lo, hi, need=MATCH, tie=1e-9, comb=None):
     """(start s or None, match, why) of the best band-limited match of buf in x within +-search s of start. When
     start is None, why says why: "weak" (the best is under need), "edge" (the best sits on the search edge), "band"
-    (buf has under 1 percent of its energy in the band), "silent", or with comb set "comb": another peak within comb
-    of the best sits more than 0.5 ms away, so the best is one tooth of a tonal sound's comb."""
+    (buf has under 1 percent of its energy in the band), "silent" (x there, or buf itself), or with comb set "comb":
+    another peak within comb of the best sits more than 0.5 ms away, so the best is one tooth of a tonal sound's comb."""
+    # synth.place records a silent buffer too, and its correlation is 0 / 0 (nan)
+    if not (buf * buf).sum():
+        return None, 0.0, "silent"
     t = band(buf, sr, lo, hi)
     if (t * t).sum() < 0.01 * (buf * buf).sum():
         return None, 0.0, "band"
@@ -711,6 +708,14 @@ def measure_entry(e, st, cue_t, fps, a48):
             "status": "missing",
             "why": f"{C.CUE_SOUNDS} has no c{e['i']} ({sound})",
         }
+    # synth.place records a silent sound as a row too: nothing of it is on the stem to find
+    if not buf.any():
+        return {
+            "sound": sound,
+            "stem": name,
+            "status": "missing",
+            "why": f"{C.CUE_SOUNDS} holds c{e['i']} ({sound}) as silence, so there is no sound to find",
+        }
     p = placement(e, st)
     base = {
         "sound": sound,
@@ -832,7 +837,12 @@ def onset_offsets(scenes, a8k, g, fps, a48=None, size=None):
         if c.get("band") and a48 is not None and len(a48):
             lo, hi = c["band"]
             rr = rises(band(np.asarray(a48, np.float64), 48000, lo, hi), 48000)
-        if c["kind"] in ("both", "audio") and rr is not None:
+        if c["kind"] in ("both", "audio") and rr is None:
+            r.update(
+                status="not found",
+                why="the decoded audio is under 40 ms, so the detector has no 10 ms windows to compare",
+            )
+        elif c["kind"] in ("both", "audio"):
             lo, hi = (
                 max(0, C.sample_of(t - 0.1, 100)),
                 min(len(rr), C.sample_of(t + 0.1, 100) + 1),
@@ -947,24 +957,11 @@ def onset_row(res, fps, why=""):
 
 def start_times(path, ffprobe=None):
     """{"video": s, "audio": s} from ffprobe's stream start_time (None where a stream has none)."""
-    ffprobe = ffprobe or C.ffprobe_of(C.find_ffmpeg() or "ffmpeg")
-    out = subprocess.run(
-        [
-            ffprobe,
-            "-v",
-            "error",
-            "-show_entries",
-            "stream=codec_type,start_time",
-            "-of",
-            "json",
-            str(path),
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
     st = {}
-    for s in json.loads(out).get("streams", []):
+    j = C.ffprobe_json(
+        path, "-show_entries", "stream=codec_type,start_time", ffprobe=ffprobe
+    )
+    for s in j.get("streams", []):
         v = s.get("start_time")
         st.setdefault(s["codec_type"], None if v in (None, "N/A") else float(v))
     return st
@@ -988,8 +985,15 @@ def mux_lag(ref, x, sr, at, half=MUX_HALF, search=MUX_SEARCH, hp=MUX_HP):
 def lag_row(ctx, name, what, fix, unmatched_note=False):
     """One Q903 row: the decoded file against the WAV `name` in the working folder, three 2 s windows (12, 45, 85
     percent, +-0.1 s, 500 Hz high-pass) and, when none matches there, again over +-1 s. FIX past 1 ms; NOT CHECKED
-    (or a NOTE with unmatched_note) when no window matches, saying whether they were silent, on the edge or unlike."""
-    ref, sr = read_wav(Path(ctx.workdir, name))
+    (or a NOTE with unmatched_note) when no window matches, saying whether they were silent, on the edge or unlike;
+    NOT CHECKED naming the WAV when it has no fmt chunk."""
+    again = (
+        "re-run run_all.py full so the WAVs and the mp4 come from the same audio stage"
+    )
+    try:
+        ref, sr = read_wav(Path(ctx.workdir, name))
+    except ValueError as e:  # no fmt chunk: an empty or cut WAV
+        return C.not_checked("Q903", f"{e}, so {what} was not measured", again)
     x = ctx.audio(sr)
     dur = min(len(ref), len(x)) / sr
     got = [(f, *mux_lag(ref, x, sr, f * dur)) for f in MUX_AT]
@@ -1014,7 +1018,6 @@ def lag_row(ctx, name, what, fix, unmatched_note=False):
             else f"{name} does not match the file's audio (best match {best:.2f} in 3 windows)"
         )
         msg = f"{why}, so {what} was not measured"
-        again = "re-run run_all.py full so the WAVs and the mp4 come from the same audio stage"
         if unmatched_note:
             return C.row(False, "Q903", msg, again, note=True)
         return C.not_checked("Q903", msg, again)
@@ -1184,7 +1187,16 @@ def _measure(ctx):
         # review R4 finding 6: a sheet without its buffers or stems cannot be measured, and must not quietly fall
         # back to the detector (a kick 90 ms late read as a NOTE)
         entries, sounds, sr_sheet = C.read_cuesheet(ctx.workdir)
-        wavs = stems(ctx.workdir)
+        try:
+            wavs = stems(ctx.workdir)
+        except ValueError as e:  # read_wav: a stem with no fmt chunk
+            return stop(
+                C.not_checked(
+                    "Q902",
+                    f"{e}, so the cues could not be measured",
+                    "rebuild the audio stage (run_all.py audio writes the sheet, its buffers and the stems together)",
+                )
+            )
         lost = [
             n
             for n, ok in (
@@ -1528,12 +1540,18 @@ def picture_argv(ff, path, w, h, fps):
 BUILD_FILES = ("scenes.py", "run_all.py", C.CUESHEET, C.CUE_SOUNDS, C.SFX)
 
 
+class Refused(ValueError):
+    """calib's --out folder holds a build, so it is refused; calib_cmd catches only this, and any other error
+    (a bad --size, an empty decode, audio.master) keeps its own message."""
+
+
 def calib(fps=30, size="320x180", out="calib", ff=None):
     """Q906 rows: a 4 s clip, black but for one white frame at 2 s and quiet but for a one-frame 1 kHz blip on that
     frame (over a 3 to 6 kHz noise bed, so the master sees programme-like audio and the blip's band stays clean),
     through audio.master and contract.mux_cmd (the mux run_all runs), then measured back as a player reads it. A
     regression guard: it reports the offset and where it entered, and never writes one for the mixer to subtract
-    (R37: do not retard audio; a real offset is fixed in the mux). Raises ValueError on a folder holding a build."""
+    (R37: do not retard audio; a real offset is fixed in the mux). Raises Refused (a ValueError) on a folder holding
+    a build."""
     ff = ff or C.find_ffmpeg() or "ffmpeg"
     import audio  # the engine copy beside qa.py
 
@@ -1543,7 +1561,7 @@ def calib(fps=30, size="320x180", out="calib", ff=None):
     held = [n for n in BUILD_FILES if (d / n).exists()]
     held += [p.name for p in (video, raw, mix) if p.exists() and not mp4.exists()]
     if held:
-        raise ValueError(
+        raise Refused(
             f"{d} holds a build ({', '.join(held)}): calib writes video.mp4 and the mixes there"
         )
     d.mkdir(parents=True, exist_ok=True)
@@ -1617,8 +1635,13 @@ def calib(fps=30, size="320x180", out="calib", ff=None):
 def calib_cmd(a):
     try:
         rows = calib(a.fps, a.size, a.out)
-    except ValueError as e:
+    except Refused as e:
         print(f"refused: {e}; pass --out calib (the default) or an empty folder")
+        return 2
+    except (
+        ValueError
+    ) as e:  # a bad --size or a decode that came back short: nothing was measured
+        print(f"CALIB: NOT CHECKED: {e}")
         return 2
     for r in rows:
         print(C.line(r))

@@ -37,6 +37,17 @@ Text slams in with a fast scale overshoot (ease_out_back) and settles; camera mo
 ## Build notes
 Draw 1080x1920 frames in PIL on the Mac using the system fonts above; keep a helper layer for outlined text, focus lines, halftone and impact inversion (ImageOps.invert). Make the mascot procedurally (a chibi head with simple cel shading and one-weight ink), with one original outfit accent per genre. Keep it original: generic devices only, no known characters. Score as numpy synth with a limiter written in numpy. Use a text-to-speech voice only if the user asks for narration (a narrated version probably teaches better, but was not requested). Use the encode ladder in `engine.md` at 1080x1920; the source file was 56.8 MB, so a CRF 20 to 23 encode is fine for sharing.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.marker("circle", box, ...)` or `"underline"` on the key line in Lesson 2; `blocks_text.captions(style="pop", words="narration/narration.json")` only for the narrated version the notes suggest (the default build is music-only).
+- **Data:** `blocks_data.counter(..., t0=...)` for the runaway counter at 15.0 to 16.5 s; in portrait keep any race names short.
+- **Backgrounds and effects:** `blocks_fx.halftone_field(t, color=..., bg=..., cell=...)` for the screentone panels, in each genre world's own palette.
+- **Transitions and camera:** `blocks_fx.FX_MENU["whip_pan"]` for the 1.5 s genre steps; `glitch_slices` fits the crash at 16.5 s only (flash risk "check": run `qa.flash_window`, and keep to the 2 impact frames a second); `blocks_fx.push_in` for the zoom-ins.
+- **Helpers:** `engine.motion_blur(draw, t, samples=4)` on the Droste runaway; `engine.wobble` for the shake on hits.
+- **Gates:** write `quiz.json` (Q210) from the three moves the recap teaches; keep the genre steps on one zoom direction so Q1106 stays quiet.
+
 ## Pitfalls (from what went wrong in our build)
 - Pace is aggressive by design: 0.75 to 1.5 s beats make some lines glimpses, and 44 to 56 px subs and 26 to 32 px HUD text are hard to read on a phone. Give every teaching line at least 1.5 to 3 s and use larger type.
 - Panel borders were stroked along the focus-line path and covered the page in black wedges: stroke borders as separate rectangles.

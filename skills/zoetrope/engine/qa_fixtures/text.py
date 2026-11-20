@@ -300,8 +300,8 @@ CASES = [
         "text.contrast_3to1",
         contrast_3to1,
         [
-            # every sampled frame reads the same 2.98:1, so the worst is the first sampled rest frame, 16 / 30 s
-            want("Q301", "FIX", "Grey on charcoal", 0.533, metric=2.98, mtol=0.05)
+            # every sampled frame reads the same 2.98:1, so the worst is the first sampled rest frame, 15 / 30 s
+            want("Q301", "FIX", "Grey on charcoal", 0.5, metric=2.98, mtol=0.05)
         ],
     ),
     case(
@@ -309,7 +309,11 @@ CASES = [
         small_text,
         [want("Q402", "NOTE", "tiny footnote", 2.0, metric=24.0, mtol=0.5)],
     ),
-    case("text.empty_registry", empty_registry, [want("Q200", "NOT CHECKED")]),
+    case(
+        "text.empty_registry",
+        empty_registry,
+        [want("Q200", "NOT CHECKED", msg="reported no readable text on any frame")],
+    ),
     case(
         "text.no_text_declared",
         no_text_declared,

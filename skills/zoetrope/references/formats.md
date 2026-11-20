@@ -6,6 +6,7 @@
 | 9:16 | 1080x1920 | phone vertical, Stories, Shorts, Reels |
 | 1:1 | 1080x1080 | feeds |
 | 4:5 | 1080x1350 | portrait feeds |
+| 4K | 3840x2160 | a 4K delivery; `--size 3840x2160` needs no other change (below) |
 
 - **FPS:** 30 (default). Keep to one fps for the whole piece. Use even width and height (yuv420p needs it).
 - **Default when unsure:** 16:9, 1920x1080, 30 fps, H.264 MP4.
@@ -13,6 +14,22 @@
 - **Layout per aspect:** re-plan the layout for 9:16 and 1:1 (stack, bigger type), do not just crop a 16:9 design. Same `SCHEDULE`, different layout code keyed on `E.W < E.H`.
 - **Naming:** `{slug}_{aspect}_{length}s_v{n}.mp4` (set `OUT` in the working folder's run_all.py), for example `{product}-launch_16x9_15s_v1.mp4`; lowercase, hyphens in the slug, bump `v` for every revision; GIF as `{same}_preview.gif`. Keep the working folder (scenes.py, `video.mp4`, the audio files): an audio fix is `run_all.py audio` (audio, master and mux again, no frame redrawn), while a visual fix draws every frame again unless the build kept its frames (`run_all.py full --keep-frames`, then `--keep-frames --redraw T0-T1` for one passage).
 - **Report at the end (all of it):** the `DELIVERED <path> (<MB>, <s>, <LUFS>, <dBTP>)` line `run_all.py` prints after a clean QA pass, quoted as printed, and the `APPROVAL` line above it (a file that failed is renamed `<name>.rejected.mp4`, one from a run that broke before its verdict `<name>.unchecked.mp4`, and neither gets a DELIVERED line; `delivery-report.md`), then resolution, fps, codec and container, which encode rung was used and why, frames checked in QA (list the times), what the audio is (music BPM, voice name), any assumption made, and how to request changes (copy, color, timing, aspect). Show the final video or a frame in a session tab. Add credits for any third-party material; none for synthesized audio and drawn shapes.
+
+## Variants: 4K, alpha, batch sizes and the draft (2.8.0)
+
+None of these changes the default build: `run_all.py full` still makes the H.264 `out.mp4` of the table above.
+
+- **4K.** `run_all.py <stage> --size 3840x2160`. The text gates scale every size rule by `1080 / min(W, H)`, which is 0.5 here, so a 48 px font counts as 24 px. On the template (2026-11-17, one run each) `proof` took 18.0 s and `full` 27.6 s (the picture 7.7 s), ending `QA: PASS (52 checks, ...)` and a DELIVERED line for a 0.5 MB file. A raw 4K frame is 24.9 MB, so the render ring holds 16 of them at 8 processes (about 400 MB); 4K has four times the pixels of 1080p, and `--ss 2` draws four times that again.
+- **A picture with transparency (`run_all.py alpha`).** For a lower third, a sticker or an overlay that goes over footage in another tool. scenes.py opts in with `draw_rgba(t)`, an RGBA image of `E.W x E.H` with alpha 0 where nothing is drawn (frames of another size are refused; `draw(t)` is untouched). `--format webm` (the default) or `--format mov`:
+
+| Format | File | Picture | Sound |
+|---|---|---|---|
+| WebM | `<OUT stem>_alpha.webm` | VP9 (`libvpx-vp9`), `yuva420p`, CRF 26 | Opus 192 kb/s |
+| MOV | `<OUT stem>_alpha.mov` | ProRes 4444 (`prores_ks`, profile 4444), fed `yuva444p10le` (ffprobe reads it back as `yuva444p12le`) | 16-bit PCM |
+
+  The sound is `mix.wav` when the last build made one, and a `note:` says when there is none. Colour is converted and tagged BT.709 limited range like the H.264 picture, and the alpha is untouched. The stage reads the file back and deletes it when it has no alpha channel or is more than 0.1 s from the film's length. No gate runs on it: Q705, Q707 and Q708 are for the H.264 file, there is no DELIVERED line, and the file has no approval. Look at it over a checkerboard, then say in the delivery message which tool it was checked in. Say so too when it is WebM (VP9: older QuickTime and some company players fail, as The encode, exactly, below says of VP9). `ALPHA refused:` lines are in `troubleshooting.md`.
+- **One film at several sizes (`run_all.py batch`).** `python run_all.py batch --sizes 1920x1080,1080x1920,1080x1080 full` runs `full` once per size in `variants/<WxH>/`, each from this folder's sources, and prints one `BATCH <size> full exit <n>: <verdict> (log ...)` line per size. Each variant keeps the name `OUT` gives it (`out.mp4`) inside its own folder: rename to `{slug}_{aspect}_{length}s_v{n}.mp4` when handing over, as above. It takes `proof`, `full`, `audio`, `draft` or `alpha`, and `batch full` followed by `batch audio` works because a variant's outputs stay. Every run copies the sources again over the variant (an edit made inside `variants/<WxH>/scenes.py` is overwritten; make it in the working folder), and the copies include `clips/` and `plates/` frame caches, so a batch of a plate-heavy film costs that much disk per size. The layout must be keyed on the frame shape (`E.W < E.H`, see Layout per aspect), or the 9:16 variant is a letterboxed 16:9 design. Details: `engine.md`.
+- **A quick look (`run_all.py draft`).** `draft.mp4` is the whole film with a 640 px long side at half the frame rate (30 fps becomes 15) and the raw unmastered mix, encoded at CRF 30. It is for judging timing and layout before the full render, in a few seconds on the template (1.5 s on 2026-11-17, 640x360 at 15 fps, 7.53 s). It is never a deliverable: the engine's gates do not run on it, it is not mastered, and it leaves `out.mp4`, `build.json` and `approved/` as they were.
 
 ## File size
 

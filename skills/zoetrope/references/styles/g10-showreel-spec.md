@@ -25,13 +25,22 @@ You're a world-class motion designer and this is your 15-second résumé reel. M
 - Layout and texture: 12-column grid, true live numeric annotations.
 
 ## Motion
-Cuts and palette swaps on 8ths; shapes squash on kicks. Dolly zoom: focal length scales with camera distance (approximate with a scaled background layer). Masked reveals start further below so tops do not show early.
+Cuts and palette swaps on 8ths; shapes squash on kicks. Dolly zoom: focal length scales with camera distance (`blocks_fx.dolly_zoom(fg_rgba, bg, k)` does it: the subject grows while the background shrinks). Masked reveals start further below so tops do not show early.
 
 ## Audio
 96 BPM, A minor. Boom, crash and stab at 0.0 s; stab and kick per 8th; 32nd snare fill into bar 2; bloops on shapes; whoosh per camera move; chord stab and pluck per palette swap; woodblock per layout snap; riser in the recap; one 16th of hard mute before the drop; kick, boom, crash on the end card; bells on the subline. -14.1 LUFS.
 
 ## Build notes
 Use 4 chapters if time is short. On-screen numbers must be literally true (15 s x 60 fps = 900 frames). Put the user's name or {brand} on the end card.
+
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Data:** `blocks_data.counter(value=0, start=15, suffix=" s left", t0=0, dur=15)` for the HUD countdown (15 minus t); one ticker block per scene, and the card's other live numeric annotations stay hand-drawn.
+- **Backgrounds and effects:** `blocks_fx.mesh_gradient(t, colors=(cobalt, pink, sun))` for the gradient field at the start of 04 COLOUR, colours from the card's palette.
+- **Transitions and camera (03 CAMERA):** `blocks_fx.push_in(img, k, scale=1.2)` for the push-in; `blocks_fx.FX_MENU["whip_pan"](a, b, p, direction="left")` for the whip pan; `blocks_fx.dolly_zoom(fg_rgba, bg, k)` for the true dolly zoom (draw `bg` a little larger than the action); `FX_MENU["zoom_through"](a, b, p, focus=(fx, fy))` or `engine.motion_blur(draw, t, samples=6)` for the crash zoom into the D.
+- **Gates:** the pink flash at the end of 03 CAMERA and the one black 16th before the drop: run `qa.flash_window(draw, t0, t1, fps)` over the flash.
 
 ## Pitfalls (from what went wrong in our build)
 - Difference-blend HUD reads mid-contrast on red and some gradients: use solid colour chosen per scene.

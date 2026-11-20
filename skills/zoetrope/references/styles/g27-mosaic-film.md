@@ -31,6 +31,16 @@ Synthesized in code: inharmonic glass-bell partials, additive pads, plucked stri
 ## Build notes
 The build was WebGL2 with 3D shading, MSAA and bloom; none of that exists in PIL. Workable substitute: a smaller grid (for example 48x48 or 72x72) of rotated rectangles drawn with PIL, flip simulated by scaling the tile width with cos(angle) and switching colour at 90 degrees, gold glitter by a per-tile tone jitter plus a moving sweep highlight, shadows as offset dark rectangles. Pre-compute figure masks as arrays and a per-tile path by a seeded function of t. Reduce scope for time: 3 to 4 scenes instead of 6, 30 to 45 s. Use numpy for the bell, pad and click layers; scale the click density by tile count. No third-party media is needed.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+None of the blocks fits the tiles: the look is hand-built, and every change of picture is the tiles' own flip.
+
+- **Backgrounds and effects:** `blocks_fx.vignette(img, strength=...)` as the last pass over the wall.
+- **Transitions and camera:** `blocks_fx.push_in(img, k, scale=...)` for the final push-in, with a margin so the title's first letter is not cropped.
+- **Helpers:** `engine.fbm(x, y, z, octaves=..., seed=...)` for the tone jitter and the murmuration's swirl; `engine.ease_out_bounce` or `engine.ease_out_elastic` for a tile clicking home (they overshoot or rebound, so check the tile stays in its socket at k = 1).
+
 ## Pitfalls (from what went wrong in our build)
 - At 72x72 the figures look like chunky pixel art; the crane's body was a blob and night houses were simple. Use a finer grid for important figures.
 - The payoff eye tile was only 20-30 px and visible about 1.5 s; make the payoff larger or longer.

@@ -16,6 +16,7 @@ import wave
 from pathlib import Path
 
 import contract as C
+import envs
 import numpy as np
 
 SR = 44100  # same rate as audio.py and synth.py; audio.master writes the final 48 kHz mix
@@ -23,15 +24,19 @@ SR = 44100  # same rate as audio.py and synth.py; audio.master writes the final 
 
 def dec(path, af=None, ch=1, sr=SR):
     """Decode any audio file to float32 with ffmpeg, optionally through a filter chain af. -nostdin: without it a
-    "q" waiting on stdin ended a 1800 s decode at 999 s with exit code 0 (seen 2026-10-28)."""
+    "q" waiting on stdin ended a 1800 s decode at 999 s with exit code 0 (seen 2026-10-28). A failed decode (a missing
+    or damaged file) raises ValueError with the end of ffmpeg's message."""
     cmd = (
         [C.find_ffmpeg() or "ffmpeg", "-nostdin", "-v", "error", "-i", path]
         + (["-af", af] if af else [])
         + ["-f", "f32le", "-ac", str(ch), "-ar", str(sr), "-"]
     )
-    return np.frombuffer(
-        subprocess.run(cmd, capture_output=True, check=True).stdout, np.float32
-    )
+    r = subprocess.run(cmd, capture_output=True, check=False)
+    if r.returncode:
+        tail = r.stderr.decode(errors="replace").strip().splitlines()[-2:]
+        err = "; ".join(s.strip() for s in tail)[-300:] or f"exit {r.returncode}"
+        raise ValueError(f"ffmpeg could not decode {path}: {err}")
+    return np.frombuffer(r.stdout, np.float32)
 
 
 def span(y, sr=SR):
@@ -213,7 +218,9 @@ def synthesize(
     captions, holds and word_cue keep the script's word. A line may hold [pause], [pause 300ms] or [pause 1.5s]: its
     parts are spoken apart and joined with exactly that silence between their speech. A line {id, text, fit} gets a
     slot of exactly fit seconds; speech that overruns it is spoken faster, up to FIT_FAST, and a line that would need
-    more raises with how many words to cut."""
+    more raises with how many words to cut. A line dict may also name its own "voice" (and "engine"): a second host.
+    A line without one is spoken by the call's engine and voice; narration.json records each line's engine, voice
+    and lang, and its top level names the default voice."""
     eng = get_engine(engine)
     eng.require()
     if speed <= 0 or rule not in ("ours", "showtime"):
@@ -221,27 +228,16 @@ def synthesize(
             f"need speed above 0 and rule 'ours' or 'showtime', got {speed}, {rule!r}"
         )
     items = _lines(lines, _lexicon(lexicon))
-    voice = voice or eng.default_voice()
-    if voice is None:
-        raise ValueError(
-            f"{engine}: name a voice; the user picks it from voice_samples.py. Voices here: "
-            f"{', '.join(eng.voices()) or 'none downloaded'}"
-        )
-    if voice not in eng.voices():
-        close = difflib.get_close_matches(voice, eng.voices(), n=3, cutoff=0.4)
-        raise ValueError(
-            f"{engine}: no voice {voice!r}; close: {', '.join(close) or 'none'}"
-        )
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
-    job = {
-        "eng": eng,
-        "model": eng.model_id(voice),
-        "code": eng.code_id(),
-        "voice": voice,
-        "folder": folder,
-        "units": {},
-    }
+    job = {"eng": eng, "folder": folder, "units": {}, "spk": {}}
+    main = _speaker(job, engine, voice)
+    voice = job["voice"] = main["voice"]
+    job["model"] = main["model"]
+    for ln in items:  # a line's own engine and voice, else the call's
+        e = ln["engine"] or engine
+        v = ln["voice"] or (voice if e == engine else None)
+        ln["engine"], ln["voice"] = e, _speaker(job, e, v)["voice"]
     speeds = {ln["id"]: speed for ln in items}
     made = set()
     for _ in range(FIT_ROUNDS):
@@ -282,6 +278,32 @@ def synthesize(
     return narr
 
 
+def _speaker(job, engine, voice):
+    """{eng, model, code, voice} for one engine and voice (the default voice when None), checked and kept in
+    job["spk"]; raises when the engine is not ready or the voice is not there."""
+    eng = get_engine(engine)
+    eng.require()
+    voice = voice or eng.default_voice()
+    if voice is None:
+        raise ValueError(
+            f"{engine}: name a voice; the user picks it from voice_samples.py. Voices here: "
+            f"{', '.join(eng.voices()) or 'none downloaded'}"
+        )
+    if (engine, voice) not in job["spk"]:
+        if voice not in eng.voices():
+            close = difflib.get_close_matches(voice, eng.voices(), n=3, cutoff=0.4)
+            raise ValueError(
+                f"{engine}: no voice {voice!r}; close: {', '.join(close) or 'none'}"
+            )
+        job["spk"][engine, voice] = {
+            "eng": eng,
+            "model": eng.model_id(voice),
+            "code": eng.code_id(),
+            "voice": voice,
+        }
+    return job["spk"][engine, voice]
+
+
 def _lines(lines, lex=None):
     """[{id, script, text, fit, parts}] from strings (ids L01, L02, ...), dicts {id, text[, fit]} or (id, text) pairs.
     text is the script without pause markers: what captions, holds and word_cue read. Each part {spoken, own, pause}
@@ -289,12 +311,12 @@ def _lines(lines, lex=None):
     says, and the silence after it."""
     out = []
     for i, ln in enumerate(lines):
-        fit = None
+        fit = who = None
         if isinstance(ln, str):
             lid, script = f"L{i + 1:02d}", ln
         elif isinstance(ln, dict):
             lid, script = ln.get("id") or f"L{i + 1:02d}", ln["text"]
-            fit = ln.get("fit")
+            fit, who = ln.get("fit"), (ln.get("engine"), ln.get("voice"))
         else:
             lid, script = ln
         lid, script = str(lid), str(script).strip()
@@ -307,6 +329,8 @@ def _lines(lines, lex=None):
                 "id": lid,
                 "script": script,
                 "fit": None if fit is None else float(fit),
+                "engine": (who or (None, None))[0],
+                "voice": (who or (None, None))[1],
             }
             | _parts(lid, script, lex or {})
         )
@@ -381,12 +405,18 @@ def _respell(lid, text, lex, base=0):
     return spoken, own
 
 
+def _spk(job, ln):
+    """The speaker (engine, model, code, voice) of line ln."""
+    return job["spk"][ln["engine"], ln["voice"]]
+
+
 def _part_key(job, ln, part, speeds):
+    s = _spk(job, ln)
     return _key(
-        job["eng"].name,
-        job["model"],
-        job["code"],
-        job["voice"],
+        s["eng"].name,
+        s["model"],
+        s["code"],
+        s["voice"],
         speeds[ln["id"]],
         part["spoken"],
     )
@@ -395,34 +425,40 @@ def _part_key(job, ln, part, speeds):
 def _make(job, items, speeds):
     """Synthesize and cache every part not cached yet, one engine run per speed; returns the keys made. A part said
     twice is made once."""
-    eng, folder = job["eng"], job["folder"]
-    todo = {}  # key -> (spoken, speed, line id)
+    folder = job["folder"]
+    todo = {}  # key -> (spoken, speed, line id, speaker)
     for ln in items:
         for p in ln["parts"]:
             k = _part_key(job, ln, p, speeds)
             if not _cached(folder, k):
-                todo.setdefault(k, (p["spoken"], speeds[ln["id"]], ln["id"]))
+                todo.setdefault(
+                    k, (p["spoken"], speeds[ln["id"]], ln["id"], _spk(job, ln))
+                )
     bad = []
-    for s in sorted({v[1] for v in todo.values()}):
-        ks = [k for k, v in todo.items() if v[1] == s]
+    for name, voice, s in sorted(
+        {(v[3]["eng"].name, v[3]["voice"], v[1]) for v in todo.values()}
+    ):  # one engine run per engine, voice and speed
+        spk = job["spk"][name, voice]
+        eng = spk["eng"]
+        ks = [k for k, v in todo.items() if v[3] is spk and v[1] == s]
         got = eng.synth(
-            [todo[k][0] for k in ks], job["voice"], s, [folder / f"{k}.wav" for k in ks]
+            [todo[k][0] for k in ks], spk["voice"], s, [folder / f"{k}.wav" for k in ks]
         )
         for k, raw in zip(ks, got):
-            spoken, _, lid = todo[k]
+            spoken, _, lid, _ = todo[k]
             wav = folder / f"{k}.wav"
             try:  # check before caching: a bad file left in the cache would fail every later run
                 _timed(eng, raw, spoken, dec(str(wav)))
-            except (ValueError, KeyError, subprocess.CalledProcessError) as e:
+            except (ValueError, KeyError) as e:
                 wav.unlink(missing_ok=True)
-                bad.append(f"{lid} ({wav}, deleted, not cached): {e}")
+                bad.append(f"{lid} [{eng.name}] ({wav}, deleted, not cached): {e}")
                 continue
             side = {
                 "v": CACHE_VERSION,
                 "engine": eng.name,
-                "model": job["model"],
-                "code": job["code"],
-                "voice": job["voice"],
+                "model": spk["model"],
+                "code": spk["code"],
+                "voice": spk["voice"],
                 "speed": s,
                 "text": spoken,
                 "raw": raw,  # the engine's own timing data, turned into words at every layout
@@ -432,7 +468,7 @@ def _make(job, items, speeds):
             tmp.write_text(json.dumps(side, indent=1), encoding="utf-8")
             os.replace(tmp, folder / f"{k}.json")
     if bad:
-        raise ValueError(f"{eng.name} wrote unusable audio: {'; '.join(bad)}")
+        raise ValueError(f"a voice engine wrote unusable audio: {'; '.join(bad)}")
     return set(todo)
 
 
@@ -556,7 +592,7 @@ def _hold(text, profile=None):
     return qa.min_hold(len(text.split()))
 
 
-def _unit(job, lid, k, spoken):
+def _unit(job, lid, k, spoken, eng):
     """(y, (c0, c1, s0, s1), words) of one cached part: its samples, trim bounds and word times in seconds of its
     file (ends filled in). Decoded once per synthesize call."""
     if k not in job["units"]:
@@ -564,8 +600,8 @@ def _unit(job, lid, k, spoken):
         try:
             y = dec(str(path))
             side = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
-            bounds, words = _timed(job["eng"], side["raw"], spoken, y)
-        except (ValueError, KeyError, subprocess.CalledProcessError) as e:
+            bounds, words = _timed(eng, side["raw"], spoken, y)
+        except (ValueError, KeyError) as e:
             raise ValueError(f"{lid} ({path}): {e}") from None
         if words:
             _ends(y, words, bounds[3])
@@ -583,7 +619,9 @@ def _assemble(job, ln, speeds):
     )
     for i, p in enumerate(ln["parts"]):
         k = _part_key(job, ln, p, speeds)
-        _, (c0, c1, s0, s1), ws = _unit(job, ln["id"], k, p["spoken"])
+        _, (c0, c1, s0, s1), ws = _unit(
+            job, ln["id"], k, p["spoken"], _spk(job, ln)["eng"]
+        )
         at = max(0, end + gap - (s0 - c0)) if i else 0
         first = first if i else s0 - c0
         placed.append((k, c0, c1, at))
@@ -653,6 +691,9 @@ def _layout(job, items, speeds, speed, fps, rule, profile, lexicon):
                 "id": ln["id"],
                 "text": ln["text"],
                 "script": ln["script"],
+                "engine": ln["engine"],
+                "voice": ln["voice"],
+                "lang": _spk(job, ln)["eng"].lang(ln["voice"]),
                 "spoken": [p["spoken"] for p in ln["parts"]],
                 "pauses": [p["pause"] for p in ln["parts"][:-1]],
                 "speed": speeds[ln["id"]],
@@ -690,7 +731,15 @@ def _layout(job, items, speeds, speed, fps, rule, profile, lexicon):
         "engine": eng.name,
         "model": job["model"],
         "voice": job["voice"],
-        "lang": eng.lang(job["voice"]),
+        # Q806 reads English only: one other-language line makes the whole narration read as that language
+        "lang": next(
+            (
+                ln["lang"]
+                for ln in out
+                if not (ln["lang"] or "en").lower().startswith("en")
+            ),
+            eng.lang(job["voice"]),
+        ),
         "speed": speed,
         "fit_fast": FIT_FAST,
         "lexicon": dict(lexicon or {}),
@@ -1119,12 +1168,18 @@ class Sapi(Engine):
 
 
 class _Worker(Engine):
-    """An engine that runs in its own uv environment (uv run --no-project --with ...), so engine/requirements.txt
-    stays Pillow and numpy only. The pins match requirements-voice.in. uv fetches the wheels on first use."""
+    """An engine that runs in its own environment, so engine/requirements.txt stays Pillow and numpy only. lock names
+    the compiled lock beside this file (its .in file holds the pins); envs.side builds the venv on first use, each
+    wheel checked against the lock's sha256."""
 
     python = "3.14"
-    packages = ()
+    lock = ""
     folder = ""
+
+    @property
+    def packages(self):
+        """The lock file's text: what code_id hashes, so a new lock synthesizes again."""
+        return Path(__file__).with_name(self.lock).read_text(encoding="utf-8")
 
     def dir(self):
         return VOICE_DIR / self.folder
@@ -1140,11 +1195,6 @@ class _Worker(Engine):
         # the worker, plus _words: the job hands the worker the words it phonemizes
         return _WORKER + inspect.getsource(_words) + inspect.getsource(_word_spans)
 
-    def _file_id(self, p):
-        with open(p, "rb") as f:
-            h = hashlib.file_digest(f, "sha256").hexdigest()[:16]
-        return f"{p.name}:{p.stat().st_size}:{h}"
-
     def run(self, job):
         """Write the worker and its job into a temp folder, run it, and return its out.json."""
         with tempfile.TemporaryDirectory() as tmp:
@@ -1153,11 +1203,9 @@ class _Worker(Engine):
             jp.write_text(
                 json.dumps(job | {"out": str(Path(tmp, "out.json"))}), encoding="utf-8"
             )
-            cmd = ["uv", "run", "--no-project", "--python", self.python]
-            for p in self.packages:
-                cmd += ["--with", p]
+            env = envs.side(Path(__file__).with_name(self.lock), self.python)
             r = subprocess.run(
-                cmd + ["python", str(py), str(jp)],
+                [str(env), str(py), str(jp)],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -1185,6 +1233,70 @@ class _Worker(Engine):
 # Kokoro voice name's first letter: the espeak-ng language its words are phonemized in (hexgrad/Kokoro-82M VOICES.md
 # names a American, b British, h Hindi). Other languages Kokoro has are not wired or tested here.
 KOKORO_LANGS = {"a": "en-us", "b": "en-gb", "h": "hi"}
+# The files kokoro-ts may load: the export at this commit, (bytes, sha256) by path in the voice folder, read from
+# the Hugging Face API on 2026-11-16 (the LFS oid of each file is its sha256). Every cached file here matched (the
+# fp32 model and 20 voices). A file that is not listed, or not of its size and sha256, is refused (model_id).
+KOKORO_REPO = "onnx-community/Kokoro-82M-v1.0-ONNX-timestamped"
+KOKORO_COMMIT = "dd4401a9add81ac692d20e240d22ec9dda82cc29"
+KOKORO_FILES = {
+    "onnx/model.onnx": (325532171, "651ea8291843a92276a4a003581a215cb07d15e47dde6fcfb1b768f9a1682054"),
+    "onnx/model_fp16.onnx": (163232776, "220724d5c5e0cc01be30f38faa6cf0c895a7cde6e7773e91db2973c8c7e5123c"),
+    "voices/af.bin": (524288, "a4f11d9d055a12bfa0db2668a3e4f0ef8fd1f1ccca69494479718e44dbf9e41a"),
+    "voices/af_alloy.bin": (522240, "c4a6b876047fd7fb472edf4ebd63cfac7c3b958a7cae7c106e8f038ca6308c45"),
+    "voices/af_aoede.bin": (522240, "4a004c33430762e2461eedb2013fad808ef4ab3121f5300f554476caf58d8361"),
+    "voices/af_bella.bin": (522240, "f69d836209b78eb8c66e75e3cda491e26ea838a3674257e9d4e5703cbaf55c8b"),
+    "voices/af_heart.bin": (522240, "d583ccff3cdca2f7fae535cb998ac07e9fcb90f09737b9a41fa2734ec44a8f0b"),
+    "voices/af_jessica.bin": (522240, "a240a5e3c15b43563d6e923bdca8ef5613a23471d9b77653694012435df23bd8"),
+    "voices/af_kore.bin": (522240, "9be5221b6a941c04b561959b8ff0b06e809444dcc4ab7e75a7b23606f691819e"),
+    "voices/af_nicole.bin": (522240, "cd2191ab31b914ed7b318416b0e4440fdf392ddad9106a060819aa600a64f59a"),
+    "voices/af_nova.bin": (522240, "18778272caa0d0eebaea251c35fd635f038434f9eee5e691d02a174bd328414f"),
+    "voices/af_river.bin": (522240, "00a2bcf82b1d86e8f19902ede58c65ccf6c0e43b44b7d74fad54e5d8933c9c30"),
+    "voices/af_sarah.bin": (522240, "4409fbc125afabacc615d94db5398d847006a737b0247d6892b7a9a0007a2f0a"),
+    "voices/af_sky.bin": (522240, "4435255c9744f3f31659e0d714ab7689bf65d9e77ec1cce060f083912614f0b9"),
+    "voices/am_adam.bin": (522240, "162b035ed91cfc48b6046982184c645f72edcdd1b82843347f605d7bf7b15716"),
+    "voices/am_echo.bin": (522240, "3968b92c3c4cd1c4416dbded36c13eaa388a90d5788d02a13e4d781f5f8cf3c3"),
+    "voices/am_eric.bin": (522240, "e8b5be17edd1e3636901ce7598baafe2dc8dd8ff707a0c23bf9e461add7e2832"),
+    "voices/am_fenrir.bin": (522240, "c27989f741f7ee34d273a39d8a595cc0837d35f5ced9a29b7cc162614616df43"),
+    "voices/am_liam.bin": (522240, "52403be32fd047c6a44517cb0bcd6b134f2a18baa73e70ef41651e0eab921ade"),
+    "voices/am_michael.bin": (522240, "1d1f21dd8da39c30705cd4c75d039d265e9bc4a2a93ed09bc9e1b1225eb95ba1"),
+    "voices/am_onyx.bin": (522240, "da5d135b424164916d75a68ffb4c2abce3d7d5ccc82dd1ee6cf447ce286145e6"),
+    "voices/am_puck.bin": (522240, "fcf73c989033e9233e0b98713eca600c8c74dcc1614b37009d5450ff4a2274a0"),
+    "voices/am_santa.bin": (522240, "61150cf726ab6c5ed7a99f90a304f91f5a72c00c592e89ec94e5df11c319227a"),
+    "voices/bf_alice.bin": (522240, "08afa6ba24da61ea5e8efa139e5aadc938d83f0a6da5a900adaf763ac1da5573"),
+    "voices/bf_emma.bin": (522240, "669fe0647f9dd04fcab92f1439a40eeb4c8b4ab1f82e4996fe3d918ce4a63b73"),
+    "voices/bf_isabella.bin": (522240, "3754352c4aaa46d17f27654ab7518d65b62ad6163a0f55a5f4330c2da2c4e94f"),
+    "voices/bf_lily.bin": (522240, "5e0ee32ebe64a467124976b14e69590746f1c4ce41a12b587a50c862edfea335"),
+    "voices/bm_daniel.bin": (522240, "6b3194bbceffb746733cbc22c8f593dd44e401a71d53895a2dca891bc595a1e8"),
+    "voices/bm_fable.bin": (522240, "f889083196807b4adb15e9204252165f503b8d33d3982e681c52443c49d798f1"),
+    "voices/bm_george.bin": (522240, "c4b235a4c1f2cd3b939fed08b899ce9385638b763f7b73a59616c4fc9bd6c9bc"),
+    "voices/bm_lewis.bin": (522240, "b8f671cef828c30e66fdf0b0756a76bba58f6bb3398cbbf27058642acbcedb97"),
+    "voices/ef_dora.bin": (522240, "f66ec66bd295acb18372e37008533a9a3228483ccd294e7538d5d9294ac9a532"),
+    "voices/em_alex.bin": (522240, "27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95"),
+    "voices/em_santa.bin": (522240, "ad43b774e1ca24d05c6161297d8aeb770ac3d29bb95daf516727af5f7d543683"),
+    "voices/ff_siwis.bin": (522240, "a35f5675ad08948e326ae75fd0ea16ba5d0042e4f76b5f3d1df77d0a48c54861"),
+    "voices/hf_alpha.bin": (522240, "040be6a4425411cc01fda5fd06693c76bfa78572632852bc8cda9c99232ffb56"),
+    "voices/hf_beta.bin": (522240, "cd83ae0bb9b2e4e4fb92b4973bd8d1822ca0036d3c498bf4fc89aa8e33917cc7"),
+    "voices/hm_omega.bin": (522240, "b02d9222d9ed00ce26b302173a862c2c93f96cc40b5c422b8d14910b9ff34137"),
+    "voices/hm_psi.bin": (522240, "644daf88ba8aeb7bd08950bbdcd4453bb280864e49dc4df93fabc6be32e03f37"),
+    "voices/if_sara.bin": (522240, "409b69248798fcdc2542330c76953d230710f19b057e59cb82fdc3c4cf71265c"),
+    "voices/im_nicola.bin": (522240, "bc578e510d52a96d6940d46f12e96d7b3df00905dbea075113226d100e6e1ab0"),
+    "voices/jf_alpha.bin": (522240, "56b479360aad9f367aeb8cef908f9201cf48b4555e488c5f4590c9dfcd978bb6"),
+    "voices/jf_gongitsune.bin": (522240, "0f1181f3772d27b7c12aaf4bcd71e31b186c4146e330d074a3dc64ee392af396"),
+    "voices/jf_nezumi.bin": (522240, "13cb71eebb0b48739d444558322aa35a8c9a489b80e1e631f14d2e6aea93026b"),
+    "voices/jf_tebukuro.bin": (522240, "29c6c0561b4288d59639677bebe7533c919743d5ea68d0d2ae992644beea6696"),
+    "voices/jm_kumo.bin": (522240, "09e959d239724c734d65661f06f14cdabcddfd476bfaaad905a937099ae9e64f"),
+    "voices/pf_dora.bin": (522240, "3da7b5b2d91847ebf5646f57631af6ececae3c29a89cd300f06edf9aa6cfe9ee"),
+    "voices/pm_alex.bin": (522240, "0175c753f59c54e7fd5a995bedef0c5ff2fb67e0043dd3dcb2ae74ec2acbeb2a"),
+    "voices/pm_santa.bin": (522240, "8b012db3185778afe2e45a62cbad69db73021774fe68dda634bcc748a982eede"),
+    "voices/zf_xiaobei.bin": (522240, "5dde6e1c9c4f12c8b327bc29c0cee361a23b52b952c04636858ba637ec66e640"),
+    "voices/zf_xiaoni.bin": (522240, "08892b62a39af0a615cd0581238db7e19e44c578e8fa0bfd0e586e93327d9cba"),
+    "voices/zf_xiaoxiao.bin": (522240, "03adb5d5e3ddd88b047954e974e651cb0a4b524c985057e5d872e962c7be1169"),
+    "voices/zf_xiaoyi.bin": (522240, "bc1555c5c486099196ac254bae5e0bb543c121952a3092f50b7d8724f1bc36b3"),
+    "voices/zm_yunjian.bin": (522240, "de48a00bdbf3649f07162269a2b6e0513604389bfac8a2e6c75cb34b323ad6fa"),
+    "voices/zm_yunxi.bin": (522240, "7243892fb4e560d47014090ddf010f8b8b790f3c6b029ff82b2ac06aa4e27c8b"),
+    "voices/zm_yunxia.bin": (522240, "6b2b8fc15b3df19a368daebe5c581c7fabf433ee5b8a17ffd6b3d723cff8936d"),
+    "voices/zm_yunyang.bin": (522240, "261e2c89470534dbbcb8fd98b8fdc495ec94063d9bb6c8277f7be43cccba3f42"),
+}  # fmt: skip
 
 
 class KokoroTs(_Worker):
@@ -1198,20 +1310,15 @@ class KokoroTs(_Worker):
     folder = "kokoro-82m-v1.0-onnx-timestamped"
     # kokoro-onnx 0.6.1 declares requires-python <3.14, so it gets a side 3.13 environment
     python = "3.13"
-    # every package that changes the sound or the phonemes, pinned (espeak-ng comes in espeakng-loader)
-    packages = (
-        "kokoro-onnx==0.6.1",
-        "onnxruntime==1.31.1",
-        "phonemizer==3.4.0",
-        "espeakng-loader==0.2.4",
-        "numpy==2.5.4",
-    )
+    # every package that changes the sound or the phonemes, pinned in requirements-kokoro.in and locked
+    lock = "requirements-kokoro.txt"
     needs = (
-        "Python 3.13 (uv fetches it) with kokoro-onnx 0.6.1, onnxruntime 1.31.1, phonemizer 3.4.0 and espeakng-loader "
-        "0.2.4 (about 40 MB of wheels, fetched by uv on first use), and from "
-        "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX-timestamped (Apache-2.0): onnx/model.onnx (fp32, "
+        "Python 3.13 (uv fetches it) with kokoro-onnx, onnxruntime, phonemizer and espeakng-loader as "
+        "requirements-kokoro.txt pins them (about 40 MB of wheels, checked against its sha256 on first use), and from "
+        f"https://huggingface.co/{KOKORO_REPO} at commit {KOKORO_COMMIT[:8]} (Apache-2.0): onnx/model.onnx (fp32, "
         "325.5 MB; or onnx/model_fp16.onnx, 163.2 MB, which can turn out NaN) plus voices/<name>.bin (0.5 MB each), "
-        f"into {VOICE_DIR / 'kokoro-82m-v1.0-onnx-timestamped'} keeping the onnx/ and voices/ folders"
+        f"into {VOICE_DIR / 'kokoro-82m-v1.0-onnx-timestamped'} keeping the onnx/ and voices/ folders, each of the "
+        "size and sha256 KOKORO_FILES pins"
     )
 
     def _model(self):
@@ -1243,8 +1350,29 @@ class KokoroTs(_Worker):
     def lang(self, voice):
         return KOKORO_LANGS.get(voice[:1])
 
+    def _pinned(self, p):
+        """name:bytes:sha256[:16] of p once its size and sha256 are the ones KOKORO_FILES pins; ValueError naming it
+        otherwise."""
+        rel = p.relative_to(self.dir()).as_posix()
+        if rel not in KOKORO_FILES:
+            raise ValueError(
+                f"kokoro-ts: {p} is not a file of {KOKORO_REPO} at {KOKORO_COMMIT[:8]} (KOKORO_FILES), so it is not "
+                f"loaded"
+            )
+        size, sha = KOKORO_FILES[rel]
+        with open(p, "rb") as f:
+            got = hashlib.file_digest(f, "sha256").hexdigest()
+        if (p.stat().st_size, got) != (size, sha):
+            raise ValueError(
+                f"kokoro-ts: {p} is {p.stat().st_size} bytes, sha256 {got[:12]}; the pinned file is {size} bytes, "
+                f"sha256 {sha[:12]}: delete it and download https://huggingface.co/{KOKORO_REPO}/resolve/"
+                f"{KOKORO_COMMIT}/{rel} again"
+            )
+        return f"{p.name}:{size}:{got[:16]}"
+
     def model_id(self, voice):
-        return f"{self._file_id(self._model())} {self._file_id(self.dir() / 'voices' / f'{voice}.bin')}"
+        """The model and the voice file, each refused unless it is the pinned file (model_id runs before synth)."""
+        return f"{self._pinned(self._model())} {self._pinned(self.dir() / 'voices' / f'{voice}.bin')}"
 
     def synth(self, texts, voice, speed, paths):
         if not 0.5 <= speed <= 2.0:
@@ -1337,7 +1465,7 @@ Unregister-Event -SourceIdentifier zdone
 $s.Dispose()
 """
 
-_WORKER = r'''# voice_worker.py : written and run by zoetrope voice.py inside uv run --no-project --with <engine packages>
+_WORKER = r'''# voice_worker.py : written and run by zoetrope voice.py in the environment envs.side built from the engine's lock
 # One job file in; one WAV per line plus out.json out.
 import json
 import sys

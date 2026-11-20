@@ -33,6 +33,16 @@ Hand-off: the first 3D frame is a plane textured with the exact last footage fra
 ## Build notes
 The build used five public-domain archive films. We cannot download or license footage: use the user's own clips or generated stills graded to the palette with grain. Keep narration at least 6.5 dB over the bed. Use only a vision and concept word the user supplied.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.captions(style="karaoke", words="narration/narration.json")` for the definition words that light up as spoken and the "the bell / the call / the memo" captions; `blocks_text.notification(title, body, ...)` for the 96 swirling chips in the storm (a generic card, icon tile of 1 to 2 characters, never a real app's mark).
+- **Backgrounds and effects:** `blocks_fx.vignette(img, strength=...)` on the graded archive shots.
+- **Transitions and camera:** `blocks_fx.push_in(img, k)` for the dolly into the mark's face.
+- **Helpers:** `footage.Clip(name, fit="cover", mode="hold")` for each archive shot the user supplied (`python footage.py prepare all` first); `engine.motion_blur` on the vortex and the slam, fast moves only.
+- **Gates:** put the palette, the Nunito fonts and the logo file in `brand.json` and run `python brand.py check` (the plum on cream and coral pairs go in `pairs`); the archive cuts are seams for Q1106, so keep one main direction through the montage.
+
 ## Pitfalls (from what went wrong in our build)
 - Vision wall opened very close and dark (34.9 to 35.8 s) and read as a dip: light some windows from frame 0.
 - Three narration lines first sat at or below 0 dB over the bed: deepen the duck.

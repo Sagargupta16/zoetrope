@@ -4,7 +4,8 @@ True 3D for a video, kept apart from the 2D engine. Blender renders the 3D pictu
 
 ## What it needs
 
-- **Blender as a Python module**: `python plate3d.py fetch` once per machine (bpy 5.2.3 LTS, 324 MB, GPL-3.0-or-later, into the uv cache; nothing is installed globally). `python plate3d.py missing` says whether it is there, and `setup.sh` prints the same as a note.
+- **Blender as a Python module**: `python plate3d.py fetch` once per machine (bpy 5.2.4 LTS on 2026-11-16, 324 MB, GPL-3.0-or-later, into its own venv in `~/.cache/zoetrope/envs/`; nothing is installed globally). `python plate3d.py missing` says whether it is there, and `setup.sh` prints the same as a note.
+- **The pin** is set in `engine/requirements-bpy.in`, and the environment runs the lock compiled from it, `requirements-bpy.txt`, which pins every package bpy pulls in (the compile command is at the top of the `.in`). `envs.py` builds the environment from it with `uv pip install --require-hashes` (each wheel checked against its sha256) into `~/.cache/zoetrope/envs/`, where `fetch` puts Blender. The lock is part of every plate's key, so a new pin makes every plate stale, and `missing` asks for a fetch again.
 - **A GPU** for a sensible wait. Measured on an RTX 4070 Laptop (OptiX), 1920x1080: proof quality 0.42 s a frame (396 frames in 168 s), final quality 2.6 to 3.0 s a frame over a whole plate (17 to 20 minutes for 396 frames; a single still takes 3.3 to 3.6 s, the first one more). Without a GPU Cycles falls back to the CPU and is many times slower: say so before starting.
 - Nothing else is downloaded. Every shape is built in code; we bring in no models, textures or HDRIs.
 
@@ -27,7 +28,7 @@ True 3D for a video, kept apart from the 2D engine. Blender renders the 3D pictu
 4. **Final plate.** `python plate3d.py render stage.py` (no `--quality`). Run it in the background: a 16.5 s film at 24 fps is about 20 minutes. A stopped render picks up where it stopped.
 5. **Full.** `python run_all.py full --fps N`, then the final review.
 
-`run_all.py proof` and `full` ask `plate3d.check()` before they draw, and stop with a `PLATE:` line and the command that clears it when a plate that `scenes.py` names is not rendered, is being rendered, is older than its stage script (or `beats.py`, or `stage3d.py`), has a frame missing, or, for `full`, is still of proof quality. Plates under other names (stills to look at) are left alone. A draft plate cannot reach a delivered file. `python plate3d.py info` lists the plates of a build.
+`run_all.py proof` and `full` ask `plate3d.check()` before they draw, and stop with a `PLATE:` line and the command that clears it when a plate that `scenes.py` names is not rendered, is being rendered, is older than its stage script (or `beats.py`, `stage3d.py`, or the Blender lock), has a frame missing, or, for `full`, is still of proof quality, and when `scenes.py` names a plate in a way the check cannot read (the rule below). Plates under other names (stills to look at) are left alone. A draft plate cannot reach a delivered file. `python plate3d.py info` lists the plates of a build.
 
 ## stage3d.py
 
@@ -52,6 +53,7 @@ Units are metres and Z is up. A character faces -Y, toward a camera at negative 
 
 - **pose(t) is pure.** It sets everything for time t from t alone, as `draw(t)` does. No state from the frame before, no clock, no unseeded random. Any frame then renders alone and a stopped render resumes.
 - **A plate is rendered once.** Rendering the same frame again gives the same picture but not the same bytes: three frames of the pilot rendered twice differed by 0.11 of 255 on average and 9 at most (the GPU path tracer and the denoiser are not bit-exact). To the eye that is nothing; to the approval it is a changed frame (Q1301). So never render an approved plate again unless the stage changed, and expect a re-review of every scene when it does.
+- **A plate's name can be read.** `check()` reads which plates a build draws from the source of `scenes.py`, without running it. Name each plate with a string (`plate3d.Plate("main")`), or with a module-level constant set once (`NAME = "main"`, then `Plate(NAME)`); `from plate3d import Plate as P` and `import plate3d as p` are read too. A name made any other way (an f-string, an argument, `**kw`, a constant set twice) or `Plate` used without a call (`P = plate3d.Plate`) stops the run with a `PLATE: scenes.py:<line>` line, in place of passing a plate the check cannot see. A name is one folder inside `plates/` (`main`, `look`), never a path: `render`, `check` and `Plate()` refuse `../x`.
 - **One render per plate.** `render` holds `plates/<name>/render.lock` while it writes, and a second render of that plate is refused; a frame is written beside its place and moved in when whole, so a killed render leaves no half frame. `--stills` on a plate that is already complete replaces nothing unless the stage or the quality changed, and then it replaces everything: use `--name look` for stills of another quality.
 - **One timeline.** Every time in `stage.py` comes from `beats.py`. A landing is `S3.jump(t, B.LAND, air)` so the feet meet the floor on the frame the thud is on, and the same constant is a `CUES` entry and a placed sound.
 - **Moments sit on frames.** At 24 fps every time in `beats.py` is a multiple of 1/24 s (Q904 notes one that is not).
@@ -76,9 +78,15 @@ Units are metres and Z is up. A character faces -Y, toward a camera at negative 
 - **The same pose crosses a cut.** End a scene in the pose the next one starts in, or bring the arm down before the cut.
 - **Leave room for the caption.** Decide where each line sits before placing the camera: the pilot kept the top left wall empty for two lines and the right two thirds for the end card.
 
+## Moving 2D clips
+
+A plate is a still render per frame. For a moving picture that is not 3D (a rain loop, a short image-to-video clip the parent session made, or a licensed file), `footage.Clip("rain", fit="cover", mode="loop")` at module level and `CLIP.frame(t)` in `draw(t)` play it frame-exact, with the same rules as a plate: the parent makes it, the builder fetches nothing, `run_all.py` stops with `CLIP:` lines when the decode is missing or stale, and the text over it is the engine's. Steps, modes and the licence line are in `image-plates.md`. A scene can use both.
+
+`engine.motion_blur` does not blur either. `Plate.frame(t)` and `Clip.frame(t)` return a whole rendered or decoded frame chosen by `floor(t * fps)`, so the sub-frame samples of `motion_blur(draw, t)` return that same frame, or at the edge of the shutter the frame before it: nothing in between is rendered, and the plate's own motion is not smoothed. Blur only what `scenes.py` itself moves over the plate.
+
 ## What it cannot do yet
 
-- Motion blur (each frame is posed and rendered alone), hair, cloth or fluid.
+- Motion blur in the plate (each frame is posed and rendered alone), hair, cloth or fluid.
 - Models, textures or HDRIs from outside: we download nothing, so the look is built shapes, soft light and clean colour.
 - A character beyond `Buddy`: a new one is new rig code in the stage script. Keep it to rounded shapes and tubes.
 - Speed for long pieces: a 60 s film at 30 fps is 1,800 frames, about 1 h 20 min to 1 h 30 min of final render on the machine above. Offer 24 fps, a shorter cut, or a plate on twos.
@@ -87,12 +95,14 @@ Units are metres and Z is up. A character faces -Y, toward a camera at negative 
 
 | Symptom | Cause and fix |
 |---|---|
-| `PLATE: plates/main is older than stage.py` | The stage, `beats.py`, `stage3d.py` or another local module it imports changed after the render: run the command the line gives. A font or data file the stage reads is not watched: render again yourself after changing one |
+| `PLATE: plates/main is older than stage.py` | The stage, `beats.py`, `stage3d.py` or another local module it imports changed after the render, or the Blender lock `requirements-bpy.txt` did (a new pin): run the command the line gives. A font or data file the stage reads is not watched: render again yourself after changing one |
+| `PLATE: scenes.py:<line> ... cannot read` or `... without calling it` | `scenes.py` names a plate in a way the check cannot read from the source: give the name as a string or a module-level constant set once (the rule above) |
+| `'../x' is not a plate name` | A `--name` or `Plate()` name with a path in it: use one folder name inside `plates/` |
 | `PLATE: plates/main is being rendered` | A render holds `render.lock`. If none is running (it was killed), delete that file and render again: it resumes |
 | `PLATE: plates/main lacks N of M frames` | A stills render or a stopped one: run the command the line gives |
 | A traceback ending `plates/main has no plate.json` | Nothing has been rendered for this build yet: `python plate3d.py render stage.py --quality proof` |
-| `not ready: Blender as a Python module` | `python plate3d.py fetch` (324 MB, once) |
-| The render re-downloads Blender | The uv cache was cleaned; the fetch note in `~/.cache/zoetrope/blender/` only says it once imported here. Let it download |
+| `not ready: Blender as a Python module` | `python plate3d.py fetch` (324 MB, once): its venv in `~/.cache/zoetrope/envs/` is missing (removed, or a new lock), or the fetch note in `~/.cache/zoetrope/blender/` is |
+| `not ready: uv pip install failed ... Hash mismatch for bpy==...` | The downloaded wheel is not the file `requirements-bpy.txt` recorded: never edit the hash to match; nothing was installed |
 | `ModuleNotFoundError: bmesh` | Something imported before `bpy`: Blender's other modules exist only after it |
 | A frame file appears in `C:\plates` | A relative path reached Blender, which reads it from the drive root. `stage3d.run` resolves `--out`; do the same for any path you pass it |
 | Device `CPU` in `plate.json` | No GPU backend was found: the render is right but slow |

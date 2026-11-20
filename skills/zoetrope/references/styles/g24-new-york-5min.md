@@ -44,6 +44,16 @@ Voice: one TTS call per sentence, male English voice, rate +4% in the build (voi
 - Include a "home angle" device (size-bar comparison, time-difference card, "just like at home" tap-to-pay) in 3 or 4 chapters to make it personal.
 - A 60 to 90 s cut: keep the cold open, 3 chapters, and the end title.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.captions(words="narration/narration.json", style="highlight", max_w=1544, accent=...)` with the taxi yellow as `accent`, for the one-line caption with the spoken word lit; `blocks_text.lower_third(name, role, style="side_rule")` for a chapter title with its one-line fact; `blocks_text.end_card(title="See you in {city}")` for the end title. Caption words are reading-hold records, so keep each page on screen as long as its words are spoken.
+- **Data:** `blocks_data.bar_race(..., decimals=1)` for the size-bar comparison with the viewer's home park (two rows, so `decimals=1` keeps two close values apart; hold the first and last key 1 s); `blocks_data.counter(..., t0=...)` for the resident count.
+- **Transitions and camera:** `blocks_fx.push_in(img, k, scale=1.2)` for the Ken Burns on a still. The card allows cuts and 0.1 to 0.6 s fades only, so none of `FX_MENU` is used.
+- **Helpers:** `footage.Clip(name, fit="cover", mode="hold", start=...)` for each clip the user owns, one per shot (`python footage.py prepare all` first).
+- **Gates:** write `quiz.json` (Q210) from the facts list so every claim is on a frame or in a line; chapter cuts are seams for Q1106 (the card cuts 0.5 s before the first spoken line: keep the motion of the shots on one axis across it); one voice, so no per-line voice.
+
 ## Pitfalls (from what went wrong in our build)
 - Picture-to-word sync was approximate: shots chosen from low-resolution previews; some lines played over a related view, not the exact place named. Check each shot against its line at full size.
 - Titles were hard to read over bright night footage: add a dark radial pool and heavier text shadow.

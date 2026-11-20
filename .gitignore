@@ -1,6 +1,8 @@
 __pycache__/
 *.pyc
 .ruff_cache/
+# envs.py builds a working folder's .venv; never one in the skill's engine/, which cp -r would copy everywhere
+.venv/
 
 # Every video and its working folder lives under outputs/, which is never committed
 outputs/

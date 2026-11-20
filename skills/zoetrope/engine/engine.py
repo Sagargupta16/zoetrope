@@ -81,6 +81,92 @@ def ease_out_back(k, s=1.70158):
     return 1 + (s + 1) * (k - 1) ** 3 + s * (k - 1) ** 2
 
 
+# More easings. Each clamps k to 0..1 first. All map 0 -> 0 and 1 -> 1 except there_and_back and wiggle, which come
+# back to 0 at k = 1.
+
+
+def ease_in_quad(k):
+    k = clamp(k)
+    return k * k
+
+
+def ease_out_quad(k):
+    k = clamp(k)
+    return 1 - (1 - k) * (1 - k)
+
+
+def ease_in_out_quad(k):
+    k = clamp(k)
+    return 2 * k * k if k < 0.5 else 1 - (-2 * k + 2) ** 2 / 2
+
+
+def ease_in_out_sine(k):
+    return (1 - math.cos(math.pi * clamp(k))) / 2
+
+
+def ease_in_out_expo(k):
+    k = clamp(k)
+    if k <= 0 or k >= 1:
+        return k
+    return 2 ** (20 * k - 10) / 2 if k < 0.5 else (2 - 2 ** (-20 * k + 10)) / 2
+
+
+def ease_out_elastic(k):
+    """0 -> 1 with a springy overshoot that rings out (the closed form, not spring()); exactly 1 at k = 1."""
+    k = clamp(k)
+    if k <= 0 or k >= 1:
+        return k
+    return 2 ** (-10 * k) * math.sin((10 * k - 0.75) * (2 * math.pi / 3)) + 1
+
+
+def ease_out_bounce(k):
+    """0 -> 1 like a ball dropped on the floor: four bounces, never over 1."""
+    k = clamp(k)
+    n, d = 7.5625, 2.75
+    if k < 1 / d:
+        return n * k * k
+    if k < 2 / d:
+        k -= 1.5 / d
+        return n * k * k + 0.75
+    if k < 2.5 / d:
+        k -= 2.25 / d
+        return n * k * k + 0.9375
+    k -= 2.625 / d
+    return n * k * k + 0.984375
+
+
+def smoothstep(k):
+    k = clamp(k)
+    return k * k * (3 - 2 * k)
+
+
+def smootherstep(k):
+    """smoothstep with zero first and second slope at both ends (Perlin's 6k^5 - 15k^4 + 10k^3)."""
+    k = clamp(k)
+    return k * k * k * (k * (6 * k - 15) + 10)
+
+
+def rush_into(k):
+    """0 -> 1, starts slow and arrives fast (Manim's rush_into): the first half of a smoothstep, stretched."""
+    return 2 * smoothstep(clamp(k) / 2)
+
+
+def rush_from(k):
+    """0 -> 1, leaves fast and lands slow (Manim's rush_from): the second half of a smoothstep, stretched."""
+    return 2 * smoothstep((clamp(k) + 1) / 2) - 1
+
+
+def there_and_back(k):
+    """0 at k = 0, 1 at k = 0.5, 0 again at k = 1, smooth at the top (Manim's there_and_back). Returns to 0."""
+    k = clamp(k)
+    return smoothstep(2 * k if k < 0.5 else 2 * (1 - k))
+
+
+def wiggle(k, wiggles=2):
+    """there_and_back(k) * sin(wiggles * pi * k): shakes `wiggles` times and settles back at 0 at both ends."""
+    return there_and_back(k) * math.sin(wiggles * math.pi * clamp(k))
+
+
 def spring(t, stiffness=100, damping=10, mass=1):
     """0 -> 1 position of a spring t seconds after release, from rest: Remotion's spring() with the same defaults,
     closed form. Damping under 2 * sqrt(stiffness * mass) overshoots, then settles; at or over it the spring moves
@@ -134,18 +220,20 @@ def font(size, bold=True):
     if key not in _fc and isinstance(bold, str):
         _fc[key] = fonts.load(bold, int(size), SS)
     if key not in _fc:
+        bad = None  # the last file that exists but would not load, and why
         for p in FONT_BOLD if bold else FONT_REG:
             if os.path.exists(p):
                 try:
                     _fc[key] = ImageFont.truetype(p, int(size))
                     break
-                except Exception:
-                    pass
+                except OSError as e:
+                    bad = (p, e)
         else:
+            why = f" ({bad[0]} exists but would not load: {bad[1]})" if bad else ""
             raise FileNotFoundError(
-                f"no font found in {FONT_BOLD if bold else FONT_REG}; {_FONT_HELP} in "
+                f"no font found in {FONT_BOLD if bold else FONT_REG}{why}; {_FONT_HELP} in "
                 f"engine.{'FONT_BOLD' if bold else 'FONT_REG'}"
-            )
+            ) from (bad[1] if bad else None)
     return _fc[key]
 
 
@@ -177,20 +265,175 @@ def rng(*keys):
     return np.random.default_rng(seed)
 
 
+# Gradient noise (Perlin's improved noise), a pure function of its coordinates and seed: no clock, no stream advanced
+# between calls, the same numbers in any process and any order. The lattice permutation comes from rng("noise", seed).
+_GRAD3 = np.array(
+    [(1, 1, 0), (-1, 1, 0), (1, -1, 0), (-1, -1, 0)]
+    + [(1, 0, 1), (-1, 0, 1), (1, 0, -1), (-1, 0, -1)]
+    + [(0, 1, 1), (0, -1, 1), (0, 1, -1), (0, -1, -1)]
+    + [(1, 1, 0), (-1, 1, 0), (0, -1, 1), (0, -1, -1)],
+    dtype=np.float64,
+)
+
+
+def _seed_key(seed):
+    if isinstance(seed, str):
+        return zlib.crc32(seed.encode())
+    if isinstance(seed, (int, np.integer)):
+        return int(seed) & 0xFFFFFFFF
+    raise TypeError(f"noise seed {seed!r}: use an int or a string, never hash()")
+
+
+@lru_cache(maxsize=16)
+def _perm(key):
+    p = rng("noise", key).permutation(256).astype(np.intp)
+    return np.concatenate([p, p])
+
+
+def _fade(t):
+    return t * t * t * (t * (t * 6 - 15) + 10)
+
+
+def noise(x, y=0.0, z=0.0, seed=0):
+    """3D gradient noise in [-1, 1] (clipped; in practice about +-0.9), smooth, 0 at every whole-number lattice point.
+    x, y, z are floats or numpy arrays (broadcast together, so noise(xs[None, :], ys[:, None]) is a 2D field); a
+    float comes back when all three are scalars. seed: an int, or a string (zlib.crc32, never hash()). Use a
+    fractional y or z to walk along x and not sit on lattice lines; one unit of x is about one feature."""
+    p = _perm(_seed_key(seed))
+    x, y, z = np.broadcast_arrays(*(np.asarray(v, dtype=np.float64) for v in (x, y, z)))
+    xf, yf, zf = np.floor(x), np.floor(y), np.floor(z)
+    xi, yi, zi = (a.astype(np.int64) & 255 for a in (xf, yf, zf))
+    fx, fy, fz = x - xf, y - yf, z - zf
+    u, v, w = _fade(fx), _fade(fy), _fade(fz)
+    out = 0.0
+    for cx in (0, 1):
+        for cy in (0, 1):
+            for cz in (0, 1):
+                h = p[p[p[xi + cx] + yi + cy] + zi + cz] & 15
+                g = _GRAD3[h]
+                dot = (
+                    g[..., 0] * (fx - cx)
+                    + g[..., 1] * (fy - cy)
+                    + g[..., 2] * (fz - cz)
+                )
+                wt = (u if cx else 1 - u) * (v if cy else 1 - v) * (w if cz else 1 - w)
+                out = out + wt * dot
+    out = np.clip(out, -1.0, 1.0)
+    return float(out) if out.ndim == 0 else out
+
+
+def fbm(x, y=0.0, z=0.0, octaves=4, seed=0):
+    """Fractal noise in [-1, 1]: `octaves` noise() layers, each at twice the frequency and half the weight of the
+    last (each shifted so the lattice points of the layers do not line up), divided by the total weight."""
+    total, amp, freq, norm = 0.0, 1.0, 1.0, 0.0
+    for o in range(max(1, int(octaves))):
+        s = 31.7 * o
+        total = total + amp * noise(x * freq + s, y * freq + s, z * freq + s, seed)
+        norm += amp
+        amp, freq = amp / 2, freq * 2
+    return total / norm
+
+
+def wobble(t, amp=1.0, hz=1.0, seed=0):
+    """(dx, dy) hand wobble or camera shake at time t: two independent smooth noise tracks, about hz changes of
+    direction a second, each within +-amp. A pure function of t (and seed): add it to a position or an offset."""
+    s = t * hz
+    return (
+        amp * fbm(s, 11.5, 0.5, octaves=2, seed=seed),
+        amp * fbm(s, 53.5, 0.5, octaves=2, seed=seed),
+    )
+
+
 def canvas(color="#000000"):
     return Image.new("RGBA", (W * SS, H * SS), hexrgb(color))
 
 
 def gradient(c1, c2, vertical=True):
+    # a copy: callers draw on it, and the cached one must stay as built
+    return _gradient(c1, c2, vertical, W, H, SS).copy()
+
+
+@lru_cache(
+    maxsize=2
+)  # a full frame each (33 MB at 1080x1920, SS 2): a crossfade's two, no more per worker
+def _gradient(c1, c2, vertical, w, h, ss):
+    """gradient()'s picture for one set of arguments and frame size, built once (about 12 ms at 1920x1080)."""
     a, b = np.array(hexrgb(c1)[:3], float), np.array(hexrgb(c2)[:3], float)
-    n = H * SS if vertical else W * SS
+    n = h * ss if vertical else w * ss
     ramp = (a + (b - a) * np.linspace(0, 1, n)[:, None]).astype(np.uint8)
     arr = (
-        np.repeat(ramp[:, None, :], W * SS, 1)
+        np.repeat(ramp[:, None, :], w * ss, 1)
         if vertical
-        else np.repeat(ramp[None, :, :], H * SS, 0)
+        else np.repeat(ramp[None, :, :], h * ss, 0)
     )
     return Image.fromarray(arr, "RGB").convert("RGBA")
+
+
+# Each element is drawn into a layer and composited. Outside its own box (plus a blur's reach) that layer holds only
+# (0, 0, 0, 0), which alpha_composite leaves as it was, so only that box is blurred and composited and the frame comes
+# out the same pixel for pixel. Text goes into a layer the size of its box. A rounded rectangle is still drawn at its
+# own coordinates, on a frame-sized one-byte mask: Pillow works its corners out in floats from the box and radius, and
+# a radius such as 54.00000000000001 (1080 * 0.05) puts some corner pixels elsewhere once the box is moved (8 of 268
+# fuzz cases, 2026-11-16).
+_MARGIN = 4  # px around a box: what ImageDraw may draw past it (round(), int(), a text mask's fractional start)
+# text boxes and advances, measured as on a layer (an RGBA Draw: the same font mode)
+_MEASURE = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+
+
+def _blur_reach(radius):
+    """How far GaussianBlur(radius) can move a value: three box blurs (Pillow), each at most ceil(radius) px."""
+    return 3 * math.ceil(radius)
+
+
+def _layer_box(img, l, t, r, b, pad):
+    """(x0, y0, x1, y1): the part of img that an element drawn inside (l, t, r, b) and spread pad px can touch,
+    clipped to img and never empty. Each edge is a frame edge or a row or column the element never reaches, and x0
+    and y0 are at most l and t when those are not negative: text moved into a layer of this box keeps the whole and
+    the fractional part of its position, so ImageDraw.text puts the same mask on the same pixels."""
+    x0 = min(max(0, math.floor(l) - pad), img.width - 1)
+    y0 = min(max(0, math.floor(t) - pad), img.height - 1)
+    x1 = max(min(img.width, math.ceil(r) + 1 + pad), x0 + 1)
+    y1 = max(min(img.height, math.ceil(b) + 1 + pad), y0 + 1)
+    return x0, y0, x1, y1
+
+
+def _layer(box):
+    x0, y0, x1, y1 = box
+    return Image.new("RGBA", (x1 - x0, y1 - y0), (0, 0, 0, 0))
+
+
+def _rounded_layer(img, box, r, ink, pad):
+    """(layer, its box): the rounded rectangle rounded_rectangle(box, r, fill=ink) draws on a frame-sized RGBA layer,
+    cut to _layer_box(pad). Drawn on a frame-sized mask at its own coordinates, then ink filled in through it: the
+    mask is 255 or 0, so every pixel is ink or (0, 0, 0, 0), as on the RGBA layer."""
+    m = Image.new("L", img.size, 0)
+    ImageDraw.Draw(m).rounded_rectangle(box, r, fill=255)
+    bx = _layer_box(img, *box, pad)
+    lay = _layer(bx)
+    lay.paste(ink, None, m.crop(bx))
+    return lay, bx
+
+
+def _text_layer_box(img, xy, runs, f, stroke, pad):
+    """_layer_box for text drawn from xy (frame px) as runs [(x, s, anchor)] at height xy[1], with stroke_width
+    stroke and spread pad px: every run's textbbox, and xy and every run's own (x, y), which the layer must not start
+    after. Multiline text starts its layer at the frame's origin: Pillow steps each line down from y in floats."""
+    y = xy[1]
+    boxes = [
+        _MEASURE.textbbox((x, y), s, font=f, anchor=a, stroke_width=stroke)
+        for x, s, a in runs
+    ]
+    boxes += [(x, y, x, y) for x in (xy[0], *(r[0] for r in runs))]
+    if any(("\n" if isinstance(s, str) else b"\n") in s for _, s, _ in runs):
+        boxes.append((0, 0, 0, 0))
+    return _layer_box(
+        img,
+        min(b[0] for b in boxes),
+        min(b[1] for b in boxes),
+        max(b[2] for b in boxes),
+        max(b[3] for b in boxes),
+        pad,
+    )
 
 
 def rrect(img, box, r, fill, alpha=1.0):
@@ -198,21 +441,23 @@ def rrect(img, box, r, fill, alpha=1.0):
     if alpha <= 0:
         return
     x0, y0, x1, y1 = [v * SS for v in box]
-    lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     c = hexrgb(fill) if isinstance(fill, str) else fill
-    ImageDraw.Draw(lay).rounded_rectangle(
-        (x0, y0, x1, y1), r * SS, fill=c[:3] + (int(c[3] * alpha),)
+    lay, bx = _rounded_layer(
+        img, (x0, y0, x1, y1), r * SS, c[:3] + (int(c[3] * alpha),), _MARGIN
     )
-    img.alpha_composite(lay)
+    img.alpha_composite(lay, bx[:2])
 
 
 def shadow(img, box, r, blur=24, dy=12, alpha=0.35):
     x0, y0, x1, y1 = [v * SS for v in box]
-    lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    ImageDraw.Draw(lay).rounded_rectangle(
-        (x0, y0 + dy * SS, x1, y1 + dy * SS), r * SS, fill=(0, 0, 0, int(255 * alpha))
+    lay, bx = _rounded_layer(
+        img,
+        (x0, y0 + dy * SS, x1, y1 + dy * SS),
+        r * SS,
+        (0, 0, 0, int(255 * alpha)),
+        _blur_reach(blur * SS) + _MARGIN,
     )
-    img.alpha_composite(lay.filter(ImageFilter.GaussianBlur(blur * SS)))
+    img.alpha_composite(lay.filter(ImageFilter.GaussianBlur(blur * SS)), bx[:2])
 
 
 def text(
@@ -231,29 +476,26 @@ def text(
     if alpha <= 0:
         return
     f = font(size * scale * SS, bold)
-    lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     c = hexrgb(fill) if isinstance(fill, str) else fill
-    d = ImageDraw.Draw(lay)
+    x, y = xy[0] * SS, xy[1] * SS
+    runs = [(x, s, anchor)]
     if tracking:  # manual letter-spacing, left anchored
-        x = xy[0] * SS
+        runs = []
         for ch in s:
-            d.text(
-                (x, xy[1] * SS),
-                ch,
-                font=f,
-                fill=c[:3] + (int(255 * alpha),),
-                anchor="ls" if anchor[1] == "s" else "la",
-            )
-            x += d.textlength(ch, font=f) + tracking * SS
-    else:
+            runs.append((x, ch, "ls" if anchor[1] == "s" else "la"))
+            x += _MEASURE.textlength(ch, font=f) + tracking * SS
+    bx = _text_layer_box(img, (xy[0] * SS, y), runs, f, 0, _MARGIN)
+    lay = _layer(bx)
+    d = ImageDraw.Draw(lay)
+    for x, part, a in runs:
         d.text(
-            (xy[0] * SS, xy[1] * SS),
-            s,
+            (x - bx[0], y - bx[1]),
+            part,
             font=f,
             fill=c[:3] + (int(255 * alpha),),
-            anchor=anchor,
+            anchor=a,
         )
-    img.alpha_composite(lay)
+    img.alpha_composite(lay, bx[:2])
 
 
 def text_w(s, size, bold=True):
@@ -286,7 +528,7 @@ def text_box(s, xy, size, anchor="la", bold=True, tracking=0):
 def fit_size(s, size, maxw, bold=True, floor=36):
     """Largest size up to `size` at which s fits in maxw px; never below `floor` (cut copy instead of shrinking)."""
     while size > floor and text_w(s, size, bold) > maxw:
-        size -= 2
+        size = max(floor, size - 2)  # the last step stops on floor, never past it
     return size
 
 
@@ -305,18 +547,20 @@ def text_outline(
     """Text with a solid outline (PIL stroke): for game, anime and caption styles over busy pictures."""
     if alpha <= 0:
         return
-    lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     c, o = (hexrgb(v) if isinstance(v, str) else v for v in (fill, outline))
+    x, y, f, sw = xy[0] * SS, xy[1] * SS, font(size * SS, bold), int(width * SS)
+    bx = _text_layer_box(img, (x, y), [(x, s, anchor)], f, sw, _MARGIN)
+    lay = _layer(bx)
     ImageDraw.Draw(lay).text(
-        (xy[0] * SS, xy[1] * SS),
+        (x - bx[0], y - bx[1]),
         s,
-        font=font(size * SS, bold),
+        font=f,
         anchor=anchor,
         fill=c[:3] + (int(255 * alpha),),
-        stroke_width=int(width * SS),
+        stroke_width=sw,
         stroke_fill=o[:3] + (int(255 * alpha),),
     )
-    img.alpha_composite(lay)
+    img.alpha_composite(lay, bx[:2])
 
 
 def text_halo(
@@ -335,18 +579,21 @@ def text_halo(
     """Text over a soft dark halo (blurred thick stroke) so it reads over imagery without a hard box."""
     if alpha <= 0:
         return
-    lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     h = hexrgb(halo) if isinstance(halo, str) else halo
+    x, y, f, sw = xy[0] * SS, xy[1] * SS, font(size * SS, bold), int(radius * SS)
+    pad = _blur_reach(radius * SS * 0.8) + _MARGIN
+    bx = _text_layer_box(img, (x, y), [(x, s, anchor)], f, sw, pad)
+    lay = _layer(bx)
     ImageDraw.Draw(lay).text(
-        (xy[0] * SS, xy[1] * SS),
+        (x - bx[0], y - bx[1]),
         s,
-        font=font(size * SS, bold),
+        font=f,
         anchor=anchor,
         fill=h[:3] + (int(255 * strength * alpha),),
-        stroke_width=int(radius * SS),
+        stroke_width=sw,
         stroke_fill=h[:3] + (int(255 * strength * alpha),),
     )
-    img.alpha_composite(lay.filter(ImageFilter.GaussianBlur(radius * SS * 0.8)))
+    img.alpha_composite(lay.filter(ImageFilter.GaussianBlur(radius * SS * 0.8)), bx[:2])
     text(img, s, xy, size, fill, anchor, alpha, bold)
 
 
@@ -367,6 +614,37 @@ def finish(img):
     if SS > 1:
         img = img.resize((W, H), Image.LANCZOS)
     return img.convert("RGB")
+
+
+def _srgb_tables():
+    """(sRGB byte -> linear light as float32, linear light in 65536 steps -> sRGB byte) for motion_blur."""
+    c = np.arange(256, dtype=np.float64) / 255
+    lin = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+    li = np.arange(65536, dtype=np.float64) / 65535
+    s = np.where(li <= 0.0031308, li * 12.92, 1.055 * li ** (1 / 2.4) - 0.055)
+    return lin.astype(np.float32), np.rint(s * 255).astype(np.uint8)
+
+
+_TO_LIN, _FROM_LIN = _srgb_tables()
+
+
+def motion_blur(draw, t, fps=None, samples=8, shutter=180.0):
+    """The frame at t with motion blur: draw(t + o) averaged over `samples` sub-frame times o, spread evenly across
+    one shutter of shutter/360 of a frame (180 degrees = half a frame, as film) and centred on t, so the blur trails
+    both ways and t is the middle of the exposure. Averaged in linear light, because a plain sRGB mean darkens the
+    edges of a bright shape on a dark ground. draw(t) returns a PIL image; the result is RGB at its size. samples
+    of 1 or less, or a shutter of 0 or less, returns draw(t) itself, untouched. fps defaults to FPS. Cost: `samples`
+    draws per frame, so use 4 to 8 and only for a scene that moves fast (pitfalls.md 15)."""
+    n = int(samples)
+    if n <= 1 or shutter <= 0:
+        return draw(t)
+    span = shutter / 360 / (fps or FPS)
+    acc = None
+    for i in range(n):
+        lin = _TO_LIN[np.asarray(draw(t + ((i + 0.5) / n - 0.5) * span).convert("RGB"))]
+        acc = lin if acc is None else acc + lin
+    idx = np.clip(np.rint(acc * (65535 / n)), 0, 65535).astype(np.intp)
+    return Image.fromarray(_FROM_LIN[idx], "RGB")
 
 
 @lru_cache(maxsize=64)

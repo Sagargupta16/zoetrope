@@ -2,14 +2,14 @@
 
 ## What this plugin is
 
-zoetrope ships one Markdown skill, two subagent definitions, style cards, kits and a Python engine that runs on your machine. The engine draws video frames with Pillow and numpy and calls your local ffmpeg. When you choose them, it also runs offline narration and a speech check in their own uv environments, and Blender for 3D plates. It has no server and makes no network calls of its own: uv downloads the pinned Python packages from PyPI on first use, and fonts, voice and speech models, recorded instruments and Blender are downloaded only when you run their `fetch` command, each pinned and checked by sha256.
+zoetrope ships one Markdown skill, two subagent definitions, style cards, kits and a Python engine that runs on your machine. The engine draws video frames with Pillow and numpy and calls your local ffmpeg. When you choose them, it also runs offline narration and a speech check in their own Python environments, and Blender for 3D plates. It has no server and makes no network calls of its own: uv downloads the pinned Python packages from PyPI on first use, and fonts, voice and speech models, recorded instruments and Blender are downloaded only when you run their `fetch` command. Fonts, the speech model and the instruments are pinned to one commit and checked by sha256 when fetched; the Kokoro voice files are checked against pinned sha256s before every synthesis. The Python environments (the engine's, the narrator's, the speech check's and Blender's) are built from locks that pin every package to an exact version with its sha256: `engine/envs.py` installs each with `uv pip install --require-hashes`, which refuses a wheel whose hash differs. A build runs in its working folder's `.venv`, made that way by `uv run --no-project python envs.py`. A command run with `uv run --with-requirements` where no such `.venv` is found gets the pinned versions without a hash check, since `uv run` does not check them (uv 0.13.8, 2026-11-16).
 
 Realistic concerns:
 
 1. **Generated code runs locally.** For each video the builder agent writes `scenes.py` and a score and runs them with Python in your working folder. A bad or injected instruction could make it run something harmful.
 2. **Skill content** can instruct Claude to run commands. A tampered skill, agent, card or kit could steer Claude toward harmful actions.
 3. **Media parsing.** ffmpeg and Pillow parse every image, video and audio file you hand the skill. Treat files from strangers as untrusted.
-4. **Model files.** Narration and the speech check load model files. Fetch them only with the engine's own `fetch` commands, which check each file's hash.
+4. **Model files.** Narration and the speech check load model files. Fetch the speech model with `qa_speech.py fetch`, which checks each file's hash; Kokoro files are downloaded by hand (`references/voice.md`), and voice.py refuses any whose size or sha256 differs from its pinned table.
 5. **Manifests** (`.claude-plugin/*.json`) could declare unexpected components if the repo were compromised.
 
 ## Reporting a vulnerability

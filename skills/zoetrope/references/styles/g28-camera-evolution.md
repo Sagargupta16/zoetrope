@@ -37,6 +37,17 @@ Each model is a wireframe (boxes, cylinders, rounded prisms) rotating with persp
 - With 30 fps, 450 frames at 1080p is quick on the Mac.
 - A longer cut (20 to 24 s) reads better; recommend it if the user wants readable facts.
 
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults.
+
+- **Text:** `blocks_text.lower_third(name="{title}", role="{one-line fact}", style="kicker", ink=..., bar=..., accent=...)` for the info panel's title and fact in the hologram cyan and amber, if the panel is not hand-drawn.
+- **Data:** `blocks_data.progress_bar(pct, ...)` with `pct = (year - 1820) / 210 * 100` for the 1820 to 2030 rail. Never `counter` for the year: the card slide-swaps years because a roll shows false ones.
+- **Backgrounds and effects:** `blocks_fx.starfield(t, sky=("#03050a", "#03050a"), cool=..., drift=...)` for the drifting dust on the void navy; `blocks_fx.vignette` as the last pass.
+- **Transitions and camera:** `blocks_fx.push_in` for a slow dolly on the platform. Keep `glitch_slices` out: the brief says no fast full-screen flashing.
+- **Helpers:** `engine.there_and_back(k)` for the local brightening on each downbeat's capture snap (0 at both ends, so it never leaves a lit frame).
+- **Gates:** write `quiz.json` (Q210) from the milestone table, one question a year and its fact, so every date is proved on a frame; one milestone a bar means the cuts are seams for Q1106, so keep the models turning the same way across a swap.
+
 ## Pitfalls (from what went wrong in our build)
 - 1.4 s per milestone is fast: year and title read once, the fact line and callouts are fully visible for about 0.8 s. Offer 20 to 24 s.
 - Wireframes are stylized, not accurate replicas (deliberately generic); the 1975 prototype and 2026 phone silhouettes are the least distinctive.

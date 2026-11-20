@@ -1,9 +1,8 @@
 # qa_audiostrip.py : review/audio.png, a picture of the sound for a reviewer who cannot hear (Z20).
 # CLI: `python qa.py audiostrip out.mp4 --scenes . [--out review/audio.png]`; a mix.wav works too (proof stage).
 # Lanes on one time axis, top to bottom: the scenes, a log-frequency spectrogram, the CUES ticks coloured by their
-# measured offset, momentary and short-term loudness with the integrated line, the true peak per 100 ms with every
+# Q902 status, momentary and short-term loudness with the integrated line, the true peak per 100 ms with every
 # frame over -1 dBTP in red, and the proof key sheet's numbered cells.
-import json
 import math
 import re
 import subprocess
@@ -23,6 +22,15 @@ LUFS_LO, LUFS_HI, TP_LO, TP_MAX = -45.0, -5.0, -30.0, -1.0
 BG, PANEL, GRID = (17, 17, 20), (27, 27, 32), (60, 60, 68)
 TEXT, DIM = (228, 228, 232), (150, 150, 160)
 GREEN, AMBER, RED, GREY = (60, 205, 95), (245, 170, 40), (240, 64, 52), (128, 128, 138)
+# cue_status words, in the order the header counts them
+CUE_WORDS = (
+    "within 1 frame",
+    "in the Q902 window",
+    "late",
+    "early",
+    "missing",
+    "not measured",
+)
 M_COL, S_COL, I_COL = (90, 190, 255), (255, 160, 70), (245, 245, 245)
 # magma-like ramp: anchors read off the published magma map at every eighth, linearly interpolated
 MAGMA = [
@@ -169,21 +177,23 @@ def _offsets(ctx):
 
 
 def cue_status(rec, kind, fps):
-    """(colour, word) of one cue's audio from its qa_sync.cue_offsets record (status ok, late, early or missing):
-    green within 1 frame, amber within 100 ms, red missing or further out, grey when not measured (no record, or a
-    picture-only cue)."""
+    """(colour, word) of one cue's audio from the status of its qa_sync.cue_offsets record, the one Q902 judges:
+    green ok (the word says "within 1 frame", or "in the Q902 window" for an ok early sound further out), red late,
+    early or missing, grey when not measured (no record, a picture-only cue, a sound not told from its twins, or one
+    the no-cue-sheet detector did not find). The offset only picks the word, never the colour: a +40 ms FIX and a
+    -35 ms ok were both amber."""
     if rec is None or kind == "picture" or rec.get("source") == "picture":
         return GREY, "not measured"
-    ms = rec.get("audio_ms")
-    if ms is None:
-        return (
-            (RED, "missing")
-            if rec.get("status") == "missing"
-            else (GREY, "not measured")
+    st, ms = rec.get("status"), rec.get("audio_ms")
+    if st == "ok" and ms is not None:
+        return GREEN, (
+            "within 1 frame" if abs(ms) <= 1000 / fps + 1e-6 else "in the Q902 window"
         )
-    if abs(ms) <= 1000 / fps + 1e-6:
-        return GREEN, "within 1 frame"
-    return (AMBER, "within 100 ms") if abs(ms) <= 100 else (RED, "missing")
+    if st in ("late", "early") and rec.get("source") == "onset":
+        return AMBER, st  # the no-cue-sheet detector's Q902 row is a NOTE, a guess
+    if st in ("late", "early", "missing"):
+        return RED, st
+    return GREY, "not measured"
 
 
 def _match(recs, c):
@@ -502,20 +512,19 @@ def strip(ctx, frames, out=C.AUDIO_PNG):
     else:
         sync = (
             "sync: "
-            + ", ".join(
-                f"{counts[w]} {w}"
-                for w in ("within 1 frame", "within 100 ms", "missing", "not measured")
-                if counts.get(w)
-            )
+            + ", ".join(f"{counts[w]} {w}" for w in CUE_WORDS if counts.get(w))
             + f" (of {n_aud} audio cues)"
         )
-    i_ok = L.get("I") is not None and abs(L["I"] + 14) <= 1
+    import qa  # build.json's loudness target (--loudness), else -14
+
+    want = qa.build_loudness(ctx.workdir)
+    i_ok = L.get("I") is not None and abs(L["I"] - want) <= 1
     tp_ok = L.get("peak") is not None and L["peak"] <= TP_MAX
     _segments(
         d,
         (8, 26),
         [
-            (f"I {L.get('I')} LUFS (want -14 +/- 1)", TEXT if i_ok else AMBER),
+            (f"I {L.get('I')} LUFS (want {want:g} +/- 1)", TEXT if i_ok else AMBER),
             (f"   LRA {L.get('LRA')} LU   ", DIM),
             (
                 f"true peak {L.get('peak')} dBTP (want <= -1): {len(over)} of {len(frames)} frames over",
@@ -523,7 +532,11 @@ def strip(ctx, frames, out=C.AUDIO_PNG):
             ),
             (
                 f"   {sync}",
-                TEXT if recs and not counts.get("missing") else AMBER if cues else DIM,
+                TEXT
+                if recs and not any(counts.get(w) for w in ("late", "early", "missing"))
+                else AMBER
+                if cues
+                else DIM,
             ),
         ],
         f_big,
@@ -541,9 +554,8 @@ def strip(ctx, frames, out=C.AUDIO_PNG):
             ("  (M, S at window centres)   ", DIM),
             ("TP over -1 dBTP", RED),
             ("   cue audio: ", DIM),
-            ("within 1 frame", GREEN),
-            ("  within 100 ms", AMBER),
-            ("  missing", RED),
+            ("ok by Q902", GREEN),
+            ("  late, early or missing", RED),
             ("  not measured", GREY),
             (
                 "   * payoff   dashed: scene cut   shaded: transition   numbers: proof_keys.png cells",
@@ -572,20 +584,7 @@ def strip(ctx, frames, out=C.AUDIO_PNG):
 
 def _probe_audio(path):
     """qa.probe's fields for a file with no video stream (mix.wav at the proof stage)."""
-    j = json.loads(
-        subprocess.check_output(
-            [
-                C.ffprobe_of(C.find_ffmpeg() or "ffmpeg"),
-                "-v",
-                "error",
-                "-show_format",
-                "-show_streams",
-                "-of",
-                "json",
-                str(path),
-            ]
-        )
-    )
+    j = C.ffprobe_json(path, "-show_format", "-show_streams")
     a = [s for s in j["streams"] if s["codec_type"] == "audio"]
     return {
         "duration": float(j["format"]["duration"]),

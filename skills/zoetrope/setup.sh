@@ -49,15 +49,31 @@ if [ -z "$pyver" ]; then
   fail=1
 fi
 
-# the engine's own interpreter, run as every build runs it: from the engine folder, on the pin, on requirements.txt
+# the engine's own environment, as envs.py builds every build's .venv: on the pin, from requirements.txt, each wheel
+# checked against its sha256 (uv run --with-requirements does not check them). Kept in ~/.cache/zoetrope/envs, so
+# the skill's engine folder never holds a .venv that cp -r would copy into every working folder
+engine_py=""
+if [ "$fail" -eq 0 ]; then
+  env_out=$(cd "$here/engine" && PYTHONDONTWRITEBYTECODE=1 uv run --no-project --python "$pyver" python envs.py --cache . 2>&1)
+  env_rc=$?
+  env_out=$(printf '%s\n' "$env_out" | tr -d '\r')
+  engine_py=$(printf '%s\n' "$env_out" | sed -n 's/^python //p')
+  if [ "$env_rc" -eq 0 ] && [ -n "$engine_py" ]; then
+    echo "ok   every wheel requirements.txt installs matched its sha256 (engine/envs.py)"
+  else
+    echo "FIX  the engine environment was not built ($(printf '%s\n' "$env_out" | tail -1)) -> a Hash mismatch means a wheel is not the file requirements.txt recorded: never edit the hash to match, find out why; otherwise check network once, or uv python install $pyver, then rerun setup.sh"
+    fail=1
+  fi
+fi
+
+# the engine's own interpreter, run as every build runs it: from the engine folder, in that environment
 engine_python() {
-  (cd "$here/engine" && printf '%s\n' "$1" | PYTHONDONTWRITEBYTECODE=1 uv run --no-project --python "$pyver" \
-    --with-requirements requirements.txt python -)
+  (cd "$here/engine" && printf '%s\n' "$1" | PYTHONDONTWRITEBYTECODE=1 "$engine_py" -)
 }
 
 if [ "$fail" -eq 0 ]; then
-  # first run downloads the pinned wheels into the uv cache; later runs are instant. Each requirements.in pin is
-  # held against what requirements.txt really installs, so the two files cannot drift apart unseen
+  # each requirements.in pin is held against what requirements.txt really installs, so the two files cannot drift
+  # apart unseen (a pin it does not install at all prints MISSING)
   pkg_out=$(engine_python 'import sys
 from importlib import metadata
 import numpy, PIL
@@ -66,18 +82,31 @@ for line in open("requirements.in", encoding="utf-8"):
     pin = line.split("#")[0].strip()
     if "==" in pin:
         name, want = (p.strip() for p in pin.split("==", 1))
-        print("pkg", name.lower(), want, metadata.version(name))' 2>&1 | tr -d '\r')
+        try:
+            have = metadata.version(name)
+        except metadata.PackageNotFoundError:
+            have = "MISSING"
+        print("pkg", name.lower(), want, have)' 2>&1)
+  pkg_rc=$?
+  pkg_out=$(printf '%s\n' "$pkg_out" | tr -d '\r')
   if printf '%s\n' "$pkg_out" | grep -q "^py "; then
     echo "ok   python $(printf '%s\n' "$pkg_out" | sed -n 's/^py //p') (engine/.python-version says $pyver)"
     while read -r name want have; do
       [ -n "$name" ] || continue
-      if [ "$have" = "$want" ]; then
+      if [ "$have" = "MISSING" ]; then
+        echo "FIX  $name is pinned to $want in requirements.in but requirements.txt does not install it -> uv pip compile --universal --generate-hashes requirements.in -o requirements.txt (in engine/)"
+        fail=1
+      elif [ "$have" = "$want" ]; then
         echo "ok   $name $have, equal to its requirements.in pin"
       else
-        echo "FIX  $name $have installs from requirements.txt but requirements.in pins $want -> uv pip compile --generate-hashes requirements.in -o requirements.txt (in engine/)"
+        echo "FIX  $name $have installs from requirements.txt but requirements.in pins $want -> uv pip compile --universal --generate-hashes requirements.in -o requirements.txt (in engine/)"
         fail=1
       fi
     done <<< "$(printf '%s\n' "$pkg_out" | sed -n 's/^pkg //p')"
+    if [ "$pkg_rc" -ne 0 ]; then
+      echo "FIX  the requirements.in pin check stopped with exit $pkg_rc ($(printf '%s\n' "$pkg_out" | tail -1)) -> fix what that line names in engine/requirements.in, then rerun setup.sh"
+      fail=1
+    fi
   else
     echo "FIX  pinned Pillow and numpy did not install on Python $pyver ($(printf '%s\n' "$pkg_out" | tail -1)) -> check network once, or uv python install $pyver, then rerun setup.sh"
     fail=1
@@ -106,7 +135,7 @@ fi
 
 # the free fonts the cards name (engine/fonts.py): a note, not a failure, since a card that names one says so itself
 if [ "$fail" -eq 0 ]; then
-  fonts_out=$(uv run --no-project --with-requirements "$here/engine/requirements.txt" python "$here/engine/fonts.py" list 2>&1)
+  fonts_out=$("$engine_py" "$here/engine/fonts.py" list 2>&1)
   missing=$(printf '%s\n' "$fonts_out" | grep -c "(missing)")
   if ! printf '%s\n' "$fonts_out" | grep -q "^Inter "; then
     echo "NOTE could not list the font cache: $fonts_out"
@@ -120,7 +149,7 @@ fi
 # the speech model (engine/qa_speech.py): a note, since only a narrated build needs it; there Q806 is NOT CHECKED
 # without it, so the build is rejected until it is fetched
 if [ "$fail" -eq 0 ]; then
-  if speech_out=$(uv run --no-project --with-requirements "$here/engine/requirements.txt" python "$here/engine/qa_speech.py" missing 2>&1); then
+  if speech_out=$("$engine_py" "$here/engine/qa_speech.py" missing 2>&1); then
     echo "ok   the speech model for Q806 and Q807 is cached (engine/qa_speech.py)"
   else
     echo "NOTE the speech model is not cached -> python engine/qa_speech.py fetch (147.8 MB, MIT; narrated builds need it)"
@@ -129,7 +158,7 @@ fi
 
 # the recorded instruments (engine/sampler.py): a note, since a score fetches only what it plays
 if [ "$fail" -eq 0 ]; then
-  if uv run --no-project --with-requirements "$here/engine/requirements.txt" python "$here/engine/sampler.py" missing >/dev/null 2>&1; then
+  if "$engine_py" "$here/engine/sampler.py" missing >/dev/null 2>&1; then
     echo "ok   the 14 recorded instruments are cached (engine/sampler.py)"
   else
     echo "NOTE not every recorded instrument is cached -> python engine/sampler.py fetch <names> (all 14: 232.8 MB, CC0)"
@@ -138,7 +167,7 @@ fi
 
 # Blender for 3D plates (engine/plate3d.py): a note, since only a 3D card needs it
 if [ "$fail" -eq 0 ]; then
-  if uv run --no-project --with-requirements "$here/engine/requirements.txt" python "$here/engine/plate3d.py" missing >/dev/null 2>&1; then
+  if "$engine_py" "$here/engine/plate3d.py" missing >/dev/null 2>&1; then
     echo "ok   Blender for 3D plates has been fetched (engine/plate3d.py)"
   else
     echo "NOTE Blender for 3D plates is not fetched -> python engine/plate3d.py fetch (324 MB, GPL-3.0; a 3D card needs it)"

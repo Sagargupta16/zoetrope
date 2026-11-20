@@ -33,11 +33,19 @@ D minor at 60 bpm (bar = 4 s, so every scene boundary is a bar line). Open-fifth
 
 ## Build notes
 - Reduce to 30-45 s: studio card, one token-decode card, starring with threads, title, one crew block, final typed line.
-- Draw each frame on a PIL canvas, crop with black bars to 2.39:1, overlay grain from a pre-generated seeded noise tile shifted per frame.
+- Draw each frame on a PIL canvas, crop with black bars to 2.39:1, add grain last with `grain.grain(img, t)` (seeded tiles, each grain held 2 frames; after the weave, `formats.md`).
 - Particle title: render the title text to a mask, sample points, and interpolate from field positions with ease_out_expo.
 - All names must be made up (studios, director, cast, crew); say so in the delivery note, and note that real people may share them. Probabilities in dropdowns are fictional design, not model measurements. Show no real model or company names.
 - Piano: sum of a few decaying sines with detuned partials; reverb by convolving with a decaying noise IR in numpy (check runtime).
 - Keep the protagonist object (here a cursor) in every section.
+
+## Blocks
+
+The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours and fonts, never the module defaults. The credits are typed, decoded and threaded by hand (the kit has the beam reveal); no text or data block draws them.
+
+- **Backgrounds and effects:** `blocks_fx.vignette(img, strength=0.3, color="#090807")` for the soft edge; `blocks_fx.light_leak(img, t, t0, dur, color=<amber>, strength=0.35)` once or twice at a low strength, never over a credit.
+- **Transitions and camera:** `blocks_fx.push_in(img, k, scale=1.1)` for the 30.8-32.0 s push-in with the riser.
+- **Helpers:** `engine.wobble(t, amp=..., hz=..., seed="weave")` for the gate weave (round it to whole pixels before `grain.grain`); `engine.noise(t * 6, 0.37, seed="flicker")` for the plus or minus 1.8 percent exposure flicker (pass a fractional `y`: it is 0 at whole-number coordinates).
 
 ## Pitfalls (from what went wrong in our build)
 - Overlapping candidate dropdowns on adjacent tokens: stagger or stack them.

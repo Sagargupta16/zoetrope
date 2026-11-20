@@ -91,8 +91,8 @@ carried them.
    and read `review/audio.png` (1600 px wide): a log-frequency spectrogram,
    loudness lanes (momentary, short-term, the integrated line), the true peak
    per 100 ms with every frame over -1 dBTP in red, cue ticks coloured by
-   their measured offset (green within 1 frame, amber within 100 ms, red
-   missing, grey not measured) and the proof cells by number. Check: every
+   their Q902 status (green ok, red late, early or missing, grey not
+   measured) and the proof cells by number. Check: every
    scenario moment with a sound has a tick and a visible onset (a bright
    vertical edge) at it; nothing stacks on a hit (two edges a few px apart);
    no dark hole at a dashed cut unless the scenario plans a stop-down; M is
@@ -108,6 +108,8 @@ carried them.
    1080x1920), so
    `python -c "from PIL import Image; im = Image.open('proof.png'); h = 1161; [im.crop((0, y, im.width, min(im.height, y + h))).save(f'review/proof_row{y // h + 1}.png') for y in range(0, im.height, h)]"`
    pages it.
+   Name every finding by its anchor cell, as `#7 C2: ...` (the number is the proof cell, `C2` the column and row of the grid drawn on it; `proof.anchor_box(cell, size)` maps a cell to pixels).
+   When `quiz.json` is in the folder, answer its questions from the frames alone before you read the Q210 rows: `python qa_quiz.py` prints them without answers. Then compare with the Q210 rows; an answer you could not read off a frame is a finding.
    Then the directing checks (`references/playbook.md` section 5), each a P1
    with its still: the subject under a third of the frame height at a key
    moment, or against an edge; a caption over the subject; two stills in a
@@ -142,7 +144,9 @@ carried them.
    draw(t) drew: back to the builder); a NOT CHECKED row goes under cannot
    verify with its code. The scan NOTEs (Q1101 to Q1104) and the flash rows
    point at moments: open each, as a strip for a pop; a NOTE needs a look,
-   not a fix, unless the look shows a fault.
+   not a fix, unless the look shows a fault. A Q1106 NOTE is a seam: look at
+   the frames either side of the cut and say whether the direction change
+   has a visible cause.
 2. Read the sheets again as at the proof stage: `run_all.py full` redrew
    them with the file's findings, pops and changes. The strips show draw(t),
    so a pop the scans report that is not on its strip came from the render or
@@ -150,10 +154,10 @@ carried them.
 3. Run `python qa.py audiostrip <video> --scenes .` and read
    `review/audio.png` (its numbered ticks are the proof_keys cells). Every
    red TP frame needs a Q802 row, and a Q802 FIX must show red bars; a frame
-   red here but not on the proof strip is the AAC encode's overshoot. An amber
-   tick (more than one frame off, within 100 ms) is a Q902 FIX when the sound
-   is late or more than 40 ms early, a Q902 NOTE when 40 ms early or less; a
-   mark with no row, or a FIX row with no mark, is a P1 R801. Every red or amber cue tick should match a
+   red here but not on the proof strip is the AAC encode's overshoot. A red
+   tick is a Q902 FIX (late past one frame, early past 40 ms, or missing); a
+   green tick can still carry a Q902 NOTE (outside -5 to +15 ms); a
+   mark with no row, or a FIX row with no mark, is a P1 R801. Every red cue tick should match a
    Q902 row (Q902 rows name the cue and its ms; a row from the no-cue-sheet
    detector is a guess); a grey tick on a cue that must sound goes under
    cannot verify. Report what only the picture shows as R801, with the time.

@@ -4,7 +4,7 @@
 # gate measures the finished picture. Rendering 3D ahead of the 2D pass is how film compositing works; doing it for
 # a code-made video is lemo-opuscar's idea (lemomo-ai/lemo-opuscar TECHNIQUE.md section 9, three.js in a headless
 # browser, MIT, read 2026-11-10; no code taken).
-#   python plate3d.py fetch                             download Blender 5.2.3 LTS as a module (324 MB, GPL-3.0)
+#   python plate3d.py fetch                             download Blender LTS as a module (324 MB, GPL-3.0)
 #   python plate3d.py render stage.py --quality proof   every frame at half size, for the proof (about 0.5 s each)
 #   python plate3d.py render stage.py                   final quality (about 3.3 s a 1080p frame on an RTX 4070)
 #   python plate3d.py check [--final]                   what run_all.py asks before it draws: stale or draft plates
@@ -21,18 +21,21 @@ import os
 import shutil
 import subprocess
 import sys
+from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image
 
 import engine as E
+import envs
 
-# Blender as a Python module, in its own uv environment like the voice engines: bpy 5.2.3 has wheels for Python
-# 3.13 only. GPL-3.0-or-later: stage3d.py and every stage.py call its API, so they could only ever be shared under
-# GPL-compatible terms (this repo is MIT, which is).
+# Blender as a Python module, in its own uv environment like the voice engines: bpy 5.2 has wheels for Python 3.13
+# only. GPL-3.0-or-later: stage3d.py and every stage.py call its API, so they could only ever be shared under
+# GPL-compatible terms (this repo is MIT, which is). The pin is in requirements-bpy.in; the environment is the lock
+# compiled from it, with every package pinned, and the lock is part of every plate's key.
 PYTHON = "3.13"
-PACKAGES = ("bpy==5.2.3",)
+REQUIREMENTS = Path(__file__).with_name("requirements-bpy.txt")
 BLENDER_DIR = Path(
     os.environ.get("ZOETROPE_BLENDER")
     or Path.home() / ".cache" / "zoetrope" / "blender"
@@ -45,36 +48,54 @@ QUALITIES = ("proof", "final")
 EVERY = 24
 
 
-def _uv(*tail):
-    with_ = [x for p in PACKAGES for x in ("--with", p)]
-    return ["uv", "run", "--no-project", "--python", PYTHON, *with_, *tail]
+def _blender(*tail):
+    """A command for Blender's Python: the venv envs.side builds from the lock (each wheel checked against its
+    sha256) and tail. Raises envs.EnvError when it cannot be built."""
+    return [str(envs.side(REQUIREMENTS, PYTHON)), *tail]
+
+
+def _pin():
+    """The bpy pin the lock holds (bpy==X.Y.Z), for the messages: requirements-bpy.in is where it is set."""
+    lines = REQUIREMENTS.read_text(encoding="utf-8").splitlines()
+    return next(x.split()[0] for x in lines if x.startswith("bpy=="))
 
 
 def _fetched():
-    """The note fetch() leaves once this pin has imported here. uv keeps no copy of a wheel this large that an
-    offline run can find (uv 0.13.6, 2026-11-10), so the cache itself cannot be asked."""
-    return BLENDER_DIR / f"{PACKAGES[0].replace('==', '-')}.txt"
+    """The note fetch() leaves once bpy has imported in this lock's venv. The venv holds the wheels itself, so a run
+    with no network finds them; uv's cache keeps no copy of a wheel this large that an offline uv run can find
+    (uv 0.13.6, 2026-11-10)."""
+    digest = hashlib.sha256(REQUIREMENTS.read_bytes()).hexdigest()[:12]
+    return BLENDER_DIR / f"{_pin().replace('==', '-')}-{digest}.txt"
 
 
 def missing():
     """What is not ready, by name (empty when a plate can render)."""
     if not shutil.which("uv"):
         return ["uv (winget install astral-sh.uv)"]
-    if _fetched().is_file():
+    if not REQUIREMENTS.is_file():
+        return [
+            f"{REQUIREMENTS.name} beside plate3d.py: copy the whole engine folder (cp -r <skill>/engine/. .)"
+        ]
+    if _fetched().is_file() and envs.ready(
+        envs.side_dir(REQUIREMENTS, PYTHON), REQUIREMENTS
+    ):
         return []
-    return [
-        f"Blender as a Python module ({PACKAGES[0]}, 324 MB): python plate3d.py fetch"
-    ]
+    return [f"Blender as a Python module ({_pin()}, 324 MB): python plate3d.py fetch"]
 
 
 def fetch():
-    """Download the Blender module into the uv cache (nothing is installed globally) and note that it imports.
-    Exit 0 when it does."""
+    """Download the Blender module into its own venv (envs.side: nothing is installed globally, and each wheel is
+    checked against the lock's sha256) and note that it imports. Exit 0 when it does."""
     if not shutil.which("uv"):
         print("not ready: uv (winget install astral-sh.uv)")
         return 1
+    try:
+        cmd = _blender("-c", "import bpy; print(bpy.app.version_string)")
+    except envs.EnvError as e:
+        print(f"not ready: {e}")
+        return 1
     r = subprocess.run(
-        _uv("python", "-c", "import bpy; print(bpy.app.version_string)"),
+        cmd,
         capture_output=True,
         text=True,
         stdin=subprocess.DEVNULL,
@@ -86,7 +107,7 @@ def fetch():
     version = r.stdout.strip().splitlines()[-1]
     BLENDER_DIR.mkdir(parents=True, exist_ok=True)
     _fetched().write_text(version, encoding="utf-8")
-    print(f"have Blender {version} ({PACKAGES[0]})")
+    print(f"have Blender {version} ({_pin()})")
     return 0
 
 
@@ -128,9 +149,9 @@ def sources(stage):
 
 
 def key(stage):
-    """What makes a plate: the bytes of its sources and the Blender pin."""
+    """What makes a plate: the bytes of its sources and of the Blender lock."""
     stage = Path(stage)
-    h = hashlib.sha256(repr(PACKAGES).encode())
+    h = hashlib.sha256(REQUIREMENTS.read_bytes())
     for p in sources(stage):
         h.update(p.relative_to(stage.parent).as_posix().encode())
         h.update(p.read_bytes())
@@ -142,10 +163,25 @@ def _meta(folder):
     return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else None
 
 
+def _bad_name(name):
+    """Why name cannot name a plate (None when it can): it must be one folder name inside plates/, never a path,
+    because a render deletes the frames and plate.json in that folder before it writes its own."""
+    if (
+        isinstance(name, str)
+        and name not in ("", ".", "..")
+        and Path(name).name == name
+    ):
+        return None
+    return f"{name!r} is not a plate name: give one folder name inside {PLATES}/, such as main or look"
+
+
 def render(stage="stage.py", name="main", quality="final", frames=None, stills=None):
     """Render plates/<name> from the stage script in the Blender environment. Frames from another source or another
     quality are deleted first, so a plate never mixes two; frames of this one are kept, so a stopped render resumes.
     Exit code of the render."""
+    if why := _bad_name(name):
+        print(why)
+        return 1
     stage, out = Path(stage), Path(PLATES, name)
     if not stage.is_file():
         print(f"no {stage} here: write the stage script first (references/plates.md)")
@@ -184,7 +220,7 @@ def _render(stage, out, quality, frames, stills):
     with (
         log.open("a", encoding="utf-8", errors="backslashreplace") as keep,
         subprocess.Popen(
-            _uv("python", str(stage), "--", *args),
+            _blender(str(stage), "--", *args),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
@@ -230,7 +266,7 @@ def run(stage, args=()):
         print("not ready: " + "; ".join(miss))
         return 1
     r = subprocess.run(
-        _uv("python", str(stage), *args),
+        _blender(str(stage), *args),
         stdin=subprocess.DEVNULL,
         env={**os.environ, "PYTHONUTF8": "1"},
         check=False,
@@ -243,36 +279,127 @@ def _frames(folder):
     return {int(p.stem[2:]) for p in Path(folder).glob("f_*.jpg")}
 
 
-def used(scenes="scenes.py"):
-    """The plates a build draws from: the names in every Plate(...) call in its scenes.py, read from the source
-    without running it (Plate() with no name is "main"). Empty for a 2D build."""
+def _plates(scenes):
+    """(names, unread): the plate names in every Plate(...) call in scenes.py, read from the source without running
+    it, and a "file:line" line for each use of Plate whose name cannot be read that way. A name is a string, a
+    module-level constant set once to one (NAME = "main"), or none ("main"); Plate is found as Plate, as X.Plate, or
+    by its import alias (from plate3d import Plate as P). Only a scenes.py that imports plate3d gets unread lines: a
+    call named some other way, or Plate used and not called (P = plate3d.Plate), so check() refuses what it cannot
+    see in place of passing it."""
     p = Path(scenes)
     if not p.is_file():
-        return set()
-    names = set()
-    for node in ast.walk(ast.parse(p.read_text(encoding="utf-8"))):
-        f = getattr(node, "func", None)
-        if isinstance(node, ast.Call) and "Plate" in (
-            getattr(f, "id", None),
-            getattr(f, "attr", None),
+        return set(), []
+    tree = ast.parse(p.read_text(encoding="utf-8"))
+    nodes = list(ast.walk(tree))
+    froms = [
+        n for n in nodes if isinstance(n, ast.ImportFrom) and n.module == "plate3d"
+    ]
+    mine = bool(froms) or any(
+        a.name == "plate3d" for n in nodes if isinstance(n, ast.Import) for a in n.names
+    )
+    plate = {"Plate"} | {
+        a.asname for n in froms for a in n.names if a.name == "Plate" and a.asname
+    }
+    bound = Counter(
+        n.id for n in nodes if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)
+    )
+    bound.update(n.arg for n in nodes if isinstance(n, ast.arg))
+    const = {}
+    for s in tree.body:
+        targets = getattr(s, "targets", None) or [getattr(s, "target", None)]
+        if (
+            isinstance(s, (ast.Assign, ast.AnnAssign))
+            and len(targets) == 1
+            and isinstance(targets[0], ast.Name)
+            and isinstance(s.value, ast.Constant)
+            and isinstance(s.value.value, str)
+            and bound[targets[0].id] == 1
         ):
-            first = node.args[0] if node.args else None
-            named = next((k.value for k in node.keywords if k.arg == "name"), first)
-            if named is None:
-                names.add("main")
-            elif isinstance(named, ast.Constant) and isinstance(named.value, str):
-                names.add(named.value)
-    return names
+            const[targets[0].id] = s.value.value
+
+    def read(x):
+        if x is None:
+            return "main"
+        if isinstance(x, ast.Constant) and isinstance(x.value, str):
+            return x.value
+        return const.get(x.id) if isinstance(x, ast.Name) else None
+
+    names, unread, called = set(), [], set()
+    for n in nodes:
+        f = getattr(n, "func", None)
+        if not isinstance(n, ast.Call) or not (
+            getattr(f, "id", None) in plate or getattr(f, "attr", None) == "Plate"
+        ):
+            continue
+        called.add(id(f))
+        spread = any(isinstance(a, ast.Starred) for a in n.args) or any(
+            k.arg is None for k in n.keywords
+        )
+        first = n.args[0] if n.args else None
+        got = (
+            None
+            if spread
+            else read(next((k.value for k in n.keywords if k.arg == "name"), first))
+        )
+        if got is not None:
+            names.add(got)
+        elif mine:
+            unread.append(
+                f"{p.as_posix()}:{n.lineno} {ast.unparse(n)} names its plate with something this check cannot "
+                'read: give the name as a string, Plate("main"), or as a module-level NAME = "main" set once'
+            )
+    if mine:
+        # a type annotation or an isinstance/issubclass test names Plate without making one
+        typed = []
+        for n in nodes:
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                a = n.args
+                typed += [
+                    x.annotation
+                    for x in (*a.posonlyargs, *a.args, *a.kwonlyargs, a.vararg, a.kwarg)
+                    if x
+                ]
+                typed.append(n.returns)
+            elif isinstance(n, ast.AnnAssign):
+                typed.append(n.annotation)
+            elif isinstance(n, ast.Call) and getattr(n.func, "id", None) in (
+                "isinstance",
+                "issubclass",
+            ):
+                typed += n.args[1:]
+        exempt = {id(s) for t in typed if t is not None for s in ast.walk(t)}
+        unread += [
+            f"{p.as_posix()}:{n.lineno} uses {ast.unparse(n)} without calling it: call Plate with the plate's name "
+            "where the plate is made, so this check can read which plate the build draws"
+            for n in nodes
+            if id(n) not in called
+            and id(n) not in exempt
+            and (
+                (isinstance(n, ast.Name) and n.id in plate)
+                or (isinstance(n, ast.Attribute) and n.attr == "Plate")
+            )
+        ]
+    return names, unread
+
+
+def used(scenes="scenes.py"):
+    """The plates a build draws from: the names in every Plate(...) call in its scenes.py (_plates). Empty for a 2D
+    build."""
+    return _plates(scenes)[0]
 
 
 def check(final=False, folder=PLATES, scenes="scenes.py"):
     """Why a build must not draw yet, one line per plate its scenes.py uses, each ending with the command that
     clears it (empty when every one is ready, or the video uses none): a plate not rendered, still being rendered,
-    older than its stage script, with frames missing, or, for the full render, of proof quality. run_all.py refuses
-    on any line, so a draft plate cannot reach a delivered file. Other folders under plates/ (stills rendered to
-    look at under another name) are nobody's business here."""
-    out = []
-    for name in sorted(used(scenes)):
+    older than its stage script, with frames missing, or, for the full render, of proof quality, and a use of Plate
+    in scenes.py whose name this check cannot read. run_all.py refuses on any line, so a draft plate cannot reach a
+    delivered file. Other folders under plates/ (stills rendered to look at under another name) are nobody's
+    business here."""
+    names, out = _plates(scenes)
+    for name in sorted(names):
+        if why := _bad_name(name):
+            out.append(why)
+            continue
         d = Path(folder, name)
         m = _meta(d)
         if (d / LOCK).is_file():
@@ -297,7 +424,8 @@ def check(final=False, folder=PLATES, scenes="scenes.py"):
             out.append(f"{folder}/{name}: its stage script {stage} is not here")
         elif m["key"] != key(stage):
             out.append(
-                f"{folder}/{name} is older than {stage} (or a module it imports): {redo} --quality {m['quality']}"
+                f"{folder}/{name} is older than {stage} (or a module it imports, or the Blender lock "
+                f"{REQUIREMENTS.name}): {redo} --quality {m['quality']}"
             )
         elif gone:
             out.append(
@@ -324,6 +452,8 @@ class Plate:
     draw(t) gives that moment's 3D picture as an RGBA canvas to draw type and graphics on."""
 
     def __init__(self, name="main", folder=PLATES):
+        if why := _bad_name(name):
+            raise ValueError(why)
         self.name, self.dir = name, Path(folder, name)
         m = _meta(self.dir)
         if m is None:
@@ -414,7 +544,8 @@ def main(argv=None):
         help="exit 1 and say what is missing when the Blender environment is not cached",
     )
     sub.add_parser(
-        "fetch", help=f"download {PACKAGES[0]} (324 MB, GPL-3.0) into the uv cache"
+        "fetch",
+        help="download Blender, the bpy pin in requirements-bpy.in (324 MB, GPL-3.0), into its own venv",
     )
     sub.add_parser("info", help="each plate here")
     c = sub.add_parser(
