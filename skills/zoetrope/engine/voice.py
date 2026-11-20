@@ -49,8 +49,81 @@ def section_beats(speech_len, bpm, hold=0.5, lead=0.06, tempo=1.04, min_beats=2)
     return max(min_beats, 2 * math.ceil(need / (60 / bpm) / 2))
 
 
-def duck_mix(bed, voice, sr=SR, depth_db=8):
-    """Voice over the bed: bed at about -18 dBFS RMS, ducked depth_db while the voice speaks (fast attack, slow release)."""
+def polish(
+    y,
+    sr=SR,
+    hp_hz=90.0,
+    presence_db=2.5,
+    presence_hz=3200.0,
+    thresh_db=-24.0,
+    ratio=3.0,
+    knee_db=6.0,
+    attack_ms=0.0,
+    release_ms=120.0,
+):
+    """Broadcast polish for a narration stem, numpy only; returns float32 of the same length, never above y's peak.
+    1. EQ in one zero-phase pass (rfft, a smooth gain curve, irfft, so no lag and Q807 still finds the stem at
+       +0.000 s): a 4th-order high-pass at hp_hz (90 Hz) and a presence bell of presence_db (+2.5 dB) centred on
+       presence_hz (3.2 kHz, about an octave wide, so 2.5 to 4 kHz is lifted). The signal is padded with 0.25 s of
+       silence each side first, so the FFT's circular wrap never folds one end into the other.
+    2. Soft-knee compressor, ratio:1 (3:1) above thresh_db (-24 dBFS, knee_db 6 dB wide), peak envelope with an
+       instant attack (attack_ms 0; a positive value smooths the rise) and release_ms 120, gain in dB, no lookahead.
+       The attack must stay at or near 0: with 3 ms every word's onset passed uncompressed, the make-up below was then
+       set by those onsets, and the voice came out 2.4 dB quieter against the bed after duck_mix (review, 2026-11-16).
+    3. Make-up gain back to the input's peak, so the output peak equals the input peak (skipped when the EQ left
+       next to nothing, as with a DC-only input, so noise is never raised to full scale).
+    The deep-dive style card turns it on through duck_mix(..., polish=True)."""
+    y = np.asarray(y, np.float64)
+    if not len(y):
+        return y.astype(np.float32)
+    peak = np.abs(y).max()
+    if peak == 0:
+        return y.astype(np.float32)
+    n, pad = len(y), int(0.25 * sr)
+    y = np.pad(
+        y - y.mean(), pad
+    )  # the high-pass removes DC anyway; taking it first keeps the padding step-free
+    f = np.fft.rfftfreq(len(y), 1 / sr)
+    hp = 1 / np.sqrt(
+        1 + (hp_hz / np.maximum(f, 1e-3)) ** 8
+    )  # Butterworth magnitude, order 4
+    bell = 10 ** (
+        presence_db
+        / 20
+        * np.exp(-0.5 * (np.log2(np.maximum(f, 1e-3) / presence_hz) / 0.5) ** 2)
+    )
+    y = np.fft.irfft(np.fft.rfft(y) * hp * bell, len(y))[pad : pad + n]
+    # peak envelope: the rise follows the attack time constant (instant at 0), the fall the release time constant
+    a, r = (
+        math.exp(-1 / (attack_ms * 1e-3 * sr)) if attack_ms > 0 else 0.0,
+        math.exp(-1 / (release_ms * 1e-3 * sr)),
+    )
+    mag, env, e = np.abs(y), np.empty(len(y)), 0.0
+    for i, m in enumerate(mag.tolist()):
+        k = a if m > e else r
+        e = k * e + (1 - k) * m
+        env[i] = e
+    lvl = 20 * np.log10(env + 1e-9) - thresh_db  # dB over the threshold
+    over = np.where(
+        2 * lvl < -knee_db,
+        0.0,
+        np.where(
+            2 * np.abs(lvl) <= knee_db,
+            (lvl + knee_db / 2) ** 2 / (2 * knee_db),
+            lvl,
+        ),
+    )  # dB above the threshold after the soft knee blend
+    y = y * 10 ** (-over * (1 - 1 / ratio) / 20)
+    top = np.abs(y).max()
+    return (y * (peak / top if top > 1e-6 * peak else 1.0)).astype(np.float32)
+
+
+def duck_mix(bed, voice, sr=SR, depth_db=8, polish=False):
+    """Voice over the bed: bed at about -18 dBFS RMS, ducked depth_db while the voice speaks (fast attack, slow release).
+    polish=True runs the voice through polish() first (high-pass, presence lift, 3:1 compressor); False is the
+    unchanged mix. The deep-dive style card turns it on."""
+    if polish:
+        voice = globals()["polish"](np.asarray(voice, float), sr)
     n = max(len(bed), len(voice))
     bed = np.pad(np.asarray(bed, float), (0, n - len(bed)))
     voice = np.pad(np.asarray(voice, float), (0, n - len(voice)))

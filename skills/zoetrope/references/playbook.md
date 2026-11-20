@@ -42,7 +42,7 @@ How we make a video, start to finish, with the tools we really have (see `engine
 
 ## 3. Scene planning and composition
 
-- **Hook in the first 1.5 s.** Frame 0 is the thumbnail: the hook line or main visual is already fully drawn on it and only the extras animate in (gate 5 in `qa-gates.md` fails a dark or empty frame 0). First motion by about 0.5 s. Lead with the claim, the pain or the surprising number, never a logo.
+- **Hook in the first 1.5 s.** Frame 0 is the thumbnail: the hook line or main visual is already fully drawn on it and only the extras animate in (gate 5 in `qa-gates.md` fails a dark or empty frame 0). First motion by about 0.5 s. Lead with the claim, the pain or the surprising number, never a logo. For a Reel or Short, `hooks.md` has the hook formulas, the screen every hook passes and the beat shape after it.
 - **One idea per scene.** If a scene needs a sentence to explain it, split it. A beat that could be a bullet is not shown yet: make it a chart, a mockup in a device frame, or a diagram that builds.
 - **Visual variety.** Pick the form from the shape of the idea: compare = bars; part of whole = segmented bar or ring; change = old value, arrow, new value; progress = gauge; trend = sparkline; process = connected nodes; product = UI mockup; one claim = big type. Do not use the same layout twice in a row.
 - **Build, then reveal.** Establish the container (frame, axes, panel) first, then fill it. Connectors draw in. A label animates with or after its anchor, never before. Every meaningful element gets an entrance; the only static element is the deliberate anchor.

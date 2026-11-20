@@ -212,7 +212,8 @@ ORD = {
     "twelve": "twelfth",
 }
 CURRENCY = {"$": "dollars", "\u00a3": "pounds", "\u20ac": "euros", "\u20b9": "rupees"}
-SAME = {"ok": "okay"}  # one word a model and a script spell two ways
+# one word a model and a script spell two ways; base.en writes a spoken "kilometers" as "km" (2026-11-16)
+SAME = {"ok": "okay", "km": "kilometers"}
 NUMBER = re.compile(
     "^([$\u00a3\u20ac\u20b9])?" r"(\d[\d,]*)(?:\.(\d+))?(%|st|nd|rd|th|s)?$"
 )
@@ -484,14 +485,21 @@ def _english(narr):
     return (narr.get("lang") or "en").lower().startswith("en")
 
 
+SPLIT = re.compile(r"^[.,]\d")  # the tail of a number base.en wrote as its own word
+
+
 def _spoken(h, a):
     """(text, times): what a transcript says, and each of its words' start on the timeline (a: the clip's start),
-    one per word as atoms() counts them."""
-    ws = [
-        w
-        for w in h["words"]
-        if not all(unicodedata.category(ch)[0] in "PS" for ch in w["w"])
-    ]
+    one per word as atoms() counts them. A word that starts with a point or a comma and a digit is joined to the
+    number before it: base.en writes a spoken 4,000 as "4" ",000" and 7.4 as "7" ".4" (2026-11-16, five lines)."""
+    ws = []
+    for w in h["words"]:
+        if all(unicodedata.category(ch)[0] in "PS" for ch in w["w"]):
+            continue
+        if ws and SPLIT.match(w["w"]) and ws[-1]["w"][-1:].isdigit():
+            ws[-1] = {**ws[-1], "w": ws[-1]["w"] + w["w"]}
+            continue
+        ws.append(w)
     return " ".join(w["w"] for w in ws), [round(a + w["start"], 3) for w in ws]
 
 
