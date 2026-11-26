@@ -61,6 +61,9 @@ jobs:
           uv run --no-project python envs.py
           uv run --no-project --with-requirements requirements.txt python qa.py selftest
 
+      - name: Studio self test (the lint's 18 rules, shotkit, a drawn probe film's timeline; standard library only)
+        run: uv run --no-project python -I skills/zoetrope/studio/selftest.py --quick
+
       - name: Show the template QA findings on failure
         if: failure()
         run: |

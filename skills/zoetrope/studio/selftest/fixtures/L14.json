@@ -1,0 +1,112 @@
+{
+ "rule": "L14",
+ "note": "one still under UNTIL 1492 and later under 1492",
+ "tier": "static",
+ "t": 4.0,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 2,
+     "over": [
+      {
+       "type": "label",
+       "tone": "accent",
+       "text": "Until 1492",
+       "y": 282
+      }
+     ],
+     "media": {
+      "kind": "still",
+      "src": "media/s01.jpg"
+     },
+     "grade": "past"
+    },
+    {
+     "id": "s02",
+     "t0": 2,
+     "t1": 4,
+     "over": [],
+     "media": {
+      "kind": "still",
+      "src": "media/s02.jpg"
+     }
+    },
+    {
+     "id": "s03",
+     "t0": 4,
+     "t1": 6,
+     "over": [
+      {
+       "type": "label",
+       "tone": "accent",
+       "text": "1492",
+       "y": 282
+      }
+     ],
+     "media": {
+      "kind": "still",
+      "src": "media/s01.jpg"
+     },
+     "grade": "past"
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 2,
+     "over": [
+      {
+       "type": "label",
+       "tone": "accent",
+       "text": "Until 1492",
+       "y": 282
+      }
+     ],
+     "media": {
+      "kind": "still",
+      "src": "media/s01.jpg"
+     },
+     "grade": "past"
+    },
+    {
+     "id": "s02",
+     "t0": 2,
+     "t1": 4,
+     "over": [],
+     "media": {
+      "kind": "still",
+      "src": "media/s02.jpg"
+     }
+    },
+    {
+     "id": "s03",
+     "t0": 4,
+     "t1": 6,
+     "over": [
+      {
+       "type": "label",
+       "tone": "accent",
+       "text": "Until 1492",
+       "y": 282
+      }
+     ],
+     "media": {
+      "kind": "still",
+      "src": "media/s01.jpg"
+     },
+     "grade": "past"
+    }
+   ]
+  },
+  "speech": []
+ }
+}

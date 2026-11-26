@@ -1,0 +1,46 @@
+{
+ "rule": "L16",
+ "note": "a present-day chip with no year",
+ "tier": "static",
+ "t": 0.5,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "label",
+       "text": "Today: mostly peanut",
+       "y": 282,
+       "at": 0.5
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "label",
+       "text": "Today, 2026: mostly peanut",
+       "y": 282,
+       "at": 0.5
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ }
+}

@@ -1,0 +1,83 @@
+{
+ "shots": [
+  {
+   "id": "s01",
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "label",
+     "text": "PROBE",
+     "y": 282,
+     "at": "+0.1"
+    }
+   ]
+  },
+  {
+   "id": "s02",
+   "cue": "L01:2",
+   "tin": {
+    "kind": "fade"
+   },
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "lower",
+     "text": "Drawn",
+     "y": 352,
+     "at": "+0.1"
+    }
+   ]
+  },
+  {
+   "id": "s03",
+   "cue": "L01:4",
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "number",
+     "value": 3,
+     "y": 352,
+     "size": 300,
+     "at": "+0.1",
+     "landAt": "L01:5"
+    }
+   ]
+  },
+  {
+   "id": "s04",
+   "cue": "L02:0",
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "long": true,
+   "len": 7.0,
+   "over": [
+    {
+     "type": "title",
+     "lines": [
+      "SAME"
+     ],
+     "y": 380,
+     "size": 150,
+     "at": "+0.3"
+    },
+    {
+     "type": "stamp",
+     "text": "PROBE",
+     "size": 100,
+     "at": "L03:3"
+    }
+   ]
+  }
+ ]
+}

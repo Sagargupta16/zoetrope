@@ -1,0 +1,46 @@
+{
+ "rule": "L10",
+ "note": "a top-row chip too long to stand beside the tag",
+ "tier": "static",
+ "t": 0.0,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "label",
+       "text": "Oldest finds from seven sites: 6,000 years",
+       "y": 282,
+       "at": 0.0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "label",
+       "text": "Oldest finds: 6,000 years",
+       "y": 282,
+       "at": 0.0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ }
+}

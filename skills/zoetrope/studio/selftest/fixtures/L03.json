@@ -1,0 +1,61 @@
+{
+ "rule": "L03",
+ "note": "a title that repeats the caption under it (the control carries says)",
+ "tier": "static",
+ "t": 0.5,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "title",
+       "lines": [
+        "LONG *PEPPER*"
+       ],
+       "at": 0.0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    0.5,
+    "Long pepper grows wild."
+   ]
+  ]
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "title",
+       "lines": [
+        "LONG *PEPPER*"
+       ],
+       "at": 0.0,
+       "says": true
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    0.5,
+    "Long pepper grows wild."
+   ]
+  ]
+ }
+}

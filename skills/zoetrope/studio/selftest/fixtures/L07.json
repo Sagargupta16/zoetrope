@@ -1,0 +1,63 @@
+{
+ "rule": "L07",
+ "note": "a number printed before its spoken word (the control lands on it)",
+ "tier": "static",
+ "t": 0.5,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 1498,
+       "group": false,
+       "count": 0,
+       "y": 352,
+       "at": 0.5
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    1.0,
+    "In 1498 they landed."
+   ]
+  ]
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 1498,
+       "group": false,
+       "count": 0,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 1.27
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    1.0,
+    "In 1498 they landed."
+   ]
+  ]
+ }
+}

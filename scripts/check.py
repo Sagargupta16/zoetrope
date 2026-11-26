@@ -18,7 +18,21 @@ ROOT = Path(__file__).resolve().parent.parent
 SKILL_NAME = "zoetrope"
 
 DASHES = (chr(0x2013), chr(0x2014))
-TEXT = {".md", ".py", ".sh", ".json", ".yml", ".yaml", ".toml", ".txt", ".svg", ".in"}
+TEXT = {
+    ".md",
+    ".py",
+    ".sh",
+    ".json",
+    ".yml",
+    ".yaml",
+    ".toml",
+    ".txt",
+    ".svg",
+    ".in",
+    ".js",
+    ".css",
+    ".html",
+}
 TEXT_NAMES = {"LICENSE", ".gitignore", ".gitattributes", ".python-version"}
 SKIP_DIRS = {
     ".git",

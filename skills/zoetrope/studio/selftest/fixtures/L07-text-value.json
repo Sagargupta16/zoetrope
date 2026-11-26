@@ -1,0 +1,116 @@
+{
+ "rule": "L07",
+ "note": "a count whose value is text is skipped, never a crash; the numeric count beside it is still judged",
+ "tier": "frames",
+ "t": 1.17,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 1498,
+       "group": false,
+       "count": 1.0,
+       "y": 352,
+       "at": 0.2,
+       "landAt": 1.27
+      },
+      {
+       "type": "number",
+       "value": "1,492",
+       "group": true,
+       "count": 1.0,
+       "y": 700,
+       "at": 0.2,
+       "landAt": 1.27
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    1.0,
+    "In 1498 they landed."
+   ]
+  ],
+  "registry": {
+   "meta": {},
+   "frames": {
+    "1.17": [
+     {
+      "role": "number",
+      "text": "1498"
+     }
+    ],
+    "1.37": [
+     {
+      "role": "number",
+      "text": "1498"
+     }
+    ]
+   }
+  }
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 1498,
+       "group": false,
+       "count": 1.0,
+       "y": 352,
+       "at": 0.2,
+       "landAt": 1.27
+      },
+      {
+       "type": "number",
+       "value": "1,492",
+       "group": true,
+       "count": 1.0,
+       "y": 700,
+       "at": 0.2,
+       "landAt": 1.27
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    1.0,
+    "In 1498 they landed."
+   ]
+  ],
+  "registry": {
+   "meta": {},
+   "frames": {
+    "1.17": [
+     {
+      "role": "number",
+      "text": "1490"
+     }
+    ],
+    "1.37": [
+     {
+      "role": "number",
+      "text": "1498"
+     }
+    ]
+   }
+  }
+ }
+}

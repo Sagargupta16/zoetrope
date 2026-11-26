@@ -1,0 +1,49 @@
+{
+ "rule": "L01",
+ "note": "a yellow date chip on a picture outside the past grade",
+ "tier": "static",
+ "t": 0.5,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "label",
+       "tone": "accent",
+       "text": "Calicut, 1498",
+       "y": 282,
+       "at": 0.5
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "label",
+       "tone": "accent",
+       "text": "Calicut, 1498",
+       "y": 282,
+       "at": 0.5
+      }
+     ],
+     "grade": "past"
+    }
+   ]
+  },
+  "speech": []
+ }
+}

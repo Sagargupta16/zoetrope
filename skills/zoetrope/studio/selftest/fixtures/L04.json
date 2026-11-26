@@ -1,0 +1,45 @@
+{
+ "rule": "L04",
+ "note": "a red stamp",
+ "tier": "static",
+ "t": 1.0,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "stamp",
+       "text": "LIKELY LEFT BEHIND",
+       "tone": "red",
+       "at": 1.0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "stamp",
+       "text": "LIKELY LEFT BEHIND",
+       "at": 1.0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ }
+}

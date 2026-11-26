@@ -1,0 +1,121 @@
+{
+ "rule": "L02",
+ "note": "one picture in the clear three times (a blurred third use is only a NOTE)",
+ "tier": "static",
+ "t": 8.0,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 2,
+     "over": [],
+     "media": {
+      "kind": "still",
+      "src": "media/s01.jpg"
+     }
+    },
+    {
+     "id": "s02",
+     "t0": 2,
+     "t1": 4,
+     "over": [],
+     "media": {
+      "kind": "still",
+      "src": "media/s02.jpg"
+     }
+    },
+    {
+     "id": "s03",
+     "t0": 4,
+     "t1": 6,
+     "over": [],
+     "media": {
+      "kind": "still",
+      "src": "media/s01.jpg"
+     }
+    },
+    {
+     "id": "s04",
+     "t0": 6,
+     "t1": 8,
+     "over": [],
+     "media": {
+      "kind": "still",
+      "src": "media/s04.jpg"
+     }
+    },
+    {
+     "id": "s05",
+     "t0": 8,
+     "t1": 10,
+     "over": [],
+     "media": {
+      "kind": "still",
+      "src": "media/s01.jpg"
+     }
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 2,
+     "over": [],
+     "media": {
+      "kind": "still",
+      "src": "media/s01.jpg"
+     }
+    },
+    {
+     "id": "s02",
+     "t0": 2,
+     "t1": 4,
+     "over": [],
+     "media": {
+      "kind": "still",
+      "src": "media/s02.jpg"
+     }
+    },
+    {
+     "id": "s03",
+     "t0": 4,
+     "t1": 6,
+     "over": [],
+     "media": {
+      "kind": "still",
+      "src": "media/s01.jpg"
+     }
+    },
+    {
+     "id": "s04",
+     "t0": 6,
+     "t1": 8,
+     "over": [],
+     "media": {
+      "kind": "still",
+      "src": "media/s04.jpg"
+     }
+    },
+    {
+     "id": "s05",
+     "t0": 8,
+     "t1": 10,
+     "over": [],
+     "media": {
+      "kind": "still",
+      "src": "media/s01.jpg"
+     },
+     "grade": "blur"
+    }
+   ]
+  },
+  "speech": []
+ }
+}
