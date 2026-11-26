@@ -2,6 +2,12 @@
 
 Every change to this copy of the video-producer package it was adapted from. The version numbers are this copy's own; the package as received is 1.0.0. File and section names in 1.0.0 and 1.1.0 refer to the package's original layout (`references/01-producer-playbook.md` to `10-qa-and-house-rules.md`).
 
+## 2.11.2 - 2026-11-26
+
+A speed fix in the Pillow engine, behaviour unchanged.
+
+- **`text_box` measures each glyph once.** Letter-spaced text was measured one glyph at a time with a fresh `ImageDraw` per call: 25.6 s of a 106 s `qa.py check` and 5.0 s of an 11.2 s `proof.py keys` on a 67.5 s reel. The box at the origin is now cached per (font, string, anchor) and the position added, and each glyph's advance per (font, glyph); a string with a newline keeps the direct `textbbox` call. Measured on that reel: the proof stage 67.6 to 48.0 s, `qa.py check` 106.2 to 91.1 s, 17,454 boxes compared with 0 different. Drawing is untouched.
+
 ## 2.11.1 - 2026-11-26
 
 Four faults the studio engine showed on its next four films.

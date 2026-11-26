@@ -502,22 +502,41 @@ def text_w(s, size, bold=True):
     return font(size * SS, bold).getlength(s) / SS
 
 
+@lru_cache(maxsize=8192)
+def _box0(f, s, anchor):
+    """One line's box with its anchor at the origin: Pillow adds the anchor position to it, so measure once."""
+    return _MEASURE.textbbox((0, 0), s, font=f, anchor=anchor)
+
+
+@lru_cache(maxsize=8192)
+def _adv(f, s):
+    return _MEASURE.textlength(s, font=f)
+
+
+def _box_at(xy, s, f, anchor):
+    if (
+        "\n" if isinstance(s, str) else b"\n"
+    ) in s:  # multiline: Pillow steps lines down from y, measure directly
+        return _MEASURE.textbbox(xy, s, font=f, anchor=anchor)
+    l, t, r, b = _box0(f, s, anchor)
+    return (l + xy[0], t + xy[1], r + xy[0], b + xy[1])
+
+
 def text_box(s, xy, size, anchor="la", bold=True, tracking=0):
     """(l, t, r, b) in output px of text drawn with text(): the box to report in scenes.text_items(t). Pass the same
     tracking text() got: letter-spaced text is drawn one letter at a time, so its box is the union of the letters."""
     f = font(size * SS, bold)
-    d = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     if not tracking:
-        l, t, r, b = d.textbbox((xy[0] * SS, xy[1] * SS), s, font=f, anchor=anchor)
+        l, t, r, b = _box_at((xy[0] * SS, xy[1] * SS), s, f, anchor)
         return (l / SS, t / SS, r / SS, b / SS)
     x, boxes = xy[0] * SS, []
     for ch in s:  # the same walk as text(tracking=)
         boxes.append(
-            d.textbbox(
-                (x, xy[1] * SS), ch, font=f, anchor="ls" if anchor[1] == "s" else "la"
-            )
+            _box_at((x, xy[1] * SS), ch, f, "ls" if anchor[1] == "s" else "la")
         )
-        x += d.textlength(ch, font=f) + tracking * SS
+        x += (
+            _adv(f, ch) if ch != "\n" else _MEASURE.textlength(ch, font=f)
+        ) + tracking * SS
     if not boxes:  # "" draws nothing (a typewriter reveal at its first frame): an empty box, as the untracked path
         return (xy[0], xy[1], xy[0], xy[1])
     l, t = min(b[0] for b in boxes), min(b[1] for b in boxes)
