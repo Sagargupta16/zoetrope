@@ -16,7 +16,7 @@ export const meta = {
 // facts.md and its pages under research/.doc-read/<slug>/). script.md is rewritten in place as version `version`
 // (default 3) and the script it replaces is kept as script_v<version - 1>.md.
 // researcher names a read-only web research agent type of your own for the fact lanes and the traces.
-// models and efforts: { facts, draft, study, trace }; a stage left out keeps its default.
+// models and efforts: { facts, draft, study, trace, keep }; a stage left out keeps its default.
 const build = `${args.batch}/builds/${args.build}`
 const topic = args.topic
 const BATCH = args.batch
