@@ -1,0 +1,10 @@
+{
+  "title": "{title}",
+  "caption": "{First line: one sentence under 125 characters that makes the claim without giving the payoff away.}\n\n{Second paragraph, the AI disclosure: the pictures and the voice are AI-generated; the pictures are illustrations, not photographs of the real things or places; diagrams and cards are drawn or redrawn by us.}\n\n{The facts in plain sentences, each source's own qualifier kept.}\n\nSources: {each source named by its kind}.\n\n{A closing question.}",
+  "hashtags": "#{tag1} #{tag2} #{tag3}",
+  "alt_text": "{Describe the film for someone who cannot see it: what is shown, what the narrator says, the numbers on screen, that the pictures are AI-generated.}",
+  "sources": [
+    {"title": "{source title}", "url": "{exact url from a facts.md row}"}
+  ],
+  "cover_ms": 500
+}

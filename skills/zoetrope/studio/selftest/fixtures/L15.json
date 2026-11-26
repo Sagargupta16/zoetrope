@@ -1,0 +1,46 @@
+{
+ "rule": "L15",
+ "note": "a six-word lower third",
+ "tier": "static",
+ "t": 0.5,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "lower",
+       "text": "About three percent of that memory",
+       "y": 368,
+       "at": 0.5
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "lower",
+       "text": "Three percent of *memory*",
+       "y": 368,
+       "at": 0.5
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ }
+}

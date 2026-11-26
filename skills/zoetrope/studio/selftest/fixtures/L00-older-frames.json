@@ -1,0 +1,43 @@
+{
+ "rule": "L00",
+ "note": "frames shot from an older timeline.json count as missing",
+ "tier": "frames",
+ "level": "NOT CHECKED",
+ "t": null,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": []
+    }
+   ]
+  },
+  "speech": [],
+  "registry": {
+   "meta": {},
+   "frames": {}
+  },
+  "older_registry": true
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": []
+    }
+   ]
+  },
+  "speech": [],
+  "registry": {
+   "meta": {},
+   "frames": {}
+  },
+  "older_registry": false
+ }
+}

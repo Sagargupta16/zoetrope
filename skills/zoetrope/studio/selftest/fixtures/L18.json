@@ -1,0 +1,63 @@
+{
+ "rule": "L18",
+ "note": "a redrawn document over a blurred generated picture",
+ "tier": "static",
+ "t": 0.5,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "document",
+       "book": "A Malayalam and English Dictionary, 1872",
+       "senses": [
+        {
+         "n": 1,
+         "text": "Ship"
+        }
+       ],
+       "y": 380,
+       "at": 0.5
+      }
+     ],
+     "grade": "blur"
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "document",
+       "book": "A Malayalam and English Dictionary, 1872",
+       "senses": [
+        {
+         "n": 1,
+         "text": "Ship"
+        }
+       ],
+       "y": 380,
+       "at": 0.5
+      }
+     ],
+     "media": {
+      "kind": "none",
+      "graphic": "ground"
+     }
+    }
+   ]
+  },
+  "speech": []
+ }
+}

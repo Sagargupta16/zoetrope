@@ -1,0 +1,16 @@
+{
+  "root": ".",
+  "accent": "#ff5a36",
+  "tag": "YOUR TAG",
+  "end": {
+    "handle": "@your.handle",
+    "follow": "Follow for the next one",
+    "ai_line": "Narration and pictures are AI-generated."
+  },
+  "music_dir": "music",
+  "voice": {"name": "af_heart", "speed": 1.0},
+  "comfy": {"exe": "comfy", "home": "~/ComfyUI", "url": "http://127.0.0.1:8188"},
+  "render": {"workers": 4, "maxrate": 5200},
+  "readers": {"audience_file": "audience.md"},
+  "package": {"check": ""}
+}

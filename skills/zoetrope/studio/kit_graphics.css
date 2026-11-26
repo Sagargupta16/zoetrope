@@ -1,0 +1,161 @@
+/* Drawn devices from kit_graphics.js. Sizes are px on the 1080x1920 stage. */
+.k-panel { position: absolute; left: 72px; width: 936px; border-radius: 22px; background: rgba(8, 10, 14, 0.78); border: 2px solid rgba(255, 255, 255, 0.22); overflow: hidden; transform-origin: 50% 50%; }
+.k-panel svg { position: absolute; left: 0; top: 0; }
+.k-panel-tag { position: absolute; left: 24px; top: 18px; font: 700 36px/1 "Barlow Condensed"; letter-spacing: 3px; text-transform: uppercase; color: rgba(255, 255, 255, 0.92); white-space: nowrap; }
+
+.k-pulse { position: absolute; left: 72px; width: 936px; height: 330px; }
+.k-pulse-big { position: absolute; left: 0; right: 0; top: 0; text-align: center; font: 900 150px/1 "Barlow Condensed"; letter-spacing: -1px; color: #fff; -webkit-text-stroke: 8px rgba(6, 8, 12, 0.92); paint-order: stroke fill; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.k-pulse-line { position: absolute; left: 0; top: 214px; width: 936px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.34); }
+.k-pulse-tail { position: absolute; left: 0; top: 211px; height: 12px; border-radius: 6px; }
+.k-pulse-dot { position: absolute; left: -17px; top: 200px; width: 34px; height: 34px; border-radius: 50%; background: var(--accent); border: 6px solid #0b0b0b; }
+.k-pulse-node { position: absolute; top: 203px; width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 6px solid #0b0b0b; }
+.k-pulse-node.a { left: -14px; }
+.k-pulse-node.b { left: 922px; }
+.k-pulse-end { position: absolute; top: 252px; font: 800 44px/1 "Barlow Condensed"; letter-spacing: 3px; text-transform: uppercase; color: #fff; -webkit-text-stroke: 5px rgba(6, 8, 12, 0.92); paint-order: stroke fill; white-space: nowrap; }
+.k-pulse-end.a { left: 0; }
+.k-pulse-end.b { right: 0; }
+
+.k-disc-hold { position: absolute; transform-origin: 50% 50%; }
+.k-disc { border-radius: 50%; background:
+    radial-gradient(circle, #1a1206 0 4.5%, #c9952c 4.6% 6%, rgba(0, 0, 0, 0) 6.1%),
+    repeating-radial-gradient(circle, rgba(90, 58, 6, 0.0) 0 1.1%, rgba(90, 58, 6, 0.22) 1.2% 1.5%),
+    conic-gradient(from 20deg, #f7d77a, #b9831f, #f3cf6b, #8e6212, #f8dc86, #b47e1c, #f1cb63, #94671a, #f7d77a);
+  box-shadow: 0 0 0 10px #6b4a0f, 0 30px 80px rgba(0, 0, 0, 0.6); }
+.k-disc-etch { position: absolute; left: 0; top: 0; }
+.k-disc-shine { position: absolute; left: 0; top: 0; border-radius: 50%; background: linear-gradient(115deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.42) 46%, rgba(255, 255, 255, 0) 60%); mix-blend-mode: screen; }
+
+.k-blocks { position: absolute; left: 72px; width: 936px; }
+.k-cell { position: absolute; left: 0; top: 0; border-radius: 12px; background: rgba(8, 10, 14, 0.72); border: 2px solid rgba(255, 255, 255, 0.26); }
+.k-cell.code { background: var(--accent); border-color: #0b0b0b; }
+.k-cell.bad { background: #ff453a; border-color: #0b0b0b; opacity: 0; }
+
+.k-meter { position: absolute; left: 72px; width: 936px; }
+.k-meter-name { font: 800 52px/1 "Barlow Condensed"; letter-spacing: 3px; text-transform: uppercase; color: #fff; -webkit-text-stroke: 5px rgba(6, 8, 12, 0.92); paint-order: stroke fill; margin-bottom: 16px; }
+.k-meter-track { height: 64px; border-radius: 14px; background: rgba(8, 10, 14, 0.72); border: 2px solid rgba(255, 255, 255, 0.26); overflow: hidden; }
+.k-meter-fill { height: 100%; width: 100%; background: var(--accent); transform-origin: 0 50%; }
+.k-meter-note { margin-top: 18px; font: 800 60px/1.02 "Barlow Condensed"; letter-spacing: 1px; text-transform: uppercase; color: #fff; -webkit-text-stroke: 6px rgba(6, 8, 12, 0.92); paint-order: stroke fill; }
+
+.k-lamp { position: absolute; border-radius: 26px; background: rgba(8, 10, 14, 0.78); border: 3px solid rgba(255, 255, 255, 0.26); overflow: hidden; transform-origin: 50% 50%; }
+.k-lamp-core { position: absolute; inset: 0; background: var(--accent); }
+
+/* signal: lane names and the state badge */
+.k-lane { position: absolute; left: 22px; font: 800 34px/1 "Barlow Condensed"; letter-spacing: 3px; text-transform: uppercase; color: rgba(255, 255, 255, 0.92); white-space: nowrap; }
+.k-badge { position: absolute; right: 18px; padding: 9px 16px 5px; border-radius: 10px; font: 900 44px/1 "Barlow Condensed"; letter-spacing: 2px; text-transform: uppercase; white-space: nowrap; transform-origin: 100% 50%; }
+.k-badge.red { background: #ff453a; color: #fff; }
+.k-badge.green { background: #32d74b; color: #06210b; }
+.k-badge.accent { background: var(--accent); color: var(--accent-ink); }
+
+/* ladder: a list that builds across shots */
+.k-ladder { position: absolute; left: 72px; width: 936px; display: flex; flex-direction: column; gap: 14px; }
+.k-ladder.plate { left: 60px; width: 960px; box-sizing: border-box; padding: 16px 12px 14px; border-radius: 14px; background: rgba(0, 0, 0, 0.55); }
+.k-rung { display: flex; align-items: baseline; gap: 18px; font: 800 64px/1 "Barlow Condensed"; letter-spacing: 1.5px; text-transform: uppercase; color: #fff; -webkit-text-stroke: 6px rgba(6, 8, 12, 0.92); paint-order: stroke fill; white-space: nowrap; }
+.k-rung .dots { flex: 1; height: 6px; align-self: center; border-radius: 3px; background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0 6px, rgba(255, 255, 255, 0) 6px 18px); }
+.k-rung .val { display: inline-block; font-variant-numeric: tabular-nums; transform-origin: 100% 60%; }
+.k-rung.live .val { color: var(--accent); }
+.k-rung.wait .val { color: rgba(255, 255, 255, 0.6); }
+
+/* strip: a row of numbered days with marks */
+.k-strip { position: absolute; left: 100px; width: 880px; height: 300px; }
+.k-strip-plate { position: absolute; left: -28px; right: -28px; top: 36px; height: 276px; border-radius: 22px; background: rgba(8, 10, 14, 0.8); border: 2px solid rgba(255, 255, 255, 0.22); }
+.k-strip-line { position: absolute; left: 0; right: 0; top: 150px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.4); }
+.k-strip-tick { position: absolute; top: 138px; width: 6px; height: 30px; margin-left: -3px; border-radius: 3px; background: rgba(255, 255, 255, 0.75); }
+.k-strip-day { position: absolute; top: 180px; transform: translateX(-50%); font: 800 44px/1 "Barlow Condensed"; color: #fff; -webkit-text-stroke: 5px rgba(6, 8, 12, 0.92); paint-order: stroke fill; }
+.k-strip-dot { position: absolute; top: 153px; width: 38px; height: 38px; border-radius: 50%; background: var(--accent); border: 6px solid #0b0b0b; }
+.k-strip-tag { position: absolute; padding: 10px 16px 6px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font: 800 40px/1 "Barlow Condensed"; letter-spacing: 2px; text-transform: uppercase; white-space: nowrap; }
+.k-strip-tag.up { top: 62px; }
+.k-strip-tag.down { top: 238px; }
+
+/* route: a journey as a rail of named stops (no map) */
+.k-route { position: absolute; left: 72px; width: 936px; }
+.k-route .line { position: absolute; left: 20px; top: 0; bottom: 0; width: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.26); }
+.k-route .done { position: absolute; left: 20px; top: 0; width: 8px; height: 100%; border-radius: 4px; background: var(--accent); transform-origin: 50% 0; }
+.k-route .line.dashed { border-radius: 0; background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 0 14px, transparent 14px 28px); }
+.k-route .done.dashed { border-radius: 0; background: repeating-linear-gradient(to bottom, var(--accent) 0 14px, transparent 14px 28px); }
+.k-route .stop { position: absolute; left: 0; display: flex; align-items: center; gap: 22px; transform: translateY(-50%); white-space: nowrap; }
+.k-route .ring { flex: none; width: 48px; height: 48px; box-sizing: border-box; border-radius: 50%; border: 7px solid rgba(255, 255, 255, 0.6); background: #10141c; }
+.k-route .stop.on .ring { border-color: var(--accent); background: var(--accent); }
+.k-route .name { display: inline-block; transform-origin: 0 50%; font: 800 62px/1 "Barlow Condensed"; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255, 255, 255, 0.45); -webkit-text-stroke: 6px rgba(6, 8, 12, 0.92); paint-order: stroke fill; }
+.k-route .stop.on .name { color: #fff; }
+.k-route .date { padding: 8px 14px 5px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font: 800 38px/1 "Barlow Condensed"; letter-spacing: 1.5px; opacity: 0; }
+.k-route .stop.on .date { opacity: 1; }
+.k-route .note { position: absolute; left: 70px; top: 66px; font: 600 32px/1 "Inter"; color: rgba(255, 255, 255, 0.88); -webkit-text-stroke: 5px rgba(6, 8, 12, 0.9); paint-order: stroke fill; opacity: 0; }
+.k-route .stop.on .note { opacity: 1; }
+.k-route .mark { position: absolute; left: 24px; width: 64px; height: 64px; margin: -32px 0 0 -32px; box-sizing: border-box; border-radius: 50%; border: 6px solid #0b0b0b; background: var(--accent); box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.92); }
+/* route, big: names large enough to carry a shot alone; the note sits beside its name */
+.k-route.big .line, .k-route.big .done { left: 24px; }
+.k-route.big .mark { left: 28px; }
+.k-route.big .ring { width: 56px; height: 56px; }
+.k-route.big .stop { transform-origin: 0 50%; }
+.k-route.big .name { font-size: 92px; letter-spacing: 2px; }
+.k-route.big .note { position: static; align-self: flex-end; margin: 0 0 14px -2px; font: 600 42px/1 "Inter"; }
+.k-route.big .date { font-size: 44px; }
+
+/* devices promoted from the films (kit_graphics.js lists them) */
+.k-light, .k-ground { position: absolute; inset: 0; }
+.k-veil { position: absolute; pointer-events: none; }
+
+/* stepsrow: numbered step chips, as tall as the label chips (63 px) */
+.k-steprow { position: absolute; left: 72px; display: flex; gap: 16px; }
+.k-step { display: flex; align-items: center; gap: 10px; height: 63px; box-sizing: border-box; padding: 0 18px 0 9px; border-radius: 34px; background: rgba(8, 10, 14, 0.8); border: 2px solid rgba(255, 255, 255, 0.24); font: 800 40px/1 "Barlow Condensed"; letter-spacing: 2px; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); white-space: nowrap; }
+.k-step .n { width: 43px; height: 43px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.16); color: rgba(255, 255, 255, 0.8); font-weight: 900; font-size: 32px; }
+.k-step.on { color: #fff; border-color: var(--accent); }
+.k-step.on .n { background: var(--accent); color: var(--accent-ink); }
+
+/* reasons: numbered answers at title size */
+.k-reasons { position: absolute; left: 72px; right: 72px; display: flex; flex-direction: column; gap: 14px; font: 900 150px/0.9 "Barlow Condensed"; letter-spacing: -1px; text-transform: uppercase; color: var(--ink); text-shadow: var(--shadow-big); -webkit-text-stroke: 7px rgba(6, 8, 12, 0.92); paint-order: stroke fill; }
+.k-reason { width: fit-content; white-space: nowrap; transform-origin: 0 50%; }
+.k-reason .n { margin-right: 0.24em; }
+.k-reason.open .what, .k-reason.dim { color: rgba(255, 255, 255, 0.62); }
+.k-reason.hot .what { color: var(--accent); }
+
+/* answers: each answer at title size under a chip that names whose it is */
+.k-answers { position: absolute; left: 72px; right: 72px; display: flex; flex-direction: column; gap: 40px; }
+.k-answer .who { width: fit-content; padding: 11px 22px 8px; border-radius: 10px; background: var(--glass); border: 2px solid var(--line); font: 700 40px/1 "Barlow Condensed"; letter-spacing: 3px; text-transform: uppercase; color: var(--ink); white-space: nowrap; }
+.k-answer .what { margin-top: 12px; font: 900 150px/0.95 "Barlow Condensed"; letter-spacing: -1px; text-transform: uppercase; color: var(--ink); text-shadow: var(--shadow-big); -webkit-text-stroke: 7px rgba(6, 8, 12, 0.92); paint-order: stroke fill; transform-origin: 0 50%; white-space: nowrap; width: fit-content; }
+.k-answer.hot .what { color: var(--accent); }
+.k-answer.wait .what { color: rgba(255, 255, 255, 0.4); }
+
+/* words: a language in its own script, with its Roman spelling and its meaning */
+.k-words { position: absolute; left: 72px; right: 72px; display: flex; flex-direction: column; gap: 34px; }
+.k-word { transform-origin: 0 50%; }
+.k-word .script { font: 700 118px/1.25 "Nirmala UI", "Noto Sans", sans-serif; color: #fff; -webkit-text-stroke: 8px rgba(6, 8, 12, 0.92); paint-order: stroke fill; white-space: nowrap; }
+.k-word.on .script .hot, .k-word.on .latin .hot { color: var(--accent); }
+.k-word .line { display: flex; align-items: baseline; gap: 22px; margin-top: 2px; white-space: nowrap; }
+.k-word .latin { font: 800 60px/1 "Barlow Condensed"; letter-spacing: 2px; text-transform: uppercase; color: #fff; -webkit-text-stroke: 6px rgba(6, 8, 12, 0.92); paint-order: stroke fill; }
+.k-word .gloss { padding: 8px 14px 6px; border-radius: 8px; background: rgba(8, 10, 14, 0.82); border: 2px solid rgba(255, 255, 255, 0.24); font: 700 38px/1 "Barlow Condensed", "Nirmala UI", sans-serif; letter-spacing: 2px; text-transform: uppercase; color: #fff; opacity: 0; }
+.k-word.on .gloss { opacity: 1; }
+
+/* document: a document redrawn on a paper card, with the line that says so */
+.k-doc-hold { position: absolute; left: 72px; width: 936px; }
+.k-doc { box-sizing: border-box; padding: 24px 40px 22px; border-radius: 2px; border: 2px solid rgba(28, 26, 23, 0.4); background: #f2e9d4; color: #1c1a17; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); }
+.k-doc .book { font: 800 36px/1 "Barlow Condensed"; letter-spacing: 3px; text-transform: uppercase; color: #6b5a3c; }
+.k-doc .head { display: flex; align-items: baseline; gap: 26px; margin-top: 8px; }
+.k-doc .head .script { font: 700 80px/1.25 "Nirmala UI", "Noto Sans", sans-serif; font-size: calc(80px * var(--z, 1)); }
+.k-doc .head .latin { font: italic 700 54px/1 Georgia, serif; font-size: calc(54px * var(--z, 1)); }
+.k-doc .sense { margin-top: 8px; font: 400 42px/1.2 Georgia, serif; font-size: calc(42px * var(--z, 1)); }
+.k-doc .sense b { font-weight: 700; margin-right: 14px; }
+.k-doc .sense.hot span { background: var(--accent); box-shadow: 0 0 0 8px var(--accent); border-radius: 4px; }
+.k-doc .row { position: relative; margin-top: 12px; padding-top: 8px; border-top: 3px solid rgba(28, 26, 23, 0.18); white-space: nowrap; }
+.k-doc .row .top { display: flex; align-items: baseline; gap: 22px; }
+.k-doc .row .bottom { display: flex; align-items: center; gap: 16px; margin-top: 2px; width: fit-content; }
+.k-doc .row.hot .bottom { background: var(--accent); box-shadow: 0 0 0 8px var(--accent); border-radius: 4px; }
+.k-doc .row .script { font: 700 54px/1.25 "Nirmala UI", "Noto Sans", sans-serif; }
+.k-doc .row .latin { font: italic 700 38px/1 Georgia, serif; color: #4a3f2c; }
+.k-doc .row .is { font: 700 44px/1 Georgia, serif; color: #6b5a3c; }
+.k-doc .row .gloss { font: 400 44px/1.1 Georgia, serif; }
+.k-doc .row .ours { font: 800 34px/1 "Barlow Condensed"; letter-spacing: 2px; text-transform: uppercase; padding: 7px 12px 5px; border-radius: 8px; background: #1c1a17; color: #f2e9d4; }
+.k-doc .row .extra { position: absolute; right: 0; bottom: 2px; }
+.k-doc .row.big .script { font-size: 60px; }
+.k-doc .row.big .latin { font-size: 40px; }
+.k-doc .row.big .gloss { font-size: 46px; }
+.k-doc .row.big .ours { font-size: 38px; }
+.k-doc-note { margin-top: 18px; width: fit-content; padding: 8px 12px 7px; border-radius: 8px; background: rgba(6, 8, 12, 0.55); font: 600 32px/1 "Inter"; letter-spacing: 0.5px; color: rgba(255, 255, 255, 0.9); white-space: nowrap; }
+
+/* years: a rail of years with a large counter above its dot */
+.k-years { position: absolute; left: 72px; right: 72px; }
+.k-years .num { position: absolute; top: 0; font: 900 170px/1 "Barlow Condensed"; letter-spacing: -2px; color: var(--ink); text-shadow: var(--shadow-mid); -webkit-text-stroke: 7px rgba(6, 8, 12, 0.92); paint-order: stroke fill; font-variant-numeric: tabular-nums; transform: translateX(-50%); white-space: nowrap; }
+.k-years .num .pre { position: absolute; right: 100%; bottom: 0.14em; margin-right: 14px; font-size: 0.3em; letter-spacing: 1px; text-transform: uppercase; -webkit-text-stroke: 4px rgba(6, 8, 12, 0.9); color: rgba(255, 255, 255, 0.92); }
+.k-years .line { position: absolute; left: 0; right: 0; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.3); }
+.k-years .done { position: absolute; left: 0; width: 100%; height: 6px; border-radius: 3px; background: var(--accent); transform-origin: 0 50%; }
+.k-years .dot { position: absolute; width: 34px; height: 34px; margin: -14px 0 0 -17px; border-radius: 50%; background: var(--accent); border: 6px solid #0b0b0b; }
+.k-years .tick { position: absolute; font: 700 40px/1 "Barlow Condensed"; letter-spacing: 1px; text-transform: uppercase; color: rgba(255, 255, 255, 0.92); -webkit-text-stroke: 4px rgba(6, 8, 12, 0.9); paint-order: stroke fill; white-space: nowrap; }

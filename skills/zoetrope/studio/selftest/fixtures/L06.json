@@ -1,0 +1,44 @@
+{
+ "rule": "L06",
+ "note": "a bare name as the source line of a generated picture",
+ "tier": "static",
+ "t": 0.4,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "source",
+       "text": "Pliny, Natural History, book 12",
+       "at": 0.4
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "source",
+       "text": "Fact from: Pliny, Natural History, translated 1855",
+       "at": 0.4
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ }
+}

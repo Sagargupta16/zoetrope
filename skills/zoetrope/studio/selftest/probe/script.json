@@ -1,0 +1,22 @@
+{
+  "slug": "probe",
+  "title": "Selftest probe",
+  "accent": "#ffd60a",
+  "tag": "PROBE",
+  "progress": false,
+  "lines": [
+    {
+      "id": "L01",
+      "text": "A drawn film checks the build."
+    },
+    {
+      "id": "L02",
+      "text": "Nothing in it is generated."
+    },
+    {
+      "id": "L03",
+      "text": "So the same words give the same frames.",
+      "payoff": true
+    }
+  ]
+}

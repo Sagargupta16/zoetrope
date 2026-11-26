@@ -1,0 +1,293 @@
+{
+ "slug": "probe",
+ "title": "Selftest probe",
+ "fps": 30,
+ "duration": 10.1333,
+ "accent": "#ffd60a",
+ "graphics": false,
+ "tag": "PROBE",
+ "progress": false,
+ "shots": [
+  {
+   "id": "s01",
+   "t0": 0.0,
+   "t1": 1.2333,
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "label",
+     "text": "PROBE",
+     "y": 282,
+     "at": 0.1,
+     "out": null
+    }
+   ],
+   "owner": "s01",
+   "generated": false,
+   "real": false
+  },
+  {
+   "id": "s02",
+   "tin": {
+    "kind": "fade",
+    "d": 0.4
+   },
+   "t0": 1.2333,
+   "t1": 2.2333,
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "lower",
+     "text": "Drawn",
+     "y": 352,
+     "at": 1.3333,
+     "out": null
+    }
+   ],
+   "owner": "s02",
+   "generated": false,
+   "real": false
+  },
+  {
+   "id": "s03",
+   "t0": 2.2333,
+   "t1": 3.1333,
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "number",
+     "value": 3,
+     "y": 352,
+     "size": 300,
+     "at": 2.3333,
+     "landAt": 2.7666,
+     "out": null
+    }
+   ],
+   "owner": "s03",
+   "generated": false,
+   "real": false
+  },
+  {
+   "id": "s04",
+   "t0": 3.1333,
+   "t1": 10.1333,
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "title",
+     "lines": [
+      "SAME"
+     ],
+     "y": 380,
+     "size": 150,
+     "at": 3.4333,
+     "out": null
+    },
+    {
+     "type": "stamp",
+     "text": "PROBE",
+     "size": 100,
+     "at": 7.4666,
+     "out": null
+    }
+   ],
+   "owner": "s04",
+   "generated": false,
+   "real": false
+  }
+ ],
+ "tokens": [
+  {
+   "d": "A",
+   "t0": 0.3,
+   "t1": 0.7,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L01"
+  },
+  {
+   "d": "drawn",
+   "t0": 0.8,
+   "t1": 1.2,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L01"
+  },
+  {
+   "d": "film",
+   "t0": 1.3,
+   "t1": 1.7,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L01"
+  },
+  {
+   "d": "checks",
+   "t0": 1.8,
+   "t1": 2.2,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L01"
+  },
+  {
+   "d": "the",
+   "t0": 2.3,
+   "t1": 2.7,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L01"
+  },
+  {
+   "d": "build",
+   "t0": 2.8,
+   "t1": 3.2,
+   "stop": true,
+   "end": true,
+   "p": "",
+   "line": "L01"
+  },
+  {
+   "d": "Nothing",
+   "t0": 3.2,
+   "t1": 3.6,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L02"
+  },
+  {
+   "d": "in",
+   "t0": 3.7,
+   "t1": 4.1,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L02"
+  },
+  {
+   "d": "it",
+   "t0": 4.2,
+   "t1": 4.6,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L02"
+  },
+  {
+   "d": "is",
+   "t0": 4.7,
+   "t1": 5.1,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L02"
+  },
+  {
+   "d": "generated",
+   "t0": 5.2,
+   "t1": 5.6,
+   "stop": true,
+   "end": true,
+   "p": "",
+   "line": "L02"
+  },
+  {
+   "d": "So",
+   "t0": 6.0,
+   "t1": 6.4,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L03"
+  },
+  {
+   "d": "the",
+   "t0": 6.5,
+   "t1": 6.9,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L03"
+  },
+  {
+   "d": "same",
+   "t0": 7.0,
+   "t1": 7.4,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L03"
+  },
+  {
+   "d": "words",
+   "t0": 7.5,
+   "t1": 7.9,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L03"
+  },
+  {
+   "d": "give",
+   "t0": 8.0,
+   "t1": 8.4,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L03"
+  },
+  {
+   "d": "the",
+   "t0": 8.5,
+   "t1": 8.9,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L03"
+  },
+  {
+   "d": "same",
+   "t0": 9.0,
+   "t1": 9.4,
+   "stop": false,
+   "end": false,
+   "p": "",
+   "line": "L03"
+  },
+  {
+   "d": "frames",
+   "t0": 9.5,
+   "t1": 9.9,
+   "stop": true,
+   "end": true,
+   "p": "",
+   "line": "L03"
+  }
+ ],
+ "mute": [],
+ "quiet": [],
+ "exempt": [],
+ "says": [],
+ "payoff": {
+  "line": "L03",
+  "t": 6.0
+ }
+}

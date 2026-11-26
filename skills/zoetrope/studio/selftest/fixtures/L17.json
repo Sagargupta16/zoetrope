@@ -1,0 +1,47 @@
+{
+ "rule": "L17",
+ "note": "a recorded day as a chip on a photoreal picture in the clear (the control blurs the plate)",
+ "tier": "static",
+ "t": 0.5,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "label",
+       "text": "Hispaniola, 4 November 1492",
+       "y": 282,
+       "at": 0.5
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "label",
+       "text": "Hispaniola, 4 November 1492",
+       "y": 282,
+       "at": 0.5
+      }
+     ],
+     "grade": "blur"
+    }
+   ]
+  },
+  "speech": []
+ }
+}

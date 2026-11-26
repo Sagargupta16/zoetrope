@@ -1,0 +1,72 @@
+{
+ "rule": "L11",
+ "note": "a stepsrow written with its documented key steps is held to the 2 s rule as rows are",
+ "tier": "static",
+ "t": 2.0,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "stepsrow",
+       "steps": [
+        {
+         "text": "LOOK",
+         "at": 0.5
+        },
+        {
+         "text": "SEE",
+         "at": 2.0
+        }
+       ],
+       "y": 392,
+       "at": 0.0
+      }
+     ],
+     "media": {
+      "kind": "none",
+      "graphic": "ground"
+     }
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 4.5,
+     "over": [
+      {
+       "type": "stepsrow",
+       "steps": [
+        {
+         "text": "LOOK",
+         "at": 0.5
+        },
+        {
+         "text": "SEE",
+         "at": 2.0
+        }
+       ],
+       "y": 392,
+       "at": 0.0
+      }
+     ],
+     "media": {
+      "kind": "none",
+      "graphic": "ground"
+     }
+    }
+   ]
+  },
+  "speech": []
+ }
+}

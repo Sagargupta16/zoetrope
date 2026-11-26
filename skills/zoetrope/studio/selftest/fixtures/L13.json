@@ -1,0 +1,80 @@
+{
+ "rule": "L13",
+ "note": "a caption page ending on NOT, so FROM INDIA stands alone",
+ "tier": "frames",
+ "t": 1.4,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": []
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    0.53,
+    "Chilli is not from India."
+   ]
+  ],
+  "registry": {
+   "meta": {},
+   "frames": {},
+   "pages": [
+    {
+     "t0": 0.5,
+     "t1": 1.4,
+     "text": "Chilli is not",
+     "line": "L01"
+    },
+    {
+     "t0": 1.4,
+     "t1": 2.0,
+     "text": "from India",
+     "line": "L01"
+    }
+   ]
+  }
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": []
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    0.53,
+    "Chilli is not from India."
+   ]
+  ],
+  "registry": {
+   "meta": {},
+   "frames": {},
+   "pages": [
+    {
+     "t0": 0.5,
+     "t1": 1.1,
+     "text": "Chilli is",
+     "line": "L01"
+    },
+    {
+     "t0": 1.1,
+     "t1": 2.0,
+     "text": "not from India",
+     "line": "L01"
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,56 @@
+{
+ "rule": "L08",
+ "note": "one picture change in the first 3.5 s",
+ "tier": "static",
+ "t": 0.0,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 2,
+     "over": []
+    },
+    {
+     "id": "s02",
+     "t0": 2,
+     "t1": 5,
+     "over": []
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 1,
+     "over": []
+    },
+    {
+     "id": "s02",
+     "t0": 1,
+     "t1": 2,
+     "over": []
+    },
+    {
+     "id": "s03",
+     "t0": 2,
+     "t1": 3.3,
+     "over": []
+    },
+    {
+     "id": "s04",
+     "t0": 3.3,
+     "t1": 5,
+     "over": []
+    }
+   ]
+  },
+  "speech": []
+ }
+}

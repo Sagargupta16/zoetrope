@@ -1,0 +1,63 @@
+{
+ "rule": "L05",
+ "note": "a list on a busy picture without its dark plate",
+ "tier": "static",
+ "t": 0.5,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 4,
+     "over": [
+      {
+       "type": "ladder",
+       "rows": [
+        {
+         "label": "Europe",
+         "value": "NO CHILLI",
+         "state": "reveal",
+         "at": 1.2,
+         "hot": true
+        }
+       ],
+       "y": 352,
+       "at": 0.5
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 4,
+     "over": [
+      {
+       "type": "ladder",
+       "rows": [
+        {
+         "label": "Europe",
+         "value": "NO CHILLI",
+         "state": "reveal",
+         "at": 1.2,
+         "hot": true
+        }
+       ],
+       "y": 352,
+       "at": 0.5,
+       "plate": true
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ }
+}
