@@ -34,8 +34,8 @@ def _state(made: float | None, *inputs: float | None) -> str:
 
 def _script(build: Path, made: float | None, source: float | None) -> str:
     """script.json against script.md: missing with no script.json; done when script.md is no newer, or when it
-    is newer and its table still holds the lines script.json holds (the voice step writes its measured read
-    into script.md after `script` ran, which changes no line of the film); stale otherwise."""
+    is newer and its tables still hold the lines and the lexicon script.json holds (the voice step writes its
+    measured read into script.md after `script` ran, which changes no line of the film); stale otherwise."""
     if made is None:
         return "missing"
     if source is None or source <= made:
@@ -43,13 +43,14 @@ def _script(build: Path, made: float | None, source: float | None) -> str:
     import studio  # the one reader of a script.md table
 
     try:
-        lines = studio.script_lines((build / "script.md").read_text(encoding="utf-8"))
-        held = json.loads((build / "script.json").read_text(encoding="utf-8")).get(
-            "lines"
-        )
+        text = (build / "script.md").read_text(encoding="utf-8")
+        lines, lexicon = studio.script_lines(text), studio.script_lexicon(text)
+        held = json.loads((build / "script.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return "stale"
-    return "done" if lines == held else "stale"
+    if lexicon is not None and lexicon != (held.get("lexicon") or {}):
+        return "stale"
+    return "done" if lines == held.get("lines") else "stale"
 
 
 def _stills(build: Path) -> str:

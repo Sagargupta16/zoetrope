@@ -241,6 +241,25 @@ def part_owner() -> str | None:
             return "status: a changed line did not make the script stale"
         if status._script(build, None, aged(source, 30)) != "missing":
             return "status: no script.json is not read as missing"
+        # the Lexicon table of script.md is part of the script: a row script.json lacks makes it stale
+        lexicon = "\n## Lexicon\n\n| word | say |\n|---|---|\n| Baarle | Barla |\n"
+        if studio.script_lexicon(table) is not None:
+            return "script: a script.md with no Lexicon table does not read as None"
+        if studio.script_lexicon(table + lexicon) != {"Baarle": "Barla"}:
+            return f"script: the Lexicon table reads as {studio.script_lexicon(table + lexicon)!r}"
+        source.write_text(table + lexicon, encoding="utf-8")
+        if status._script(build, aged(made, 60), aged(source, 30)) != "stale":
+            return (
+                "status: a Lexicon row script.json lacks did not make the script stale"
+            )
+        made.write_text(
+            json.dumps(
+                {"lines": studio.script_lines(table), "lexicon": {"Baarle": "Barla"}}
+            ),
+            encoding="utf-8",
+        )
+        if status._script(build, aged(made, 60), aged(source, 30)) != "done":
+            return "status: a Lexicon table script.json already holds made the script stale"
         video = build / "out" / "film.mp4"
         video.parent.mkdir()
         video.write_bytes(b"0")
@@ -260,8 +279,10 @@ def part_owner() -> str | None:
 
 
 def part_look() -> tuple[str | None, str]:
-    """`look` on a test film of 3 s: one frame every second and the last one, on sheets as tall as their rows,
-    and the sheets of an earlier look cleared. Needs ffmpeg and Pillow (the --render tier). Returns (problem, note)."""
+    """`look` on a test film built like a rendered one: 3 s of picture from a PNG that carries an ICC profile
+    (so ffprobe ends the row of the stream's length with a comma) under 3.6 s of sound. One frame every second
+    and the last one of the PICTURE, on sheets as tall as their rows, no cell left empty, and the sheets of an
+    earlier look cleared. Needs ffmpeg and Pillow (the --render tier). Returns (problem, note)."""
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         return "look: ffmpeg not found", ""
@@ -269,23 +290,57 @@ def part_look() -> tuple[str | None, str]:
         sys.path.insert(0, str(STUDIO))
     try:
         import sheet
-        from PIL import Image
+        from PIL import Image, ImageCms, ImageDraw
     except ImportError as error:
         return f"look: {error} (run with studio/requirements.txt)", ""
+    # what ffprobe really printed for finished films, and what it prints when it knows no length
+    for answer, want in (
+        ("112.266667,\r\n", 112.266667),
+        ("3.000000\n", 3.0),
+        ("N/A\n", None),
+        ("", None),
+    ):
+        if sheet.seconds(answer) != want:
+            return (
+                f"look: seconds({answer!r}) is {sheet.seconds(answer)!r}, not {want!r}",
+                "",
+            )
     with tempfile.TemporaryDirectory(prefix="studio-selftest-") as scratch:
-        film = Path(scratch) / "film.mp4"
+        film, still = Path(scratch) / "film.mp4", Path(scratch) / "still.png"
+        picture = Image.new("RGB", (270, 480), (40, 80, 160))
+        ImageDraw.Draw(picture).rectangle((60, 120, 210, 360), fill=(250, 210, 0))
+        picture.save(
+            still,
+            icc_profile=ImageCms.ImageCmsProfile(
+                ImageCms.createProfile("sRGB")
+            ).tobytes(),
+        )
         made = subprocess.run(
             [
                 ffmpeg,
                 "-v",
                 "error",
                 "-y",
+                "-loop",
+                "1",
+                "-framerate",
+                "30",
+                "-t",
+                "3",
+                "-i",
+                str(still),
                 "-f",
                 "lavfi",
+                "-t",
+                "3.6",
                 "-i",
-                "testsrc2=size=270x480:rate=30:duration=3",
+                "sine=frequency=440",
+                "-c:v",
+                "libx264",
                 "-pix_fmt",
                 "yuv420p",
+                "-c:a",
+                "aac",
                 str(film),
             ],
             capture_output=True,
@@ -299,15 +354,29 @@ def part_look() -> tuple[str | None, str]:
         except (OSError, RuntimeError) as error:
             return f"look: {error}", ""
         if frames != 4 or len(sheets) != 2:
-            return f"look: {frames} frames on {len(sheets)} sheets, not 4 on 2", ""
+            return (
+                f"look: {frames} frames on {len(sheets)} sheets, not 4 on 2 (the sound outlasts the picture: "
+                "the frames must come from the picture's length)",
+                "",
+            )
         with Image.open(sheets[0]) as first, Image.open(sheets[1]) as second:
             sizes = [first.size, second.size]
+            # the last frame's cell holds the still's yellow block, not the sheet's dark ground
+            last = second.convert("RGB").getpixel((45, 80))
         if sizes != [(270, 160), (270, 160)]:
             return f"look: the sheets measure {sizes}, not two of (270, 160)", ""
+        if not (last[0] > 180 and last[1] > 150 and last[2] < 110):
+            return (
+                f"look: the last frame's cell is {last}, not the picture (an empty cell)",
+                "",
+            )
         again, _ = sheet.look(film, out, step=3.0, cols=3, rows=1, width=90)
         if sorted(item.name for item in out.glob("*")) != [item.name for item in again]:
             return "look: sheets of an earlier look were left in the folder", ""
-    return None, "4 frames on 2 sheets, an earlier look cleared"
+    return (
+        None,
+        "4 frames of the picture on 2 sheets under a longer sound, an earlier look cleared",
+    )
 
 
 def part_filmdiff() -> str | None:
@@ -545,6 +614,25 @@ def part_cli() -> str | None:
                 shown = " ".join(str(a) for a in args).replace(str(batch), "<batch>")
                 return f"cli: `{shown}` exited {code} (want {want}{', ' + repr(text) if text else ''}): {said.strip()[-200:]}"
             return None
+
+        tables = batch / "builds" / "03-tables"
+
+        def tables_json(**more: object) -> dict | None:
+            """script.json of the tables build as a dict; with keys, they are written into it and None comes back."""
+            held = json.loads((tables / "script.json").read_text(encoding="utf-8"))
+            if not more:
+                return held
+            (tables / "script.json").write_text(
+                json.dumps({**held, **more}), encoding="utf-8"
+            )
+            return None
+
+        def tables_md(more: str) -> None:
+            """Adds text to the end of the tables build's script.md."""
+            with (tables / "script.md").open(
+                "a", encoding="utf-8", newline=""
+            ) as handle:
+                handle.write(more)
 
         def local_day() -> str | None:
             """The brief is dated by the local day: in a zone 14 hours ahead of UTC and in one 12 hours behind,
@@ -837,6 +925,42 @@ def part_cli() -> str | None:
                 )["voice"]
                 == {"speed": 1.12}
                 else "cli: script did not keep the per-film voice speed"
+            ),
+            # a lexicon, a lead and a progress put into script.json by hand outlive a script run
+            lambda: tables_json(lexicon={"Baarle": "Barla"}, lead=0.3, progress=False),
+            lambda: expect(
+                0,
+                ("script", batch / "builds" / "03-tables"),
+                "script.json: 2 lines, lexicon: Baarle (no music",
+            ),
+            lambda: (
+                None
+                if [tables_json().get(key) for key in ("lexicon", "lead", "progress")]
+                == [{"Baarle": "Barla"}, 0.3, False]
+                else "cli: script dropped a lexicon, lead or progress an earlier script.json held"
+            ),
+            # the Lexicon table of script.md wins, and a word it no longer lists is dropped out loud
+            lambda: tables_md(
+                "\n## Lexicon\n\n| word | say |\n|---|---|\n| Johannes | Yo-hahn-ess |\n"
+            ),
+            lambda: expect(
+                0,
+                ("script", batch / "builds" / "03-tables"),
+                (
+                    "NOTE lexicon: Baarle was in the earlier script.json",
+                    "lexicon: Johannes (no music",
+                ),
+            ),
+            lambda: (
+                None
+                if tables_json().get("lexicon") == {"Johannes": "Yo-hahn-ess"}
+                else "cli: script did not take the lexicon from script.md's Lexicon table"
+            ),
+            lambda: tables_md("| Schmidt | |\n"),
+            lambda: expect(
+                1,
+                ("script", batch / "builds" / "03-tables"),
+                "FIX lexicon row",
             ),
         ]
         for step in steps:

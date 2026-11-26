@@ -2,6 +2,17 @@
 
 Every change to this copy of the video-producer package it was adapted from. The version numbers are this copy's own; the package as received is 1.0.0. File and section names in 1.0.0 and 1.1.0 refer to the package's original layout (`references/01-producer-playbook.md` to `10-qa-and-house-rules.md`).
 
+## 2.11.1 - 2026-11-26
+
+Four faults the studio engine showed on its next four films.
+
+- **`look` saw the whole picture.** ffprobe ends the csv row of a stream that carries side data with a comma (`112.266667,` on every rendered film, whose frames bring an ICC profile), so `look` could not read the picture's length, fell back to the container's (the sound runs 0.1 s longer) and left the last cell of its sheets empty. `sheet.seconds()` reads the row's first field, and `look` refuses (2) when ffmpeg writes no frame for one of its times in place of leaving an empty cell.
+- **A lexicon lives in `script.md`.** `studio.py script` copies a table with a `word` and a `say` column (the template's `## Lexicon`) into `script.json` and names its words in the closing line; without the table it keeps the `lexicon`, `lead` and `progress` of an earlier `script.json`, which it used to drop. A word the table no longer lists is dropped with a `NOTE lexicon:` line. `status` shows `script` as stale when the table and `script.json` differ.
+- **A read-only research lane loses nothing.** In `script-prep.js` and `script-revise.js` every research lane (the facts, the traces, the fact lanes of a revision) is followed by a `keep` agent (`haiku` at `low` by default, `models.keep` and `efforts.keep`) that saves the lane's reply when its file is missing and changes nothing else; the fact lane returns its rows whole, not a summary. One film's `facts.md` was never written because its research agent type could not write.
+- **A trace names what it searched for.** A trace row that says a source does not state something names the words it searched the saved page for; one trace missed a sentence that stood in a paper's Methods.
+- **Selftest.** The `look` part builds its film like a rendered one (a PNG with an ICC profile under a longer sound), checks `sheet.seconds()` on the rows ffprobe really printed and checks that the last cell holds the picture; `probe` cases cover the Lexicon table, the kept keys and the dropped word.
+- **Repo.** `.scratch/` is ignored: an agent's one-off helpers showed up as untracked files in the checkout.
+
 ## 2.11.0 - 2026-11-26
 
 The studio engine: narrated films drawn on an HTML stage in headless Chrome, as a second engine beside the Pillow one. Built from a batch of narrated films made on 2026-11-24 and 2026-11-25, so that the setup, the shot helpers, the devices and the checks those films each re-wrote are made once.

@@ -38,6 +38,16 @@ Columns:
 - `gap`: seconds of silence after the line when it should differ from 0.2 (a breath before a turn 0.45 to 0.6,
   never more than 0.7). Empty means the default.
 
+## Lexicon
+
+A word the voice gets wrong in every line goes here, once: `studio.py script <build>` copies this table into
+`script.json` as the lexicon, and the voice then says the word as the `say` column reads (the captions keep
+the word as written). One word per row; add a row only after a real read showed the voice gets it wrong.
+Leave the table empty when no word needs it.
+
+| word | say |
+|---|---|
+
 ## Size targets
 
 - 27 to 32 lines; 285 to 315 spoken words; each line 18 words or fewer; one idea per line.

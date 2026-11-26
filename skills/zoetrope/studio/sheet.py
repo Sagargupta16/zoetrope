@@ -45,6 +45,19 @@ def strip(
     return out
 
 
+def seconds(answer: str) -> float | None:
+    """The number in the first row of an ffprobe csv answer, or None when it holds none (N/A, nothing). A video
+    stream that carries side data, such as the ICC profile of a rendered film, makes ffprobe end the row with a
+    comma ("112.266667,"), so the row is read up to its first comma."""
+    rows = answer.strip().splitlines()
+    if not rows:
+        return None
+    try:
+        return float(rows[0].split(",")[0])
+    except ValueError:
+        return None
+
+
 def look(
     film: Path,
     out: Path,
@@ -80,11 +93,9 @@ def look(
             text=True,
             check=False,
         )
-        try:
-            length = float(probe.stdout.strip().splitlines()[0])
+        length = seconds(probe.stdout)
+        if length is not None:
             break
-        except (ValueError, IndexError):
-            continue
     if length is None:
         raise RuntimeError(
             f"ffprobe gave no length for {film}: {probe.stderr.strip()[:200]}"
@@ -134,9 +145,13 @@ def look(
                 check=False,
             )
             x, y = (index % cols) * width, (index // cols) * tall
-            if frame.is_file():
-                with Image.open(frame) as picture:
-                    page.paste(picture.convert("RGB"), (x, y))
+            if not frame.is_file():
+                # an empty cell reads as a dark frame: refuse the look instead
+                raise RuntimeError(
+                    f"ffmpeg wrote no frame at {at:.2f} s of {film.name} (its picture is {length:.2f} s long)"
+                )
+            with Image.open(frame) as picture:
+                page.paste(picture.convert("RGB"), (x, y))
             draw.rectangle((x, y, x + 118, y + 40), fill=(0, 0, 0))
             draw.text((x + 6, y + 3), f"{at:.2f}", font=font, fill=(255, 230, 0))
         name = out / f"look_{len(sheets) + 1:02d}.png"

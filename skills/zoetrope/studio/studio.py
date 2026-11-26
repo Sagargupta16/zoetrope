@@ -482,8 +482,40 @@ def script_lines(text: str) -> list[dict]:
     return lines
 
 
+def script_lexicon(text: str) -> dict[str, str] | None:
+    """The respellings a script.md declares for the voice, as script.json holds them ({word: say}): the first
+    table whose header has a word and a say column (the template keeps it under "## Lexicon"). None when the
+    file has no such table, so a lexicon someone put into an earlier script.json by hand is kept. Raises
+    ValueError when a row has only one of the two."""
+    out, head, found = {}, None, False
+    for line in text.splitlines():
+        if not line.strip().startswith("|"):
+            if found:
+                break
+            head = None
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if head is None:
+            head = [cell.lower() for cell in cells]
+            found = "word" in head and "say" in head
+        elif found and not all(set(cell) <= set("-: ") for cell in cells):
+            row = dict(zip(head, cells))
+            word, say = row.get("word", ""), row.get("say", "")
+            if not word and not say:
+                continue
+            if not word or not say:
+                raise ValueError(
+                    f"lexicon row {' | '.join(cells)!r}: it needs a word and what the voice says"
+                )
+            out[word] = say
+    return out if found else None
+
+
 def cmd_script(args) -> int:
-    """script.md table (id, beat, caption, spoken, gap) plus the batch tag and accent into script.json."""
+    """script.md table (id, beat, caption, spoken, gap) plus the batch tag and accent into script.json. The
+    Lexicon table of script.md, when it has one, becomes the lexicon; the keys a table cannot hold (voice,
+    music, lead, progress, and the lexicon of a script.md with no such table) are kept from an earlier
+    script.json."""
     batch = load_batch(args.build)
     if batch is None:
         return NOT_CHECKED
@@ -494,6 +526,7 @@ def cmd_script(args) -> int:
     text = source.read_text(encoding="utf-8")
     try:
         lines = script_lines(text)
+        lexicon = script_lexicon(text)
     except ValueError as error:
         print(f"FIX {error}")
         return FIX
@@ -515,6 +548,16 @@ def cmd_script(args) -> int:
         # an earlier per-film voice wins; the batch's speed fills only a missing key
         "voice": {"speed": batch.voice.get("speed", 1.0), **old.get("voice", {})},
     }
+    # script.md's Lexicon table wins; without one, the lexicon of the earlier script.json stays
+    earlier = old.get("lexicon") or {}
+    if lexicon is None:
+        lexicon = earlier
+    dropped = sorted(set(earlier) - set(lexicon))
+    if lexicon:
+        out["lexicon"] = lexicon
+    for key in ("lead", "progress"):
+        if key in old:
+            out[key] = old[key]
     music = dict(old.get("music", {}))
     for key, value in (
         ("theme", args.theme),
@@ -541,7 +584,14 @@ def cmd_script(args) -> int:
         if music.get("theme") and music.get("track")
         else f" (no music: render refuses until script {args.build} --theme <theme> --track <track>)"
     )
-    print(f"script.json: {len(lines)} lines{note}")
+    said = f", lexicon: {', '.join(lexicon)}" if lexicon else ""
+    if dropped:
+        # never silent: the voice would go back to reading these words as written
+        print(
+            f"NOTE lexicon: {', '.join(dropped)} was in the earlier script.json and is not in script.md's "
+            "Lexicon table, so it is dropped: add a row to keep it"
+        )
+    print(f"script.json: {len(lines)} lines{said}{note}")
     return PASS
 
 
