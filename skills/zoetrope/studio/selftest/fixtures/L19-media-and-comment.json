@@ -1,0 +1,50 @@
+{
+ "rule": "L19",
+ "note": "the fault registers stamp with a space before the bracket and a backtick name, and a shot asks for a stamp; the control names stamp only in a comment and registers number for a shot's media graphic, which the kit does draw",
+ "tier": "static",
+ "t": 1.0,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "stamp",
+       "text": "LIKELY",
+       "at": 1.0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [],
+  "graphics": "(() => {\n  const { graphic } = Kit;\n  graphic (`stamp`, (wrap, spec, ctx) => () => {});\n})();\n"
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "media": {
+      "kind": "none",
+      "graphic": "number"
+     },
+     "over": [
+      {
+       "type": "stamp",
+       "text": "LIKELY",
+       "at": 1.0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [],
+  "graphics": "(() => {\n  const { graphic } = Kit;\n  // graphic('stamp', ...) was tried first: a built-in type cannot be replaced\n  /* graphic(\"stamp\", old) */\n  graphic('number', (cam, media, ctx) => () => {});\n})();\n"
+ }
+}

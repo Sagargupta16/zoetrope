@@ -520,6 +520,8 @@ def frames(build: Path, extra: str | None) -> int:
                         moments[round(item["at"] + 0.04, 2)] = shot["id"]
             # a count's landing, just before and just after it, so the lint's L07 sees both sides
             land = spec.get("landAt") if spec.get("type") == "number" else None
+            if spec.get("standing"):
+                land = None  # a standing number is landed from its first frame: the kit does not read landAt
             if spec.get("type") in ("rail", "years"):
                 land = spec.get("until")
             if isinstance(land, (int, float)):

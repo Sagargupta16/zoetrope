@@ -14,7 +14,12 @@ from pathlib import Path
 
 def words(spec: dict) -> str:
     parts = []
-    for key in ("lines", "text", "sub", "label", "handle", "line"):
+    keys = ("lines", "text", "sub", "label", "handle", "line")
+    if (
+        spec.get("type") == "end"
+    ):  # the end card's big lines and its chip (a route's `big` is a switch)
+        keys = ("big", "chip", *keys)
+    for key in keys:
         value = spec.get(key)
         if isinstance(value, list):
             parts.append(" / ".join(str(item) for item in value))

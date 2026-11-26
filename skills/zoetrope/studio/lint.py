@@ -53,6 +53,7 @@ RULES = {
     "L16": "A present-day claim on a chip carries its year",
     "L17": "A photoreal picture under a real name is a P0, whatever the tag says.",
     "L18": "A redrawn document stands on a plain plate drawn by the stage",
+    "L19": "A film's own device never takes the name of a built-in overlay type",
 }
 TIERS = {"static", "frames", "all"}
 
@@ -611,15 +612,42 @@ def credit_like(text: str) -> bool:
     return bool(names) and all(w[0].isupper() for w in names)
 
 
+def _twin(film: Film, shot: dict, spec: dict) -> dict | None:
+    """The same overlay on the shot before (its type and its words), or None. When that shot holds it more than
+    once, the copy that stands to the cut is the one that is carried, else the last one listed."""
+    if not shot["_i"]:
+        return None
+    before = film.shots[shot["_i"] - 1]
+    same = [
+        o
+        for o in before["over"]
+        if o.get("type") == spec.get("type") and text_of(o) == text_of(spec)
+    ]
+    reaching = [
+        o for o in same if o.get("out") is None or o["out"] >= before["t1"] - 0.01
+    ]
+    return (reaching or same or [None])[-1]
+
+
 def _carried(film: Film, shot: dict, spec: dict) -> bool:
     """A standing overlay that continues the same one on the shot before (reported once, on its first shot)."""
-    if not shot["_i"]:
-        return False
-    before = film.shots[shot["_i"] - 1]
-    return any(
-        o.get("type") == spec.get("type") and text_of(o) == text_of(spec)
-        for o in before["over"]
-    )
+    return _twin(film, shot, spec) is not None
+
+
+def _chain(film: Film, shot: dict, spec: dict) -> list[tuple[dict, dict]]:
+    """The earlier copies of a carried overlay as (shot, overlay), oldest first: the same overlay on the shot
+    before, and on the shots before that for as long as each copy is itself standing. Empty when the shot
+    before does not hold it."""
+    found, held, index = [], spec, shot["_i"]
+    while index > 0:
+        twin = _twin(film, film.shots[index], held)
+        if twin is None:
+            break
+        found.append((film.shots[index - 1], twin))
+        held, index = twin, index - 1
+        if not twin.get("standing"):
+            break  # a copy with an entrance of its own: the chain starts here
+    return found[::-1]
 
 
 def outexpo_hit(span: float, step: float) -> float:
@@ -655,7 +683,34 @@ def counted(spec: dict) -> bool:
     )
 
 
+def landing(spec: dict, value: float, dec: int) -> tuple[float, str]:
+    """When a number overlay first shows its last value, and how a row words it: a standing figure and one
+    printed whole from their first frame, a landAt by the clock, an eased count where it gets there."""
+    dur = spec.get("count", 1.1)
+    if spec.get("standing"):
+        shows = spec["at"]
+        return (
+            shows,
+            f"stands landed from {shows:.2f} (standing, and the shot before does not show it)",
+        )
+    if "landAt" in spec:
+        shows = float(spec["landAt"])
+        return shows, f"lands at {shows:.2f}"
+    if not dur:
+        shows = spec["at"]
+        return shows, f"is printed whole at {shows:.2f}"
+    span = abs(value - float(spec.get("from") or 0))
+    shows = spec["at"] + 0.05 + dur * outexpo_hit(span, 10.0**-dec)
+    return (
+        shows,
+        f"has no landAt and its eased count shows {number_text(value, dec)} at {shows:.2f}",
+    )
+
+
 def l07(film: Film, rows: list[dict]) -> None:
+    chains: set[int] = (
+        set()
+    )  # the carried numbers that have their row: one stand, one row
     for shot in film.shots:
         for spec in shot["over"]:
             kind = spec.get("type")
@@ -663,27 +718,79 @@ def l07(film: Film, rows: list[dict]) -> None:
             if kind == "number" and counted(spec):
                 value, dec = float(spec["value"]), int(spec.get("decimals") or 0)
                 word = matching(film, value, spec["at"], end)
+                chain = _chain(film, shot, spec) if spec.get("standing") else []
+                if chain:
+                    # Carried: the figure stands on after each cut as it stood before it, so the copies are one
+                    # stand. It first shows its last value when its first copy lands or, when that copy's shot
+                    # cut away (or it left) before it landed, on the first frame of the next copy. The fault is
+                    # a word first heard later than that. It is raised once, on the copy during whose stand the
+                    # word is first heard: a word first heard before this copy began was an earlier copy's
+                    # business (also one in the last half millisecond before the cut, which that copy's own
+                    # window holds), a word heard on the way and said again is no fault, and a word spoken
+                    # while the number is off the screen counts as heard.
+                    first_shot, first = chain[0]
+                    next_shot, after = chain[1] if len(chain) > 1 else (shot, spec)
+                    # the first frame of the copy after the first one; when its shot holds the standing number
+                    # more than once, of the earliest
+                    whole = min(
+                        o["at"]
+                        for o in next_shot["over"]
+                        if o is after
+                        or (
+                            o.get("standing")
+                            and o.get("type") == spec.get("type")
+                            and text_of(o) == text_of(spec)
+                        )
+                    )
+                    where = next_shot["id"]
+                    if counted(first):
+                        landed = landing(first, value, dec)[0]
+                        if landed < film.end_of(first_shot, first) - 0.0005:
+                            whole, where = landed, first_shot["id"]
+                    heard = matching(film, value, first["at"], end)
+                    if (
+                        heard is not None
+                        and id(first) not in chains
+                        and heard["t0"]
+                        >= max(spec["at"] - 0.0005, film.end_of(*chain[-1]))
+                        and heard["t0"] > whole + LAND_TOL + 0.0005
+                    ):
+                        chains.add(id(first))
+                        since = (
+                            "from the first frame of its copy on this shot"
+                            if where == shot["id"]
+                            else f"on {where}, and standing over each cut since"
+                        )
+                        row(
+                            rows,
+                            "L07",
+                            "FIX",
+                            whole,
+                            f"{shot['id']}: number {number_text(value, dec)} has stood whole since {whole:.2f}"
+                            f" ({since}), but its word is first spoken at {heard['t0']:.2f}",
+                            'land the count on its word: set "landAt" to the word\'s cue on the copy that is on'
+                            ' screen then, and take "standing" off that copy',
+                        )
+                    continue
                 if word is None:
                     continue  # never spoken while it stands (or said before it): nothing to land on
-                dur = spec.get("count", 1.1)
-                if "landAt" in spec:
-                    shows = float(spec["landAt"])
-                    why = f"lands at {shows:.2f}"
-                elif not dur:
-                    shows = spec["at"]
-                    why = f"is printed whole at {shows:.2f}"
-                else:
-                    span = abs(value - float(spec.get("from") or 0))
-                    shows = spec["at"] + 0.05 + dur * outexpo_hit(span, 10.0**-dec)
-                    why = f"has no landAt and its eased count shows {number_text(value, dec)} at {shows:.2f}"
-                if abs(shows - word["t0"]) > LAND_TOL:
+                # the kit shows a standing figure landed from its first frame, whatever landAt says
+                shows, why = landing(spec, value, dec)
+                fix = (
+                    'take "standing" off: it is for a count that landed on the shot before'
+                    if spec.get("standing")
+                    else f'set "landAt" to the word\'s cue (it lands by the clock, within {LAND_TOL} s)'
+                )
+                if (
+                    abs(shows - word["t0"]) > LAND_TOL + 0.0005
+                ):  # float noise at the exact tolerance
                     row(
                         rows,
                         "L07",
                         "FIX" if shows < word["t0"] else "NOTE",
                         shows,
                         f"{shot['id']}: number {number_text(value, dec)} {why}; the word is spoken at {word['t0']:.2f}",
-                        f'set "landAt" to the word\'s cue (it lands by the clock, within {LAND_TOL} s)',
+                        fix,
                     )
             elif kind in ("rail", "years") and isinstance(spec.get("to"), (int, float)):
                 word = matching(film, float(spec["to"]), spec["at"], end)
@@ -698,7 +805,7 @@ def l07(film: Film, rows: list[dict]) -> None:
                         f'{shot["id"]}: {kind} ends on {spec["to"]} with no "until"; the word is at {word["t0"]:.2f}',
                         'set "until" to the word\'s cue',
                     )
-                elif abs(spec["until"] - word["t0"]) > LAND_TOL:
+                elif abs(spec["until"] - word["t0"]) > LAND_TOL + 0.0005:
                     row(
                         rows,
                         "L07",
@@ -897,6 +1004,8 @@ def chips_of(shot: dict) -> list[tuple[str, float]]:
     for spec in shot["over"]:
         if spec.get("type") in ("label", "callout", "chip"):
             chips.append((plain(spec.get("text")), spec["at"]))
+        if spec.get("type") == "end" and isinstance(spec.get("chip"), str):
+            chips.append((plain(spec["chip"]), spec["at"]))  # the end card's chip
         listed = spec.get(
             "rows"
         )  # a list of rows on a card; a count on some devices (film 01)
@@ -997,6 +1106,59 @@ def l18(film: Film, rows: list[dict]) -> None:
                 )
 
 
+# The overlay types kit.js builds itself (its TYPES table; the selftest compares the two). The kit looks an
+# overlay's type up among these first, so a device that a film registers under one of these names is never
+# drawn as an overlay (as a shot's `media` graphic it is: that lookup reads the registered devices only).
+BUILT_IN = (
+    "hook",
+    "title",
+    "label",
+    "number",
+    "lower",
+    "source",
+    "chapter",
+    "stamp",
+    "callout",
+    "compare",
+    "rail",
+    "quote",
+    "end",
+)
+REGISTERED = re.compile(r"""\bgraphic\s*\(\s*['"`]([A-Za-z0-9_-]+)['"`]""")
+# a string (kept) or a comment (dropped): a // inside a string, such as a URL, is not a comment
+JS_COMMENTS = re.compile(
+    r"""("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|/\*.*?\*/|//[^\n]*""",
+    re.DOTALL,
+)
+
+
+def l19(film: Film, rows: list[dict]) -> None:
+    try:
+        text = (film.build / "graphics.js").read_text(encoding="utf-8")
+    except OSError:
+        return  # a film without devices of its own
+    code = JS_COMMENTS.sub(lambda found: found.group(1) or "", text)
+    named = set(REGISTERED.findall(code)) & set(BUILT_IN)
+    for shot in film.shots:
+        for spec in shot["over"]:
+            kind = spec.get("type")
+            if kind not in named:
+                continue
+            named.discard(
+                kind
+            )  # one row per name, on the first overlay that asks for it
+            row(
+                rows,
+                "L19",
+                "FIX",
+                spec["at"],
+                f"{shot['id']}: graphics.js registers a device named {kind}, but {kind} is a built-in overlay"
+                " type, so the kit draws its own here and never the film's",
+                "give the film's device another name and use that as the overlay's type, or use the built-in"
+                " type's own settings (docs/studio.md, Built in)",
+            )
+
+
 STATIC = (
     l01,
     l02,
@@ -1014,6 +1176,7 @@ STATIC = (
     l16,
     l17,
     l18,
+    l19,
 )
 
 
@@ -1136,6 +1299,8 @@ def f07(film: Film, registry: dict, rows: list[dict]) -> None:
         for spec in shot["over"]:
             if spec.get("type") != "number" or "landAt" not in spec:
                 continue
+            if spec.get("standing"):
+                continue  # the kit shows it landed from its first frame; the static tier judges it
             if not counted(spec):
                 continue  # a text value or landAt: build refuses it, the lint never crashes on it
             land, final = (
@@ -1640,6 +1805,8 @@ def plant(folder: Path, case: dict) -> None:
         json.dumps(built["layout"]), encoding="utf-8"
     )
     (folder / "script.json").write_text(json.dumps(built["script"]), encoding="utf-8")
+    if isinstance(case.get("graphics"), str):  # the film's own devices (L19)
+        (folder / "graphics.js").write_text(case["graphics"], encoding="utf-8")
     if built["registry"] is not None:
         registry = folder / "proof" / "frames" / "registry.json"
         registry.write_text(json.dumps(built["registry"]), encoding="utf-8")
@@ -1659,6 +1826,15 @@ def selftest() -> int:
 
     A case may name the "level" it must raise (FIX by default; L00 cases say NOT CHECKED)."""
     fired, clean, problems = 0, 0, []
+    # L19 names the kit's built-in types: the list here and the table in kit.js must be the same
+    kit = (HERE / "kit.js").read_text(encoding="utf-8")
+    table = kit[kit.find("const TYPES = {") :]
+    table = table[: table.find("\n  };")]
+    own = re.findall(r"^    ([A-Za-z_$][\w$]*)\s*:", table, re.MULTILINE)
+    if sorted(own) != sorted(BUILT_IN):
+        problems.append(
+            f"BUILT_IN and the TYPES table of kit.js differ: {sorted(set(own) ^ set(BUILT_IN))}"
+        )
     cases = [FIXTURES / f"{code}.json" for code in RULES] + sorted(
         FIXTURES.glob("L*-*.json")
     )

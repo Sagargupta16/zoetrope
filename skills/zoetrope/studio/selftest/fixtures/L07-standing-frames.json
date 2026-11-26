@@ -1,0 +1,133 @@
+{
+ "rule": "L07",
+ "note": "the frames tier: a number that reads its last value before its landAt is a fault, but a standing number is landed from its first frame and the kit does not read its landAt (the control), so the frames tier leaves it to the static tier",
+ "tier": "frames",
+ "t": 3.9,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 23,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 2.8
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 6,
+     "over": [
+      {
+       "type": "number",
+       "value": 23,
+       "y": 352,
+       "landAt": 4.0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [],
+  "registry": {
+   "meta": {},
+   "frames": {
+    "2.70": [
+     {
+      "role": "number",
+      "text": "21"
+     }
+    ],
+    "2.90": [
+     {
+      "role": "number",
+      "text": "23"
+     }
+    ],
+    "3.90": [
+     {
+      "role": "number",
+      "text": "23"
+     }
+    ],
+    "4.10": [
+     {
+      "role": "number",
+      "text": "23"
+     }
+    ]
+   }
+  }
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 23,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 2.8
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 6,
+     "over": [
+      {
+       "type": "number",
+       "value": 23,
+       "y": 352,
+       "standing": true,
+       "landAt": 4.0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [],
+  "registry": {
+   "meta": {},
+   "frames": {
+    "2.70": [
+     {
+      "role": "number",
+      "text": "21"
+     }
+    ],
+    "2.90": [
+     {
+      "role": "number",
+      "text": "23"
+     }
+    ],
+    "3.90": [
+     {
+      "role": "number",
+      "text": "23"
+     }
+    ],
+    "4.10": [
+     {
+      "role": "number",
+      "text": "23"
+     }
+    ]
+   }
+  }
+ }
+}

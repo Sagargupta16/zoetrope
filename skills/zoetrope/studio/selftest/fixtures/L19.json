@@ -1,0 +1,45 @@
+{
+ "rule": "L19",
+ "note": "the film's graphics.js registers a device named stamp (the control names it stampmark)",
+ "tier": "static",
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "stamp",
+       "text": "LIKELY",
+       "at": 1.0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [],
+  "graphics": "(() => {\n  const { graphic } = Kit;\n  graphic('stamp', (wrap, spec, ctx) => () => {});\n})();\n"
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "stamp",
+       "text": "LIKELY",
+       "at": 1.0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [],
+  "graphics": "(() => {\n  const { graphic } = Kit;\n  graphic('stampmark', (wrap, spec, ctx) => () => {});\n})();\n"
+ }
+}

@@ -37,6 +37,9 @@ from unittest import mock
 STUDIO = Path(__file__).resolve().parent
 PROBE = STUDIO / "selftest" / "probe"
 GOLDEN_TIMELINE = PROBE / "timeline.golden.json"
+OPTIONS = (
+    STUDIO / "selftest" / "options" / "shots.json"
+)  # part_options: carried overlays and the end card
 FRAME_TIMES = (0.5, 2.5, 4.0, 8.0)
 BLOCK = 60  # px: the side of a block when a frame is compared by its mean colours
 JITTER = 0.25  # of 255: how far a block's mean colour may sit from the golden's
@@ -212,6 +215,14 @@ def part_owner() -> str | None:
     import status
     import studio
 
+    # what a copy of engine/ leaves out: caches, never a dot-file that is part of the engine
+    with tempfile.TemporaryDirectory(prefix="studio-selftest-") as scratch:
+        (Path(scratch) / ".ruff_cache").mkdir()
+        (Path(scratch) / ".python-version").write_text("3.13\n", encoding="utf-8")
+        names = [".ruff_cache", ".python-version", "__pycache__", "mix.pyc", "mix.py"]
+        left_out = studio.cache_names(scratch, names)
+        if left_out != {".ruff_cache", "__pycache__", "mix.pyc"}:
+            return f"upgrade: a copy of engine/ leaves out {sorted(left_out)}"
     table = (
         "# T (script v1)\n\n| id | beat | caption | spoken | gap |\n|---|---|---|---|---|\n"
         "| L01 | hook | One. | One. | |\n| L02 | close | Two. | Two. | 0.5 |\n"
@@ -376,6 +387,100 @@ def part_look() -> tuple[str | None, str]:
     return (
         None,
         "4 frames of the picture on 2 sheets under a longer sound, an earlier look cleared",
+    )
+
+
+def part_options() -> tuple[str | None, str]:
+    """The kit's carried overlays and its end card, on frames of a short film (the probe's script under the shot
+    list in selftest/options). A hook, a number and a stamp with `standing` read on the first frame after the
+    cut exactly as on the last frame before it; a number takes its `x` and, with `align: "center"`, the middle
+    of the frame; the end card sets its chip, lights its marked words and breaks its send line where the text
+    does. Needs the browser (the --render tier). Returns (problem, note)."""
+    with tempfile.TemporaryDirectory(prefix="studio-selftest-") as scratch:
+        build = plant_probe(Path(scratch))
+        shutil.copyfile(OPTIONS, build / "shots.json")
+        done = run(STUDIO / "build.py", "timeline", build)
+        if done.returncode:
+            return f"options build: {last_line(done)}", ""
+        timeline = json.loads((build / "timeline.json").read_text(encoding="utf-8"))
+        starts = {shot["id"]: shot["t0"] for shot in timeline["shots"]}
+        frame = 1 / timeline.get("fps", 30)
+        # the last frame before each cut and the first after it; the end card once it has settled
+        times = {
+            f"{name} {side}": round(starts[name] + offset, 4)
+            for name in ("s01b", "s03", "s05")
+            for side, offset in (("before", -frame), ("after", 0.0001))
+        }
+        times["end"] = round(starts["end"] + 1.5, 4)
+        out = Path(scratch) / "frames"
+        done = run(
+            STUDIO / "render.py",
+            "stills",
+            "--video",
+            build,
+            "--times",
+            ",".join(str(moment) for moment in times.values()),
+            "--out",
+            out,
+        )
+        if done.returncode:
+            return f"options render: {last_line(done)}", ""
+        frames = json.loads((out / "registry.json").read_text(encoding="utf-8"))[
+            "frames"
+        ]
+
+    def boxes(when: str, role: str) -> list[dict]:
+        return [box for box in frames[f"{times[when]:.2f}"] if box["role"] == role]
+
+    def same(first: list[dict], second: list[dict]) -> bool:
+        return (
+            len(first) == len(second) == 1
+            and all(abs(first[0][key] - second[0][key]) <= 1 for key in "xywh")
+            and first[0]["text"] == second[0]["text"]
+            and first[0]["opacity"] == second[0]["opacity"] == 1
+        )
+
+    problems = []
+    for role, shot in (("hook", "s01b"), ("stamp", "s05")):
+        if not same(boxes(f"{shot} before", role), boxes(f"{shot} after", role)):
+            problems.append(
+                f"a standing {role} does not stand as it stood before the cut:"
+                f" {boxes(f'{shot} before', role)} then {boxes(f'{shot} after', role)}"
+            )
+    # the stamp of the options film is 56 px with a hedge line: 133 px tall with the hedge at 0.62 of its words,
+    # 163 px with the 62 px hedge a small stamp used to wear
+    small = boxes("s05 before", "stamp")  # the stamp at rest, before the cut
+    if len(small) != 1 or small[0]["h"] > 145:
+        problems.append(
+            f"a 56 px stamp wears a hedge above 0.62 of its words: its box is {small[0]['h'] if small else 'missing'}"
+        )
+    landed, carried = boxes("s03 before", "number"), boxes("s03 after", "number")
+    if len(landed) != 1 or abs(landed[0]["x"] - 300) > 1 or landed[0]["text"] != "23":
+        problems.append(f"a number with x 300 stands at {landed}")
+    if (
+        len(carried) != 1
+        or carried[0]["text"] != "23"
+        or carried[0]["opacity"] != 1
+        or abs(carried[0]["x"] + carried[0]["w"] / 2 - 540) > 2
+        or abs(carried[0]["w"] - (landed[0]["w"] if landed else 0)) > 1
+    ):
+        problems.append(
+            f"a standing, centred number does not stand landed and centred after the cut: {carried}"
+        )
+    card = {box["text"]: box for box in boxes("end", "endcard")}
+    chip = [box for box in boxes("end", "label") if box["text"] == "AS OF 2026"]
+    line = [box for text, box in card.items() if text.lower().startswith("send this")]
+    if len(chip) != 1 or abs(chip[0]["x"] + chip[0]["w"] / 2 - 540) > 2:
+        problems.append(f"the end card's chip is not set in the middle: {chip}")
+    if any("*" in text for text in card) or "STILLMOVING ON2026" not in card:
+        problems.append(f"the end card prints its markers: {sorted(card)}")
+    if len(line) != 1 or line[0]["h"] < 100 or line[0]["w"] > 700:
+        problems.append(f"the end card's send line does not break in two lines: {line}")
+    if problems:
+        return "options: " + "; ".join(problems), ""
+    return None, (
+        "a standing hook, number and stamp hold across their cuts, a number takes x and the centre, the end card"
+        " sets its chip, its marked words and its line break"
     )
 
 
@@ -602,6 +707,57 @@ def part_cli() -> str | None:
             return done.returncode, done.stdout + done.stderr
 
         made = Path(scratch) / "made"
+        second = Path(scratch) / "second"
+
+        def copied_without_cache() -> str | None:
+            """new-batch run from the first batch's own copy of the engine (its engine/ holds a planted cache)."""
+            done = subprocess.run(
+                [
+                    sys.executable,
+                    "-I",
+                    str(made / "studio" / "studio.py"),
+                    "new-batch",
+                    str(second),
+                    "--config",
+                    str(batch / "batch.json"),
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                env=env,
+                timeout=120,
+                check=False,
+            )
+            if done.returncode:
+                said = (done.stdout + done.stderr).strip()[-200:]
+                return f"cli: new-batch from a batch's own copy exited {done.returncode}: {said}"
+            snapshot = (second / "SNAPSHOT.txt").read_text(encoding="utf-8")
+            if (
+                second / "engine" / ".ruff_cache"
+            ).exists() or ".ruff_cache" in snapshot:
+                return "cli: a tool's cache folder of engine/ went into a new batch or its snapshot"
+            if (
+                not (second / "engine" / ".python-version").is_file()
+                or "engine/.python-version" not in snapshot
+            ):
+                return "cli: the engine's .python-version did not travel into a new batch and its snapshot"
+            return None
+
+        def forced_upgrade() -> str | None:
+            """upgrade --force over a copy with an edit, an added and a deleted file, whose snapshot still holds
+            the two cache lines appended above: it names the three, and no cache line as removed."""
+            code, said = cli("upgrade", made, "--force")
+            wanted = (
+                "dropped a local edit: studio/qa.py",
+                "dropped an added file: studio/fonts/Inter.ttf",
+                "dropped a local deletion: studio/sheet.py",
+            )
+            if code != 0 or any(part not in said for part in wanted):
+                return f"cli: `upgrade <made> --force` exited {code} (want 0, {wanted!r}): {said.strip()[-200:]}"
+            listed = [line for line in said.splitlines() if ".ruff_cache" in line]
+            if listed:
+                return f"cli: upgrade --force listed a cache line of an older snapshot: {listed[0]}"
+            return None
 
         def pictured(plan: dict) -> dict:
             plan["shots"][1]["media"] = {"kind": "still", "src": "media/none.jpg"}
@@ -743,6 +899,23 @@ def part_cli() -> str | None:
                 else None
             ),
             lambda: expect(0, ("upgrade", made), "0 changed, 0 added, 0 removed"),
+            # an engine whose engine/ folder holds a tool's cache hands on neither the cache nor a snapshot line
+            # for it, and its .python-version still travels: the batch's own copy, with a cache planted in its
+            # engine/, makes a second batch
+            lambda: (made / "engine" / ".ruff_cache").mkdir(exist_ok=True),
+            lambda: (made / "engine" / ".ruff_cache" / "x").write_bytes(b"cache"),
+            lambda: copied_without_cache(),
+            # a snapshot written by an older engine lists cache files: one that changed since and one that is
+            # gone are no edits of the copy
+            lambda: (
+                (made / "SNAPSHOT.txt")
+                .open("a", encoding="utf-8", newline="")
+                .write(
+                    f"{'0' * 64}  engine/.ruff_cache/x\n{'0' * 64}  engine/.ruff_cache/gone\n"
+                )
+                and None
+            ),
+            lambda: expect(0, ("diff", made), "0 file(s) differ"),
             lambda: (made / "studio" / "qa.py").write_text(
                 "edited\n", encoding="utf-8"
             ),
@@ -770,15 +943,7 @@ def part_cli() -> str | None:
                     {"stuck": made / "engine-before-upgrade"},
                 )
             ),
-            lambda: expect(
-                0,
-                ("upgrade", made, "--force"),
-                (
-                    "dropped a local edit: studio/qa.py",
-                    "dropped an added file: studio/fonts/Inter.ttf",
-                    "dropped a local deletion: studio/sheet.py",
-                ),
-            ),
+            lambda: forced_upgrade(),
             lambda: (
                 None
                 if (made / "studio" / "qa.py").read_bytes()
@@ -1119,6 +1284,13 @@ def main(argv: list[str]) -> int:
             failed.append("look")
         else:
             print(f"ok   look: {note}")
+        problem, note = part_options()
+        count += 1
+        if problem:
+            print(f"FAIL {problem}")
+            failed.append("kit options")
+        else:
+            print(f"ok   kit options: {note}")
     if failed:
         print(f"STUDIO SELFTEST: FAIL ({'; '.join(failed)})")
         return 1

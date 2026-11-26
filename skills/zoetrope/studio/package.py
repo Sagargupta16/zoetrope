@@ -124,5 +124,17 @@ def package(batch, build: Path) -> int:
         newline="",
     )
     print(f"{slug}: {seconds:.1f} s, {size / 1e6:.1f} MB, cover {cover} ms")
+    # What the owner reads before an upload: the two lines a viewer meets first, and the counts. (A title lost
+    # a word between the script and post.json on one film, and only the caption had been read.) Printed in
+    # ASCII, so a console that cannot show a letter never stops a package that is already written.
+    first = next((row for row in caption.splitlines() if row.strip()), "")
+    tags = str(post.get("hashtags") or "")
+    for text in (
+        f"title: {post['title']}",
+        f"first line ({len(first)} characters): {first}",
+        f"caption {len(caption)} characters, {len(tags.split())} hashtags ({len(tags)} characters),"
+        f" {len(post['sources'])} sources",
+    ):
+        print(text.encode("ascii", "backslashreplace").decode("ascii"))
     print(out / f"{slug}.mp4")
     return 0

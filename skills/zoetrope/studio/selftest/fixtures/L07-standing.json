@@ -1,0 +1,85 @@
+{
+ "rule": "L07",
+ "note": "a number that landed on the shot before and stands on after the cut: without standing its copy counts again and lands late (a NOTE), with standing it is the same number carried (the control)",
+ "tier": "static",
+ "level": "NOTE",
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 23,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 2.8
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 6,
+     "over": [
+      {
+       "type": "number",
+       "value": 23,
+       "y": 352
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    1.3,
+    "In a room of only 23 people."
+   ]
+  ]
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 23,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 2.8
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 6,
+     "over": [
+      {
+       "type": "number",
+       "value": 23,
+       "y": 352,
+       "standing": true
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    1.3,
+    "In a room of only 23 people."
+   ]
+  ]
+ }
+}

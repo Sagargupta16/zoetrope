@@ -126,6 +126,28 @@ def refuse_stale(build: Path) -> int | None:
 # ---- batch and build setup ----
 
 
+def cache_names(folder: str, names: list[str]) -> set[str]:
+    """What a copy of engine/ leaves out: __pycache__, a .pyc and a tool's dot-folder (.ruff_cache). A dot-file
+    such as .python-version is part of the engine and travels with it."""
+    return {
+        name
+        for name in names
+        if name == "__pycache__"
+        or name.endswith(".pyc")
+        or (name.startswith(".") and (Path(folder) / name).is_dir())
+    }
+
+
+def cached(relative: Path) -> bool:
+    """A file of a tool's cache inside a copy: under __pycache__ or a dot-folder, or a .pyc. A snapshot never
+    lists one and the edit check never reads one, also when an older engine wrote it into SNAPSHOT.txt."""
+    return (
+        "__pycache__" in relative.parts
+        or relative.suffix == ".pyc"
+        or any(part.startswith(".") for part in relative.parts[:-1])
+    )
+
+
 def copy_engine(target: Path) -> list[str]:
     """Copy this engine into a batch folder (studio/, the audio engine as engine/, the manual and the rule
     list as docs/) and return its snapshot lines. new-batch and upgrade share it, so a batch always holds a
@@ -150,7 +172,7 @@ def copy_engine(target: Path) -> list[str]:
             engine,
             target / "engine",
             dirs_exist_ok=True,
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            ignore=cache_names,
         )
         print(f"engine copied to {target / 'engine'}")
     else:
@@ -176,24 +198,23 @@ def copy_engine(target: Path) -> list[str]:
         "docs",
     ):  # every copied file is in the snapshot, not only studio/
         for path in sorted((target / folder).rglob("*")):
-            relative = path.relative_to(target).as_posix()
-            if (
-                path.is_file()
-                and "__pycache__" not in relative
-                and path.suffix != ".pyc"
-            ):
-                copied.append(f"{sha256(path)}  {relative}")
+            relative = path.relative_to(target)
+            # a tool's cache folder in the batch's own copy (an earlier upgrade copied .ruff_cache along)
+            if path.is_file() and not cached(relative):
+                copied.append(f"{sha256(path)}  {relative.as_posix()}")
     return copied
 
 
 def read_snapshot(path: Path) -> dict[str, str]:
-    """SNAPSHOT.txt as {file name: sha256}; empty when there is none."""
+    """SNAPSHOT.txt as {file name: sha256}; empty when there is none. A line for a tool's cache file is left
+    out (an engine up to 2.11.1 wrote the cache files its upgrade copied along into the snapshot), so neither
+    the edit check nor upgrade's list of changed, added and removed files reads one."""
     if not path.is_file():
         return {}
     recorded = {}
     for line in path.read_text(encoding="utf-8").splitlines():
         digest, _, name = line.partition("  ")
-        if name:
+        if name and not cached(Path(name)):
             recorded[name] = digest
     return recorded
 
@@ -1490,7 +1511,12 @@ def make_parser() -> argparse.ArgumentParser:
     p.add_argument("--before")
     p.add_argument("--db", type=float, default=45.0)
     p = add("diff", cmd_diff, "batch")
-    p.add_argument("--against", default="SNAPSHOT")
+    p.add_argument(
+        "--against",
+        default="SNAPSHOT",
+        help="SNAPSHOT (the default: the batch's copy against its own SNAPSHOT.txt) or the studio/ folder of"
+        " another engine, such as <skill>/studio",
+    )
     p = add("upgrade", cmd_upgrade, "batch")
     p.add_argument("--force", action="store_true")
     return parser

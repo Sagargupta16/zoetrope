@@ -388,7 +388,8 @@ def write_timeline(batch: object, build: Path) -> None:
             )
             words = len(text.split())
             need = 0.5 + 0.3 * words if words else 0.0
-            if words and shown < need - 0.05:
+            # a standing overlay goes on from the shot before: its hold is the plan check's to add up (P07)
+            if words and shown < need - 0.05 and not spec.get("standing"):
                 warnings.append(
                     f'{shot["id"]}: {spec["type"]} "{text[:28]}" shows {shown:.2f} s, needs {need:.2f} s for {words} words'
                 )

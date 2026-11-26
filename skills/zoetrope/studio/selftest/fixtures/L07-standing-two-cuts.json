@@ -1,0 +1,121 @@
+{
+ "rule": "L07",
+ "note": "a standing number carried over two cuts from a shot that cut away before its count landed: it stands whole from the first standing copy (3.0) and its word is first spoken at 6.0, on the third shot, where the row is raised. In the control the count landed on its word in the first shot and the number is said again on the third: the walk back to the first copy is what keeps it clean",
+ "tier": "static",
+ "t": 3.0,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 3.6
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 5,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "landAt": 3.6
+      }
+     ]
+    },
+    {
+     "id": "s03",
+     "t0": 5,
+     "t1": 8,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "landAt": 3.6
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    4.8,
+    "Then there were about 40 people."
+   ]
+  ]
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 2.2
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 5,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "landAt": 2.2
+      }
+     ]
+    },
+    {
+     "id": "s03",
+     "t0": 5,
+     "t1": 8,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "landAt": 2.2
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    1.0,
+    "Then there were about 40 people."
+   ],
+   [
+    "L02",
+    5.4,
+    "Yes, 40 people."
+   ]
+  ]
+ }
+}
