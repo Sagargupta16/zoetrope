@@ -591,6 +591,13 @@ def part_cli() -> str | None:
         steps = [
             lambda: expect(0, ("build", probe)),
             # 1 and 3: an input newer than the timeline, by the one definition, refuses every reader of it
+            # (the other inputs are aged first: on a fresh checkout every file of the probe is seconds old)
+            lambda: [
+                os.utime(probe / name, (time.time() - 120,) * 2)
+                for name in ("shots.py", "shots.json", "script.json", "graphics.js")
+                if (probe / name).is_file()
+            ]
+            and None,
             lambda: os.utime(timeline, (time.time() - 60,) * 2),
             lambda: os.utime(
                 probe / "narration" / "layout.json", (time.time() - 30,) * 2
