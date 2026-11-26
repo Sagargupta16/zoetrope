@@ -1,0 +1,139 @@
+{
+ "shots": [
+  {
+   "id": "s01",
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "hook",
+     "lines": [
+      "HOOK *STAYS*",
+      "IN PLACE"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "s01b",
+   "cue": "L01:1",
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "hook",
+     "lines": [
+      "HOOK *STAYS*",
+      "IN PLACE"
+     ],
+     "standing": true
+    }
+   ]
+  },
+  {
+   "id": "s02",
+   "cue": "L01:3",
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "number",
+     "value": 23,
+     "y": 352,
+     "size": 200,
+     "sub": "PEOPLE IN *ONE* ROOM",
+     "x": 300,
+     "at": "+0.1",
+     "landAt": "L01:5"
+    }
+   ]
+  },
+  {
+   "id": "s03",
+   "cue": "L02:0",
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "number",
+     "value": 23,
+     "y": 352,
+     "size": 200,
+     "sub": "PEOPLE IN *ONE* ROOM",
+     "align": "center",
+     "standing": true,
+     "landAt": "L01:5",
+     "x": 300
+    }
+   ]
+  },
+  {
+   "id": "s04",
+   "cue": "L02:2",
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "stamp",
+     "text": "ONE STUDY",
+     "who": "OUR NOTE",
+     "size": 56,
+     "y": 700,
+     "at": "+0.1"
+    }
+   ]
+  },
+  {
+   "id": "s05",
+   "cue": "L03:0",
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "over": [
+    {
+     "type": "stamp",
+     "text": "ONE STUDY",
+     "who": "OUR NOTE",
+     "size": 56,
+     "y": 700,
+     "standing": true
+    }
+   ]
+  },
+  {
+   "id": "end",
+   "cue": "L03:4",
+   "len": 3.0,
+   "media": {
+    "kind": "none",
+    "graphic": "ground"
+   },
+   "captions": false,
+   "over": [
+    {
+     "type": "end",
+     "big": [
+      "STILL",
+      "*MOVING* ON",
+      2026
+     ],
+     "chip": "AS OF 2026",
+     "handle": "probe",
+     "line": "Send this to someone\nwho *lives* on it",
+     "lift": 80
+    }
+   ]
+  }
+ ]
+}

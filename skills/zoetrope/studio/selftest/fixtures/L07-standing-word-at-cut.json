@@ -1,0 +1,88 @@
+{
+ "rule": "L07",
+ "note": "a number printed whole at 0.2 and carried over a cut at 4.0, with its word first spoken just after the cut (4.05): the figure stood whole 3.85 s before its word, however close the word is to the cut (in the control the figure is printed on its word)",
+ "tier": "static",
+ "t": 0.2,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 4,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "at": 0.2,
+       "count": 0
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 4,
+     "t1": 6,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "count": 0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    2.85,
+    "Then there were about 40 people."
+   ]
+  ]
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 4,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "at": 1.4,
+       "count": 0
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 4,
+     "t1": 6,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "count": 0
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    0.2,
+    "Then there were about 40 people."
+   ]
+  ]
+ }
+}

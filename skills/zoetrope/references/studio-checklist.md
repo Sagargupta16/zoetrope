@@ -35,6 +35,7 @@ Run `build` again after any change to `shots.py`, `shots.json`, `script.json`, `
 - [lint L01] A date chip stands only on a picture in the `past` grade with nothing of today in it.
 - [lint L17] A real name, a specific day, a document or a recorded event is never a chip on a photoreal picture: type on a blurred plate, our own drawing, or the source line. Declare a chip's real name with `real()`.
 - [lint L18] A redrawn document stands on the stage's plain plate (`ground`), never on a generated picture.
+- [lint L19] A film's own device in `graphics.js` never takes the name of a built-in overlay type (`stamp`, `number`, `end` and the rest): an overlay of that type is drawn by the kit's own.
 - [look] A data device with no honest picture goes on a blurred plate with a still camera.
 
 ## 3. Words and devices (the static lint)
@@ -49,6 +50,7 @@ Run `build` again after any change to `shots.py`, `shots.json`, `script.json`, `
 - [lint L15] A lower third is five words or fewer on one line.
 - [lint L16] A present-day claim on a chip carries its year.
 - [qa P07] A text overlay stands its reading hold: 0.5 s plus 0.3 s per word, at most 4 s; the same words carried over a cut count as one hold only while it is unbroken.
+- [look] What stands on both sides of a cut (a drawing, a plate, a rail, a label, a stamp, a number) stands in the same place and at the same size on both, or moves there in one visible move; an overlay that goes on from the shot before is set `standing: true`.
 - [look] Hero text is five words or fewer; one hero element per shot.
 - [look] A date chip is yellow, a label chip dark; the words that mark one part of a row mark it in every row.
 - [look] A source line names only what it sources, and keeps the source's qualifier on screen (TENDS TO RUST, not RUSTS).

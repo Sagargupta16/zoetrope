@@ -1,0 +1,98 @@
+{
+ "rule": "L07",
+ "note": "a standing number carried from the shot where its count landed on its word, while the narration says the number again later: no fault (the control). The fault is the same carry from a shot that cut away before the count landed",
+ "tier": "static",
+ "t": 3.0,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 3.6
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 7,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "landAt": 3.6
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    2.4,
+    "Then there were about 40 people."
+   ],
+   [
+    "L02",
+    5.0,
+    "Yes, 40 people."
+   ]
+  ]
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 2.2
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 7,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "landAt": 2.2
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    1.0,
+    "Then there were about 40 people."
+   ],
+   [
+    "L02",
+    4.0,
+    "Yes, 40 people."
+   ]
+  ]
+ }
+}

@@ -1,0 +1,81 @@
+{
+ "rule": "L07",
+ "note": "a standing number that the shot before does not show: the kit prints it landed from the shot's first frame, before its spoken word, whatever its landAt says (the control lands on the word)",
+ "tier": "static",
+ "t": 3.0,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "label",
+       "text": "A ROOM"
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 7,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "landAt": 4.5
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    3.3,
+    "Then there were about 40 people."
+   ]
+  ]
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "label",
+       "text": "A ROOM"
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 7,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "landAt": 4.5
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    3.3,
+    "Then there were about 40 people."
+   ]
+  ]
+ }
+}

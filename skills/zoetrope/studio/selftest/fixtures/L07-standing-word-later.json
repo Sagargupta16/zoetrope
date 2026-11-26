@@ -1,0 +1,88 @@
+{
+ "rule": "L07",
+ "note": "a standing number carried from a shot that cut away before its count landed: the figure stands whole from the cut, 0.6 s before its word (the control's count landed on its word before the cut)",
+ "tier": "static",
+ "t": 3.0,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 3.6
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 6,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "landAt": 3.6
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    2.4,
+    "Then there were about 40 people."
+   ]
+  ]
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 2.8
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 6,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "landAt": 2.8
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    1.6,
+    "Then there were about 40 people."
+   ]
+  ]
+ }
+}

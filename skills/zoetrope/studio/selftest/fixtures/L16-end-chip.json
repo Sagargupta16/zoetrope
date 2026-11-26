@@ -1,0 +1,52 @@
+{
+ "rule": "L16",
+ "note": "the end card's chip makes a present-day claim with no year (the control carries the year)",
+ "tier": "static",
+ "t": 0.0,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "end",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "end",
+       "big": [
+        "STILL",
+        "MOVING"
+       ],
+       "chip": "TRUE TODAY",
+       "line": "Send this to someone who lives on it"
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "end",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "end",
+       "big": [
+        "STILL",
+        "MOVING"
+       ],
+       "chip": "TODAY, AS OF 2026",
+       "line": "Send this to someone who lives on it"
+      }
+     ]
+    }
+   ]
+  },
+  "speech": []
+ }
+}

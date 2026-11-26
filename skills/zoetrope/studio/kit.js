@@ -71,9 +71,11 @@ const Kit = (() => {
     wrap.appendChild(el);
     const step = spec.step || 0.075;
     if (o.standing) {
-      // The hook stands complete on its first frame; its entrance only settles it.
+      // The hook stands complete on its first frame; its entrance only settles it. standing: it stands settled
+      // from the shot's first frame (a shot that continues the hook's shot after a cut-in).
+      const at = spec.standing ? ctx.at - 9 : ctx.at;
       return t => {
-        const p = ease.outExpo(remap(t, ctx.at, ctx.at + 0.55));
+        const p = ease.outExpo(remap(t, at, at + 0.55));
         el.style.transformOrigin = '0 50%';
         el.style.transform = 'scale(' + lerp(1.07, 1, p).toFixed(4) + ')';
       };
@@ -95,12 +97,19 @@ const Kit = (() => {
     number: (wrap, spec, ctx) => {
       const num = h('span', { text: '' });
       const size = spec.size || 300;
-      const el = h('div', { class: 'k-num' + (spec.tone === 'accent' ? ' accent' : ''), 'data-role': 'number' }, [
+      // align "center": the figure and its second line are centred on the frame. x: their left edge (not read
+      // when centred: the two would centre the figure between x and the right edge, not on the frame).
+      const center = spec.align === 'center';
+      const left = center || typeof spec.x !== 'number' || !Number.isFinite(spec.x) ? undefined : spec.x;
+      const el = h('div', { class: 'k-num' + (spec.tone === 'accent' ? ' accent' : '') + (center ? ' center' : ''), 'data-role': 'number' }, [
         spec.prefix ? h('span', { class: 'pre', text: spec.prefix }) : null, num,
         spec.unit ? h('span', { class: 'unit', text: spec.unit }) : null,
       ]);
       const y = spec.y === undefined ? 600 : spec.y;
       el.style.top = y + 'px';
+      if (left !== undefined) el.style.left = left + 'px';
+      // the room the figure is fitted to: from its left edge (70 by the kit's CSS) to 24 px inside the safe box
+      const room = 996 - (left === undefined ? 70 : left);
       el.style.fontSize = size + 'px';
       wrap.appendChild(el);
       const dec = spec.decimals || 0, from = spec.from || 0, to = spec.value;
@@ -109,28 +118,32 @@ const Kit = (() => {
       Stage.afterFonts(() => {
         meas.font = '900 100px "Barlow Condensed"';
         const w100 = meas.measureText(full).width + (spec.unit ? meas.measureText(' ' + spec.unit).width * 0.5 : 0);
-        el.style.fontSize = Math.min(size, Math.floor((100 * 926) / w100)) + 'px';
+        el.style.fontSize = Math.min(size, Math.floor((100 * room) / w100)) + 'px';
       });
       let subs = [];
       if (spec.sub) {
         subs = mark(spec.sub, spec.hot);
-        const sub = h('div', { class: 'k-sub', 'data-role': 'body' }, subs);
+        const sub = h('div', { class: 'k-sub' + (center ? ' center' : ''), 'data-role': 'body' }, subs);
         sub.style.top = (spec.subY === undefined ? y + size * 0.9 + 26 : spec.subY) + 'px';
+        if (left !== undefined) sub.style.left = (left + 2) + 'px';
         wrap.appendChild(sub);
       }
       const dur = spec.count === undefined ? 1.1 : spec.count;
+      // standing: the figure and its second line stand landed from the shot's first frame (a count that landed on
+      // the shot before and stands on after the cut); count and landAt are then not read.
+      const at = spec.standing ? ctx.at - 9 : ctx.at;
       // landAt: the count ends on this time (the spoken number). The figure stands at its start value from the
       // overlay's first frame and the final value is never on screen before its word.
-      const land = spec.landAt;
+      const land = spec.standing ? undefined : spec.landAt;
       const step = dec ? Math.pow(10, -dec) : 1;
       return t => {
-        const p = !dur ? 1 : land === undefined ? ease.outExpo(remap(t, ctx.at + 0.05, ctx.at + 0.05 + dur)) : ease.inOutCubic(remap(t, land - dur, land));
+        const p = !dur ? 1 : land === undefined ? ease.outExpo(remap(t, at + 0.05, at + 0.05 + dur)) : ease.inOutCubic(remap(t, land - dur, land));
         const landed = land === undefined ? p >= 0.999 : t >= land - 0.0005;  // by the clock when it lands on a word
         let v = landed ? to : from + (to - from) * p;
         if (land !== undefined && !landed && to > from) v = Math.min(dec ? v : Math.round(v), to - step);
         num.textContent = fmt(dec ? v : Math.round(v));
-        pop(el, t, land === undefined ? ctx.at : Math.max(ctx.at, land - dur - 0.05), { f: 2.8, z: 0.62, rise: 30 });
-        subs.forEach((sp, i) => pop(sp, t, ctx.at + (spec.subAt === undefined ? 0.5 : spec.subAt) + i * 0.06, { rise: 26 }));
+        pop(el, t, land === undefined ? at : Math.max(ctx.at, land - dur - 0.05), { f: 2.8, z: 0.62, rise: 30 });
+        subs.forEach((sp, i) => pop(sp, t, at + (spec.subAt === undefined ? 0.5 : spec.subAt) + i * 0.06, { rise: 26 }));
       };
     },
     lower: (wrap, spec, ctx) => {
@@ -167,11 +180,14 @@ const Kit = (() => {
       hold.appendChild(el);
       wrap.appendChild(hold);
       const rot = spec.rot === undefined ? -7 : spec.rot;
+      // standing: the stamp stands landed from the shot's first frame, with no slam and no shake (it landed on
+      // the shot before and still stands after the cut).
+      const at = spec.standing ? ctx.at - 9 : ctx.at;
       return t => {
-        const p = ease.outExpo(remap(t, ctx.at, ctx.at + 0.24));
-        const settle = 1 - remap(t, ctx.at + 0.2, ctx.at + 0.55);
-        const jx = noise(11, (t - ctx.at) * 38) * 9 * settle, jy = noise(17, (t - ctx.at) * 38) * 9 * settle;
-        el.style.opacity = t < ctx.at ? '0' : Math.min(1, (t - ctx.at) / 0.05).toFixed(3);
+        const p = ease.outExpo(remap(t, at, at + 0.24));
+        const settle = 1 - remap(t, at + 0.2, at + 0.55);
+        const jx = noise(11, (t - at) * 38) * 9 * settle, jy = noise(17, (t - at) * 38) * 9 * settle;
+        el.style.opacity = t < at ? '0' : Math.min(1, (t - at) / 0.05).toFixed(3);
         el.style.transform = 'translate(-50%,-50%) translate(' + jx.toFixed(2) + 'px,' + jy.toFixed(2) + 'px) rotate(' + rot + 'deg) scale(' + lerp(2.6, 1, p).toFixed(4) + ')';
       };
     },
@@ -290,10 +306,40 @@ const Kit = (() => {
       return t => spans.forEach((sp, i) => pop(sp, t, ctx.at + i * (spec.step || 0.09)));
     },
     end: (wrap, spec, ctx) => {
-      const big = h('div', { class: 'big', 'data-role': 'endcard' }, (spec.big || ['FOLLOW', 'FOR MORE']).map((line, i) => h('div', { class: i === 0 ? 'hot' : '', text: line })));
+      // "*word*" lights words in the big lines and in the send line; a line break in `line` is kept (the CSS).
+      // Marked text is set one block per line: a word is an inline block, so a break inside one would stack it.
+      const set = (attrs, given) => {
+        const text = String(given);  // a line given as a number (a year) is still a line
+        if (!text.includes('*')) return h('div', Object.assign({}, attrs, { text }));
+        if (!text.includes('\n')) return h('div', attrs, mark(text, spec.hot));
+        // A marked phrase may run across the break: it is closed at the end of its row and opened again on the
+        // next. Whether a row leaves the phrase open is told by mark()'s own rule (a word that starts with a
+        // star opens, a word that ends with a star and any punctuation closes), so a star inside a word is
+        // only a star. An empty row keeps its height, as it does in an unmarked line.
+        const leaves = (row, lit) => {
+          for (const raw of row.split(' ').filter(Boolean)) {
+            const w = raw.startsWith('*') ? raw.slice(1) : raw;
+            if (raw.startsWith('*')) lit = true;
+            if (/^(.*)\*([,.;:!?"')\]]*)$/.test(w)) lit = false;
+          }
+          return lit;
+        };
+        let lit = false;
+        const rows = text.split('\n').map(given => {
+          const row = given.trim();
+          if (!row) return null;
+          const opened = lit && !row.startsWith('*');
+          lit = leaves(row, lit);
+          return (opened ? '*' : '') + row + (lit ? '*' : '');
+        });
+        return h('div', attrs, rows.map(row => h('div', {}, row === null ? [document.createTextNode(String.fromCharCode(160))] : mark(row, spec.hot))));
+      };
+      const big = h('div', { class: 'big', 'data-role': 'endcard' }, (spec.big || ['FOLLOW', 'FOR MORE']).map((line, i) => set({ class: i === 0 ? 'hot' : '' }, line)));
       const kids = [big];
+      // chip: a small dark chip under the big words (AS OF 2026 under a claim about today)
+      if (spec.chip) kids.push(h('div', { class: 'chip', 'data-role': 'label', text: spec.chip }));
       if (spec.handle) kids.push(h('div', { class: 'handle', 'data-role': 'endcard', text: '@' + spec.handle }));
-      if (spec.line) kids.push(h('div', { class: 'line', 'data-role': 'endcard', text: spec.line }));
+      if (spec.line) kids.push(set({ class: 'line', 'data-role': 'endcard' }, spec.line));
       const el = h('div', { class: 'k-end' }, kids);
       // lift: raise the stack by this many px (it is centred, so the bottom padding grows by twice that)
       if (spec.lift) el.style.paddingBottom = (300 + 2 * spec.lift) + 'px';

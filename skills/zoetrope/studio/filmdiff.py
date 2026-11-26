@@ -22,6 +22,18 @@ left out of that comparison, and the word captions, which follow the narration a
 unique id per shot in both timelines, and a comparison that matched no shot of the kept timeline compared no
 frame, so it is NOT CHECKED.
 
+After the runs come up to three lines. "changed shots" names the shots that hold a changed frame, each with its
+lowest value. "fine detail only, in clips" names the shots whose changed frames all show a clip (their
+own, or a neighbour's through an overlapping transition) and pass two more measures: with both pictures scaled down 16 times every frame reads at or above the threshold, and no
+block of 16 x 16 px differs by 24 of 255 or more in its mean brightness. A re-encoded clip of fine moving
+texture reads so with nothing changed (measured 2026-11-26 on two films: 36.3 to 44.5 dB at full size, 49.5 to
+54.4 dB scaled down, blocks of 4 to 11), while a moved label or a caption page read 30.8 and 35.6 dB scaled down
+with blocks of 141 and 158; the first measure catches a change spread over the whole picture (a grade), the
+second a small one. It is a reading, not a ruling: look at one frame of each. "cuts next to a changed shot" lists
+the cuts into and out of the changed shots, each with the two times to give ffmpeg's -ss for the last frame
+before it and the first after it, to look at as frame pairs: a drawing that stands on both sides of a cut has
+to stand in the same place and size on both, or move there in one visible move.
+
 Standard library only; needs ffmpeg and ffprobe on the path. Exit codes: 0 compared (or kept), 2 NOT CHECKED,
 3 refused, 64 usage error.
 """
@@ -39,6 +51,8 @@ from pathlib import Path
 DB = 45.0  # dB: a frame pair under this average PSNR counts as changed
 GAP = 2  # frames: two changed frames this close are one run
 CROP = 12  # px at the top left out of a shot-by-shot comparison (the progress bar runs on film time)
+COARSE = 16  # the second measures scale both pictures down this many times (so a block is 16 x 16 px)
+BLOCK = 24.0  # of 255: a block whose mean brightness differs by this much holds a change, not encoder noise
 TOL = 1e-6  # frames: a time this little after a frame's own time is float noise and reads as that frame
 # (a time rounded to four places, 0.0667 for frame 2, lies a thousandth of a frame after it: that is a real
 # step to the next frame, as the renderer draws it, so the tolerance must stay far under it)
@@ -55,6 +69,22 @@ def parse(text: str) -> list[tuple[int, float]]:
         level = re.search(r"psnr_avg:(inf|[0-9.]+)", line)
         if number and level:
             rows.append((int(number.group(1)) - 1, float(level.group(1))))
+    return rows
+
+
+def parse_blocks(text: str) -> list[tuple[int, float]]:
+    """The metadata filter's print lines as (frame index from 0, the largest value in that frame's picture)."""
+    rows: list[tuple[int, float]] = []
+    frame = None
+    for line in text.splitlines():
+        head = re.match(r"frame:(\d+)", line)
+        if head:
+            frame = int(head.group(1))
+            continue
+        level = re.search(r"YMAX=([0-9.]+)", line)
+        if level and frame is not None:
+            rows.append((frame, float(level.group(1))))
+            frame = None
     return rows
 
 
@@ -190,10 +220,13 @@ def measure(
     new_from: int = 0,
     count: int | None = None,
     crop: int = 0,
+    mode: str = "fine",
 ) -> tuple[list[tuple[int, float]] | None, str]:
     """Every frame pair's PSNR as (index from 0, dB), or None with the reason it could not be measured. With
     old_from, new_from and count it compares `count` frames from those two frames on; crop leaves out that
-    many rows at the top of both pictures."""
+    many rows at the top of both pictures. mode "coarse" measures the PSNR with both pictures scaled down
+    COARSE times, and mode "blocks" gives, in place of a PSNR, the largest difference in mean brightness over
+    any block of COARSE x COARSE px (0 to 255)."""
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         return None, "ffmpeg not found"
@@ -208,7 +241,20 @@ def measure(
         # parts were joined can run a fraction of a millisecond early from a join on (measured 2026-11-25:
         # 0.65 ms after frame 2567 of a 115 s film), which paired every later frame with its neighbour.
         clock = f"setpts=N/({fps:g}*TB)"
-        graph = f"[0:v]{clock},{cut}[n];[1:v]{clock},{cut}[o];[n][o]psnr=stats_file='{name}'"
+        small = f"scale=iw/{COARSE}:ih/{COARSE}:flags=area"
+        soft = f",{small}" if mode == "coarse" else ""
+        if mode == "blocks":
+            # 8-bit code values whatever the film's own depth: BLOCK is of 255
+            soft = ",format=yuv420p"
+        graph = f"[0:v]{clock},{cut}{soft}[n];[1:v]{clock},{cut}{soft}[o];[n][o]"
+        if mode == "blocks":
+            # the difference first, then the mean of each block: the brightest pixel left is the worst block
+            graph += (
+                f"blend=all_mode=difference,{small},signalstats,"
+                f"metadata=print:key=lavfi.signalstats.YMAX:file='{name}'"
+            )
+        else:
+            graph += f"psnr=stats_file='{name}'"
         limit = [] if count is None else ["-frames:v", str(count)]
         done = subprocess.run(
             [
@@ -235,8 +281,167 @@ def measure(
         )
         if done.returncode or not stats.is_file():
             return None, (done.stderr.strip().splitlines() or ["ffmpeg failed"])[-1]
-        rows = parse(stats.read_text(encoding="utf-8"))
+        text = stats.read_text(encoding="utf-8")
+        rows = parse_blocks(text) if mode == "blocks" else parse(text)
         return (rows if count is None else rows[:count]), ""
+
+
+def sort_shots(
+    timeline: dict,
+    fine: dict[int, float],
+    coarse: dict[int, float],
+    blocks: dict[int, float],
+    limit: float = DB,
+) -> tuple[list[tuple[str, float]], list[tuple[str, float]]]:
+    """The shots that hold a changed frame, in film order and in two lists of (id, lowest dB): the shots that
+    changed, and the shots that differ in fine detail only. A shot is of the second kind when every one of its
+    changed frames shows a clip (its own, or a neighbour's through an overlapping transition: clip_frames),
+    reads at or above the limit with both pictures scaled down (coarse) and has no block that differs by BLOCK
+    or more (blocks); a frame without both values keeps its shot in the first list. A frame belongs to the shot
+    the cut gives it to."""
+    on_clip = clip_frames(timeline)
+    changed: list[tuple[str, float]] = []
+    detail: list[tuple[str, float]] = []
+    for shot, (start, stop) in spans(timeline).items():
+        under = [
+            frame for frame in range(start, stop) if fine.get(frame, math.inf) < limit
+        ]
+        if not under:
+            continue
+        low = min(fine[frame] for frame in under)
+        calm = all(
+            frame in on_clip
+            and coarse.get(frame, -math.inf) >= limit
+            and blocks.get(frame, math.inf) < BLOCK
+            for frame in under
+        )
+        (detail if calm else changed).append((shot, low))
+    return changed, detail
+
+
+def cut_list(
+    timeline: dict, ids: list[str], older: dict | None = None
+) -> list[tuple[float, str, str]]:
+    """The cuts into and out of the named shots as (time, the shot before, the shot after), in film order, each
+    cut once. With the kept timeline of the older film it also lists every cut whose two shots did not follow
+    each other there: when a shot is gone or two shots changed places, a cut between two unchanged shots is new."""
+    shots = sorted(timeline.get("shots", []), key=lambda shot: shot["t0"])
+    was = (
+        None
+        if older is None
+        else sorted(older.get("shots", []), key=lambda shot: shot["t0"])
+    )
+    pairs = (
+        None
+        if was is None
+        else {(a["id"], b["id"]) for a, b in zip(was, was[1:], strict=False)}
+    )
+    found = []
+    for before, after in zip(shots, shots[1:], strict=False):
+        pair = (before["id"], after["id"])
+        if (
+            pair[0] in ids
+            or pair[1] in ids
+            or (pairs is not None and pair not in pairs)
+        ):
+            found.append((after["t0"], *pair))
+    return found
+
+
+def clip_frames(timeline: dict) -> set[int]:
+    """The frames on which a clip is on screen: every frame of a shot that plays a clip and, around an
+    overlapping transition, the frames of its neighbour on which the clip already shows or still shows (the
+    same window shots_in names a shot for). A fade or a whip into a clip carries the clip's re-encode onto the
+    last frames of the shot before it."""
+    fps = timeline.get("fps", 30)
+    shots = sorted(timeline.get("shots", []), key=lambda shot: shot["t0"])
+    found: set[int] = set()
+    for place, shot in enumerate(shots):
+        media = shot.get("media")
+        if not isinstance(media, dict) or media.get("kind") != "clip":
+            continue
+        after = shots[place + 1] if place + 1 < len(shots) else None
+        found.update(
+            range(
+                frame_at(shot["t0"] - lap(shot), fps),
+                frame_at(shot["t1"] + lap(after), fps),
+            )
+        )
+    return found
+
+
+def clips_under(
+    timeline: dict, fine: dict[int, float], limit: float
+) -> list[tuple[str, int, int]]:
+    """The shots that hold a changed frame on which a clip shows (their own, or a neighbour's through an
+    overlapping transition), as (id, first frame, the frame after the last): the shots the second measures
+    are taken for."""
+    on_clip = clip_frames(timeline)
+    return [
+        (shot, start, stop)
+        for shot, (start, stop) in spans(timeline).items()
+        if any(
+            frame in on_clip and fine.get(frame, math.inf) < limit
+            for frame in range(start, stop)
+        )
+    ]
+
+
+def tail(
+    timeline: dict,
+    fine: dict[int, float],
+    coarse: dict[int, float],
+    blocks: dict[int, float],
+    moved: list[str],
+    limit: float,
+    older: dict | None = None,
+) -> None:
+    """Print which shots changed, which clips differ in fine detail only and the cuts next to a changed shot.
+    moved names the shots that are new or changed their length: they changed whatever their frames read, so
+    none of them is listed as fine detail. older is the kept timeline when the cuts moved (see cut_list)."""
+    changed, detail = sort_shots(timeline, fine, coarse, blocks, limit)
+    lows = dict(changed)
+    lows.update((shot, low) for shot, low in detail if shot in moved)
+    detail = [(shot, low) for shot, low in detail if shot not in moved]
+    order = {shot["id"]: place for place, shot in enumerate(timeline.get("shots", []))}
+    ids = sorted(
+        set(lows) | {shot for shot in moved if shot in order},
+        key=lambda item: order.get(item, 0),
+    )
+    if ids:
+        print(
+            "  changed shots: "
+            + ", ".join(
+                f"{shot} {lows[shot]:.1f} dB" if shot in lows else shot for shot in ids
+            )
+        )
+    if detail:
+        print(
+            "  fine detail only, in clips: "
+            + ", ".join(f"{shot} {low:.1f} dB" for shot, low in detail)
+        )
+        print(
+            f"    (scaled down {COARSE} times each frame reads {limit:g} dB or more, and no block of {COARSE} px"
+            f" differs by {BLOCK:g} of 255 or more: a re-encoded clip reads so with nothing changed; look at one"
+            " frame of each)"
+        )
+    near = cut_list(timeline, ids, older)
+    if near:
+        fps = timeline.get("fps", 30)
+
+        def pair(at: float) -> str:
+            """The two times to seek to for the last frame before a cut and the first after it. ffmpeg's -ss
+            gives the first frame at or after a time, so each lies half a frame before its frame (as seek())."""
+            frame = frame_at(at, fps)
+            return f"{(frame - 1.5) / fps:.3f} and {(frame - 0.5) / fps:.3f}"
+
+        print(
+            "  cuts next to a changed shot, to look at as frame pairs (ffmpeg -ss to each of the two times): "
+            + ", ".join(
+                f"{at:.3f} ({before} | {after}: {pair(at)})"
+                for at, before, after in near
+            )
+        )
 
 
 def kept_names(build: Path, slug: str, name: str) -> tuple[Path, Path]:
@@ -293,19 +498,31 @@ def line(first: int, last: int, low: float, fps: float, ids: list[str]) -> str:
 
 
 def by_shot(
-    old: Path, new: Path, before: dict, timeline: dict, limit: float
+    old: Path,
+    new: Path,
+    before: dict,
+    timeline: dict,
+    limit: float,
+    seen: dict | None = None,
 ) -> tuple[int, list[str], int, int, int]:
     """Compare shot by shot. Returns (exit code, touched shot ids, runs, changed frames, compared frames) and
-    prints one line per run, per shot whose length changed, per new shot and per shot that is gone."""
+    prints one line per run, per shot whose length changed, per new shot and per shot that is gone. A dict
+    given as seen is filled for `tail`: "fine", "coarse" and "blocks" hold each measure by the new film's
+    frame number (the last two for the clips that hold a changed frame), and "moved" names the shots that are
+    new or changed their length."""
     fps = timeline.get("fps", 30)
     was, now = spans(before), spans(timeline)
     touched: list[str] = []
     found = changed = compared = 0
     code = PASS
+    if seen is not None:
+        seen.update({"fine": {}, "coarse": {}, "blocks": {}, "moved": []})
     for shot, (start, stop) in now.items():
         if shot not in was:
             print(f"  shot {shot}: new (frames {start} to {stop - 1})")
             touched.append(shot)
+            if seen is not None:
+                seen["moved"].append(shot)
             continue
         old_start, old_stop = was[shot]
         count = min(stop - start, old_stop - old_start)
@@ -316,6 +533,8 @@ def by_shot(
                 f" ({old_stop - old_start} to {stop - start})"
             )
             touched.append(shot)
+            if seen is not None:
+                seen["moved"].append(shot)
         if count <= 0:
             continue
         rows, problem = measure(
@@ -332,6 +551,27 @@ def by_shot(
             code = NOT_CHECKED
             continue
         compared += len(rows)
+        if seen is not None:
+            seen["fine"].update((start + index, level) for index, level in rows)
+            if clips_under(
+                timeline, {start + index: level for index, level in rows}, limit
+            ):
+                # this shot plays a clip and holds a changed frame: the two measures that tell a re-encode
+                # from a change (a measure that fails leaves the shot among the changed ones)
+                for mode in ("coarse", "blocks"):
+                    more_rows, _ = measure(
+                        old,
+                        new,
+                        fps=fps,
+                        old_from=old_start,
+                        new_from=start,
+                        count=count,
+                        crop=CROP,
+                        mode=mode,
+                    )
+                    seen[mode].update(
+                        (start + index, level) for index, level in more_rows or []
+                    )
         for first, last, low in runs(rows, limit):
             # the shots on screen in either film: a run inside a transition names both shots of it
             ids = shots_in(timeline, start + first, start + last)
@@ -421,11 +661,21 @@ def report(build: Path, before: Path | None = None, limit: float = DB) -> int:
             f"changed: {new.name} against {before.name}, shot by shot (the cuts moved), threshold {limit:g} dB,"
             f" top {CROP} px left out"
         )
+        seen: dict = {}
         code, touched, found, changed, compared = by_shot(
-            before, new, older, timeline, limit
+            before, new, older, timeline, limit, seen
         )
         print(
             f"changed: {found} runs, {changed} of {compared} frames, shots: {', '.join(touched) or 'none'}"
+        )
+        tail(
+            timeline,
+            seen["fine"],
+            seen["coarse"],
+            seen["blocks"],
+            seen["moved"],
+            limit,
+            older,
         )
         return code
     rows, problem = measure(before, new, fps=fps)
@@ -454,6 +704,19 @@ def report(build: Path, before: Path | None = None, limit: float = DB) -> int:
         f"changed: {len(found)} runs, {sum(last - first + 1 for first, last, _ in found)} of {len(rows)} frames,"
         f" shots: {names}"
     )
+    fine = dict(rows)
+    more: dict[str, dict[int, float]] = {"coarse": {}, "blocks": {}}
+    if clips_under(timeline, fine, limit):
+        for mode in more:
+            again, why = measure(before, new, fps=fps, mode=mode)
+            if again:
+                more[mode] = dict(again)
+            else:
+                print(
+                    f"  NOTE the {mode} measure failed ({why or 'ffmpeg compared no frame'}), so every clip"
+                    " that holds a changed frame is listed as changed"
+                )
+    tail(timeline, fine, more["coarse"], more["blocks"], [], limit)
     return PASS
 
 
@@ -631,9 +894,122 @@ def moved_cut_test(problems: list[str]) -> bool:
     return True
 
 
+def detail_test(problems: list[str]) -> bool:
+    """Four short test films of one noisy picture: the same film encoded twice (fine detail only), one with a
+    small box drawn in (the block measure must catch it) and one made a little brighter (the block measure
+    misses that, so the scaled-down PSNR must catch it). The first pair must read as fine detail and the other
+    two as changed, through `measure` and through `by_shot`. False when ffmpeg is missing (the test is
+    skipped)."""
+    import contextlib
+    import io
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return False
+    # what each pair has to show for the test to mean anything: (fine, coarse, worst block) -> bool
+    legs = {
+        "again": lambda fine, coarse, block: fine < DB <= coarse and block < BLOCK,
+        "boxed": lambda fine, coarse, block: fine < DB and block >= BLOCK,
+        "bright": lambda fine, coarse, block: coarse < DB and block < BLOCK,
+    }
+    with tempfile.TemporaryDirectory() as folder:
+        base = Path(folder)
+        source = base / "source.mp4"
+        codec = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "12"]
+        picture = (
+            "testsrc2=size=320x568:rate=30:duration=1,noise=alls=10:allf=t:all_seed=7"
+        )
+        made = [
+            subprocess.run(
+                [ffmpeg, "-v", "error", "-y", "-f", "lavfi", "-i", picture]
+                + codec
+                + ["-crf", "0", str(source)],
+                capture_output=True,
+                check=False,
+            ).returncode
+        ]
+        films = {
+            "first": ("null", "12"),
+            "again": ("null", "20"),
+            "boxed": ("drawbox=x=120:y=200:w=40:h=20:color=white:t=fill", "12"),
+            "bright": ("eq=brightness=0.04", "12"),
+        }
+        for name, (change, quality) in films.items():
+            made.append(
+                subprocess.run(
+                    [ffmpeg, "-v", "error", "-y", "-i", str(source), "-vf", change]
+                    + codec
+                    + ["-crf", quality, str(base / f"{name}.mp4")],
+                    capture_output=True,
+                    check=False,
+                ).returncode
+            )
+        if any(made):
+            problems.append(f"the fine detail test films were not made ({made})")
+            return True
+        # two shots, so the shot-by-shot comparison takes its second measures after a seek (the clip starts at
+        # frame 15); the first shot shows a still, which is never fine detail
+        plan = {
+            "fps": 30,
+            "shots": [
+                {"id": "c0", "t0": 0.0, "t1": 0.5, "media": {"kind": "still"}},
+                {"id": "c1", "t0": 0.5, "t1": 1.0, "media": {"kind": "clip"}},
+            ],
+        }
+        first = base / "first.mp4"
+        want = {
+            "again": (["c0"], ["c1"]),
+            "boxed": (["c0", "c1"], []),
+            "bright": (["c0", "c1"], []),
+        }
+        for name, (changed, detail) in want.items():
+            other = base / f"{name}.mp4"
+            read = {}
+            for mode in ("fine", "coarse", "blocks"):
+                rows, why = measure(other, first, mode=mode)
+                if not rows or len(rows) != 30:
+                    problems.append(
+                        f"fine detail test: the {mode} measure of {name} gave {len(rows or [])} rows ({why})"
+                    )
+                read[mode] = dict(rows or [])
+            got = sort_shots(plan, read["fine"], read["coarse"], read["blocks"], DB)
+            if ([shot for shot, _ in got[0]], [shot for shot, _ in got[1]]) != (
+                changed,
+                detail,
+            ):
+                problems.append(
+                    f"fine detail test: {name} sorted as {got}; lowest fine {min(read['fine'].values(), default=0):.1f},"
+                    f" lowest coarse {min(read['coarse'].values(), default=0):.1f}, worst block"
+                    f" {max(read['blocks'].values(), default=0):.0f}"
+                )
+            lows = (
+                min(read["fine"].values(), default=0.0),
+                min(read["coarse"].values(), default=0.0),
+                max(read["blocks"].values(), default=0.0),
+            )
+            if not legs[name](*lows):
+                problems.append(
+                    f"fine detail test: {name} does not test its measure (lowest fine {lows[0]:.1f}, lowest"
+                    f" coarse {lows[1]:.1f}, worst block {lows[2]:.0f})"
+                )
+            seen: dict = {}
+            with contextlib.redirect_stdout(io.StringIO()):
+                by_shot(other, first, plan, plan, DB, seen)
+            again = sort_shots(plan, seen["fine"], seen["coarse"], seen["blocks"], DB)
+            if ([shot for shot, _ in again[0]], [shot for shot, _ in again[1]]) != (
+                changed,
+                detail,
+            ):
+                problems.append(
+                    f"fine detail test: shot by shot, {name} sorted as {again}"
+                )
+    return True
+
+
 def selftest() -> int:
     """The comparison's own arithmetic (the stats lines it reads, how changed frames join into runs, which
-    shots a run names) and, when ffmpeg is on the path, a moved cut on two test films."""
+    shots a run names, how the second measures sort a clip) and, when ffmpeg is on the path, a moved cut on
+    two test films and fine detail against a change on four."""
     problems: list[str] = []
     stats = "\n".join(
         [
@@ -723,13 +1099,132 @@ def selftest() -> int:
         problems.append(f"no shot in common: by_shot gave {none}")
     if seek(0, 30) != [] or seek(30, 30) != ["-ss", "0.983333"]:
         problems.append(f"seek gave {seek(0, 30)} and {seek(30, 30)}")
+    # the second measures: only a clip whose changed frames all pass both reads as fine detail
+    printed = "\n".join(
+        [
+            "frame:0    pts:0       pts_time:0",
+            "lavfi.signalstats.YMAX=7",
+            "frame:1    pts:1       pts_time:0.0333",
+            "lavfi.signalstats.YMAX=141",
+        ]
+    )
+    if parse_blocks(printed) != [(0, 7.0), (1, 141.0)]:
+        problems.append(f"parse_blocks read {parse_blocks(printed)}")
+    mixed = {
+        "fps": 30,
+        "shots": [
+            {"id": "a", "t0": 0.0, "t1": 1.0, "media": {"kind": "still"}},
+            {"id": "b", "t0": 1.0, "t1": 2.0, "media": {"kind": "clip"}},
+            {"id": "c", "t0": 2.0, "t1": 3.0, "media": {"kind": "clip"}},
+            {"id": "d", "t0": 3.0, "t1": 4.0, "media": {"kind": "clip"}},
+            {"id": "e", "t0": 4.0, "t1": 5.0, "media": {"kind": "none"}},
+        ],
+    }
+    fine = {10: 30.0, 40: 38.0, 41: 39.0, 70: 37.0, 100: 44.0, 130: 50.0}
+    coarse = {10: 50.0, 40: 50.0, 41: 47.0, 70: 50.0, 100: 41.0}
+    blocks = {10: 5.0, 40: 9.0, 41: 11.0, 70: 42.0, 100: 6.0}
+    sorted_ = sort_shots(mixed, fine, coarse, blocks, 45.0)
+    # a: not a clip; b: both measures pass; c: one block differs; d: still low when scaled down; e: no frame
+    if sorted_ != ([("a", 30.0), ("c", 37.0), ("d", 44.0)], [("b", 38.0)]):
+        problems.append(f"sort_shots gave {sorted_}")
+    if sort_shots(mixed, {40: 38.0}, {}, {}, 45.0) != ([("b", 38.0)], []):
+        problems.append(
+            "sort_shots took a clip without its second measures for fine detail"
+        )
+    if clips_under(mixed, fine, 45.0) != [("b", 30, 60), ("c", 60, 90), ("d", 90, 120)]:
+        problems.append(f"clips_under gave {clips_under(mixed, fine, 45.0)}")
+    near = cut_list(mixed, ["a", "c"])
+    if near != [(1.0, "a", "b"), (2.0, "b", "c"), (3.0, "c", "d")]:
+        problems.append(f"cut_list gave {near}")
+    if cut_list(mixed, ["e"]) != [(4.0, "d", "e")] or cut_list(mixed, []) != []:
+        problems.append("cut_list misread the last shot or an empty list")
+    # the older film had a shot x between b and c: with x gone, the cut from b to c is new though neither changed
+    with_x = {
+        "fps": 30,
+        "shots": [
+            {"id": name, "t0": start, "t1": start + 1.0}
+            for name, start in zip(
+                "abxcde", (0.0, 1.0, 2.0, 3.0, 4.0, 5.0), strict=True
+            )
+        ],
+    }
+    if cut_list(mixed, [], with_x) != [(2.0, "b", "c")] or cut_list(mixed, [], mixed):
+        problems.append(
+            f"cut_list with the older timeline gave {cut_list(mixed, [], with_x)} and {cut_list(mixed, [], mixed)}"
+        )
+    # a fade into a clip shows the clip on the last frames of the still before it: re-encode noise there is
+    # fine detail for both shots, and a changed frame of the still outside the fade keeps it among the changed
+    faded_clip = {
+        "fps": 30,
+        "shots": [
+            {"id": "A", "t0": 0.0, "t1": 1.0, "media": {"kind": "still"}},
+            {
+                "id": "B",
+                "t0": 1.0,
+                "t1": 2.0,
+                "media": {"kind": "clip"},
+                "tin": {"kind": "fade", "d": 0.4},
+            },
+            {
+                "id": "C",
+                "t0": 2.0,
+                "t1": 3.0,
+                "media": {"kind": "still"},
+                "tin": {"kind": "fade", "d": 0.4},
+            },
+        ],
+    }
+    # the clip B shows on frames 24 to 65: the last six of A, its own, and the first six of C
+    noise = dict.fromkeys(range(24, 66), 40.0)
+    for name, extra, want in (
+        ("a fade into and out of a clip", {}, ([], ["A", "B", "C"])),
+        ("a still changed before the fade in", {10: 40.0}, (["A"], ["B", "C"])),
+        ("a still changed after the fade out", {80: 40.0}, (["C"], ["A", "B"])),
+    ):
+        read = {**noise, **extra}
+        got = sort_shots(
+            faded_clip, read, dict.fromkeys(read, 50.0), dict.fromkeys(read, 5.0), 45.0
+        )
+        if ([shot for shot, _ in got[0]], [shot for shot, _ in got[1]]) != want:
+            problems.append(f"{name}: sort_shots gave {got}")
+    if [shot for shot, _, _ in clips_under(faded_clip, noise, 45.0)] != ["A", "B", "C"]:
+        problems.append(
+            f"a fade into and out of a clip: clips_under gave {clips_under(faded_clip, noise, 45.0)}"
+        )
+    # a clip whose length changed is a changed shot, never fine detail
+    with contextlib.redirect_stdout(io.StringIO()) as said:
+        tail(mixed, fine, coarse, blocks, ["b"], 45.0)
+    lines = said.getvalue().splitlines()
+    if (
+        len(lines) != 2
+        or lines[0] != "  changed shots: a 30.0 dB, b 38.0 dB, c 37.0 dB, d 44.0 dB"
+    ):
+        problems.append(f"tail with a moved clip printed {lines}")
+    with contextlib.redirect_stdout(io.StringIO()) as said:
+        tail(mixed, fine, coarse, blocks, ["e"], 45.0)
+    lines = said.getvalue().splitlines()
+    if (
+        len(lines) != 4
+        or lines[0] != "  changed shots: a 30.0 dB, c 37.0 dB, d 44.0 dB, e"
+        or lines[1] != "  fine detail only, in clips: b 38.0 dB"
+        or not lines[3].endswith(
+            "1.000 (a | b: 0.950 and 0.983), 2.000 (b | c: 1.950 and 1.983),"
+            " 3.000 (c | d: 2.950 and 2.983), 4.000 (d | e: 3.950 and 3.983)"
+        )
+    ):
+        problems.append(f"tail printed {lines}")
     films = moved_cut_test(problems)
+    measures = detail_test(problems)
     for problem in problems:
         print(f"FAIL {problem}")
-    parts = "stats lines, runs, shots" + (
-        ", a moved cut on two test films"
-        if films
-        else "; no ffmpeg, so the moved cut was not tried"
+    parts = (
+        "stats lines, runs, shots, the two second measures"
+        + (
+            ", a moved cut on two test films"
+            if films
+            else "; no ffmpeg, so the moved cut was not tried"
+        )
+        + (", fine detail against a change on four test films" if measures else "")
     )
     print("FILMDIFF: FAIL" if problems else f"FILMDIFF: PASS ({parts})")
     return 1 if problems else 0

@@ -1,0 +1,93 @@
+{
+ "rule": "L07",
+ "note": "a standing number carried from a shot where its count landed without its word: the figure has stood whole since 2.2 and its word is first spoken at 4.3 (in the control the word was heard on the shot before and is said again)",
+ "tier": "static",
+ "t": 2.2,
+ "fault": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 2.2
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 7,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "landAt": 2.2
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L02",
+    4.0,
+    "Yes, 40 people."
+   ]
+  ]
+ },
+ "control": {
+  "timeline": {
+   "shots": [
+    {
+     "id": "s01",
+     "t0": 0,
+     "t1": 3,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "at": 0.5,
+       "landAt": 2.2
+      }
+     ]
+    },
+    {
+     "id": "s02",
+     "t0": 3,
+     "t1": 7,
+     "over": [
+      {
+       "type": "number",
+       "value": 40,
+       "y": 352,
+       "standing": true,
+       "landAt": 2.2
+      }
+     ]
+    }
+   ]
+  },
+  "speech": [
+   [
+    "L01",
+    1.0,
+    "Then there were about 40 people."
+   ],
+   [
+    "L02",
+    4.0,
+    "Yes, 40 people."
+   ]
+  ]
+ }
+}

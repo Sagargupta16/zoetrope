@@ -153,11 +153,13 @@ def end_card(
     cue: str,
     seconds: float = 3.0,
     end: dict | None = None,
+    chip: str | None = None,
     **k,
 ) -> dict:
     """The fields of the closing shot: the end overlay over a blurred earlier picture, with the handle and the
-    AI line the batch names (batch.json `end`), so no film types them again. `line` is this film's send line;
-    without one the batch's `follow` line stands.
+    AI line the batch names (batch.json `end`), so no film types them again. `line` is this film's send line
+    (a line break in it is kept); without one the batch's `follow` line stands. `chip` is a small dark chip
+    under the big words (AS OF 2026 under a claim about today).
 
         plan.shot("end", **end_card(["IT CAME", "BY SHIP"], "Send this to someone who loves chilli",
                                     use="s01", cue="L32:end"))
@@ -169,6 +171,8 @@ def end_card(
         "line": line or str(end.get("follow") or ""),
         "lift": 80,
     }
+    if chip:
+        card["chip"] = chip
     handle = str(end.get("handle") or "").lstrip("@")  # the kit writes the @ itself
     if handle:
         card["handle"] = handle
