@@ -28,7 +28,7 @@ QA run: {the QA: line as printed, for example "QA: PASS (49 checks, 0 FIX, 0 NOT
 - Reading holds (Q401, {profile} profile): {tightest hold and its line}
 - First and last frame (Q501, Q502): {grey means}
 - Flashes (Q601 to Q603, WCAG 2.2, 3 a second at most): {worst a second / passages that need care}
-- Purity and lint (Q1201 to Q1206): {frames checked / findings}
+- Purity and lint (Q1201 to Q1207): {frames checked / findings}
 - Audio and video sync at hits (Q902, Q903): {worst ms on the stem, mux ms / list}
 - Loudness and true peak (Q801, Q802, Q805): {values}
 - What the narration says (Q806, Q807): {words heard as written / each NOTE and what listening found / no narration}
