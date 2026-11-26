@@ -86,14 +86,25 @@ def _flat(colour=DATA_BG):
     return E.canvas(colour)
 
 
+def _grid(img, steps, ink, width):
+    """A see-through grid over img, one line at each share of its width and height in steps. Drawn on a transparent
+    layer and composited: straight onto the RGBA picture, ImageDraw replaces the pixels and the lines come out at
+    full strength (pitfalls.md item 72, Q1207)."""
+    w, h = img.size
+    lay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(lay)
+    for k in steps:
+        d.line((w * k, 0, w * k, h), fill=ink, width=width)
+        d.line((0, h * k, w, h * k), fill=ink, width=width)
+    img.alpha_composite(lay)
+
+
 def _subject():
     """A frame with something in it to push in on, vignette or mark: a grid, a disc and a word."""
     img = _photo()
-    d = ImageDraw.Draw(img)
     w, h = img.size
-    for i in range(1, 8):
-        d.line((w * i / 8, 0, w * i / 8, h), fill="#FFFFFF28", width=2)
-        d.line((0, h * i / 8, w, h * i / 8), fill="#FFFFFF28", width=2)
+    _grid(img, [i / 8 for i in range(1, 8)], "#FFFFFF28", 2)
+    d = ImageDraw.Draw(img)
     r = h * 0.22
     d.ellipse((w / 2 - r, h / 2 - r, w / 2 + r, h / 2 + r), fill=SUBJECT_INK)
     E.text(img, "Subject", (w / 2 / E.SS, h / 2 / E.SS), E.H * 0.1, LABEL_INK, "mm")
@@ -110,10 +121,7 @@ def _layers():
     )
     E.text(fg, "Front", (w / 2 / E.SS, h / 2 / E.SS), E.H * 0.07, LABEL_INK, "mm")
     bg = _photo()
-    d = ImageDraw.Draw(bg)
-    for i in range(17):
-        d.line((w * i / 16, 0, w * i / 16, h), fill="#FFFFFF50", width=3)
-        d.line((0, h * i / 16, w, h * i / 16), fill="#FFFFFF50", width=3)
+    _grid(bg, [i / 16 for i in range(17)], "#FFFFFF50", 3)
     E.text(bg, "Back", (w * 0.2 / E.SS, h * 0.2 / E.SS), E.H * 0.07, LABEL_INK, "mm")
     E.text(bg, "Back", (w * 0.8 / E.SS, h * 0.8 / E.SS), E.H * 0.07, LABEL_INK, "mm")
     return fg, bg.convert("RGB")

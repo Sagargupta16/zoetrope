@@ -11,7 +11,7 @@
     {
       "name": "zoetrope",
       "source": "./",
-      "description": "The zoetrope skill: 41 style cards, a builder and a reviewer agent, a Python engine that draws every frame as a pure function of time, numpy and recorded CC0 instruments mastered to -14 LUFS, optional Blender 3D plates, a block library, and 62 coded QA checks.",
+      "description": "The zoetrope skill: 41 style cards, a builder and a reviewer agent, a Python engine that draws every frame as a pure function of time, numpy and recorded CC0 instruments mastered to -14 LUFS, optional Blender 3D plates, a block library, and 63 coded QA checks.",
       "version": "2.11.0",
       "license": "MIT",
       "category": "design"

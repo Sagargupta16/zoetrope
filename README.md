@@ -65,9 +65,9 @@ The diagram's source is `docs/zoetrope-flow.workflow.json` (an archify workflow 
 | 3D plates | A card can render its picture in Blender (Cycles on the GPU) as a plate that `scenes.py` reads like footage: real light, depth of field and a small character rig, under the same gates and approval (`plate3d.py`, `stage3d.py`, `references/plates.md`). `run_all.py` refuses a stale, unfinished or draft-quality plate. |
 | Image plates | Photo-like pictures (planets, landscapes, food) from an image model run before the build, a local FLUX.1 schnell through ComfyUI (about 15 s a plate on an 8 GB laptop GPU) or a hosted Space; the engine animates them and draws every word and number on top (`references/image-plates.md`). |
 | Render | Frames pass from worker processes through shared memory into ffmpeg; no PNGs on disk. 45 fps on the template, BT.709 tagged. |
-| QA gates | 62 coded checks (`qa.py check`): safe area, overlap, contrast, reading holds, WCAG 2.2 flashes, pops and freezes, motion that reverses across a cut, whether the facts of a `quiz.json` are on screen, true peak, what the narration says, cue sync on the stems, the mux, colour tags, size. |
+| QA gates | 63 coded checks (`qa.py check`): safe area, overlap, contrast, reading holds, WCAG 2.2 flashes, pops and freezes, motion that reverses across a cut, whether the facts of a `quiz.json` are on screen, true peak, what the narration says, cue sync on the stems, the mux, colour tags, size. |
 | Approval | `approved/` keeps the hashes of what the reviewer passed; stale approval, regressions and changed frames are found mechanically. |
-| Selftest | `qa.py selftest` plants a fault for every one of the 62 codes (177 fixtures), proves each gate still catches it, and compares template frames with a golden set by PSNR. |
+| Selftest | `qa.py selftest` plants a fault for every one of the 63 codes (186 fixtures), proves each gate still catches it, and compares template frames with a golden set by PSNR. |
 | Narration | Offline narration in Kokoro's `af_heart` voice, one cached file per part with word times for cues (`voice.py`): respellings for names (`lexicon=`), exact pauses inside a line (`[pause 300ms]`), and lines held to their storyboard time (`fit=`). A speech model checks what it says (Q806 on the stem, Q807 in the file). Two hosts on one timeline by naming a voice per line. |
 
 ## Run it
@@ -87,7 +87,7 @@ By hand, from a working folder that holds a copy of the engine (`cp -r skills/zo
 | `qa.py speech narration/narration.json` | Q806 alone, right after narrating: each line transcribed by a speech model and held against its script. |
 | `qa.py audiostrip out.mp4 --scenes .` | `review/audio.png`: spectrogram, loudness and cue timing for a reviewer who cannot hear. |
 | `qa.py approve --review <reply>`, `qa.py diff --expect 2.5-5`, `qa.py verify` | Bind a review to the file, name what changed since, re-hash before delivery. |
-| `qa.py selftest` | Every gate against its planted fault: `SELFTEST: PASS (177 fixtures, 62 of 62 codes covered, 0 expected gaps)`. `--bless` rewrites the golden frames after an intended change. |
+| `qa.py selftest` | Every gate against its planted fault: `SELFTEST: PASS (186 fixtures, 63 of 63 codes covered, 0 expected gaps)`. `--bless` rewrites the golden frames after an intended change. |
 | `plate3d.py render stage.py [--quality proof]`, `plate3d.py check --final` | Render a 3D plate for a build (half size for the proof, full for delivery), and ask whether every plate is current and final. |
 | `python skills/zoetrope/engine/cards.py check` | The style router in SKILL.md, its kit list and every card count against the cards' `**Spec:**` lines: `CARDS: OK (41 cards ...)`. |
 | `python scripts/check.py` | The repo gate: en or em dashes, secret-shaped strings, absolute home paths, the SKILL.md frontmatter, broken relative links in Markdown, JSON that does not parse, plugin manifest versions against the CHANGELOG head, and CR line ends. |
