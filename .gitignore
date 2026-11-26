@@ -6,6 +6,8 @@ __pycache__/
 
 # Every video and its working folder lives under outputs/, which is never committed
 outputs/
+# one-off helpers of an agent or a session
+.scratch/
 frames/
 review/
 *.mp4
