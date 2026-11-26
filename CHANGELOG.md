@@ -19,6 +19,12 @@ What three films made side by side asked of the kit and of `changed`.
 - **Smaller things.** The shot table lists the end card's big lines and its chip; `build` no longer warns about the reading hold of a standing overlay (the plan check adds a carried hold up); `package` takes the caption's first line that is not blank; a number's `x` has to be a number.
 - **Selftest.** A rendered part shoots a short film of the new options (`selftest/options/shots.json`) and checks the boxes on the frames either side of each cut and on the end card; it fails on the 2.11.1 kit on every one of its checks. The comparison's own selftest makes four test films (one encoded twice, one with a small box that the block measure has to catch, one made brighter, which only the scaled-down measure catches). The rendered part also measures a small stamp with its hedge and a centred number that carries an `x`. Lint fixtures cover L19 (also a device named in a comment or used as a shot's `media`), a standing number carried and not carried (L07) and the end card's chip (L16), and the command line part makes a batch from an engine whose `engine/` holds a tool's cache.
 
+## 2.11.2 - 2026-11-26
+
+A speed fix in the Pillow engine, behaviour unchanged.
+
+- **`text_box` measures each glyph once.** Letter-spaced text was measured one glyph at a time with a fresh `ImageDraw` per call: 25.6 s of a 106 s `qa.py check` and 5.0 s of an 11.2 s `proof.py keys` on a 67.5 s reel. The box at the origin is now cached per (font, string, anchor) and the position added, and each glyph's advance per (font, glyph); a string with a newline keeps the direct `textbbox` call. Measured on that reel: the proof stage 67.6 to 48.0 s, `qa.py check` 106.2 to 91.1 s, 17,454 boxes compared with 0 different. Drawing is untouched.
+
 ## 2.11.1 - 2026-11-26
 
 Four faults the studio engine showed on its next four films.
