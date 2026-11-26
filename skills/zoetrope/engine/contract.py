@@ -733,6 +733,12 @@ CODES = {
     "Q1204": ("qa_lint", 1, "NOTE", "scenes.py redefines an engine helper"),
     "Q1205": ("qa_lint", 1, "NOTE", "text drawn outside the engine text helpers"),
     "Q1206": ("qa_lint", 1, "NOTE", "colour literal outside the palette block"),
+    "Q1207": (
+        "qa_lint",
+        1,
+        "FIX",
+        "see-through colour that ImageDraw does not blend: on an RGBA picture, a plain ImageDraw on RGB, or text",
+    ),
     "Q1301": (
         "qa_approve",
         1,

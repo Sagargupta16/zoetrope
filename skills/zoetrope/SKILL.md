@@ -8,7 +8,7 @@ description: >-
   3D) and game parodies, trailers, recipes and sketchbook looks. Use when someone asks to
   make, animate or render a video, promo, explainer, reel or motion graphic.
   Not for animating a web UI or rendering SVG or HTML scenes in headless
-  Chrome (motion), or the visual for a LinkedIn post (social-post).
+  Chrome (ui-motion), or the visual for a LinkedIn post (social-post).
 license: MIT
 ---
 

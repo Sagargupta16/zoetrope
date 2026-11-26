@@ -144,7 +144,7 @@ voice-led piece with no narration files), and say so under `blocked`.
    (up to 34 frames, 24 on the template, drawn in order, reversed in a fresh
    `python -I` process and through the render pool must hash the same; a FIX
    names the worst frame, the pixels that differ and the frame that poisons
-   it); and the lint (Q1202 to Q1206, Q904, Q905). Fix every FIX and NOT
+   it); and the lint (Q1202 to Q1207, Q904, Q905). Fix every FIX and NOT
    CHECKED row. Read every NOTE: fix it, or keep it on purpose with the
    pragma the row names (`# zoetrope: state-ok` for a memo dict or a QA log,
    `text-ok` for a mask or a typesetter). Then check every wipe, dip, hit and
