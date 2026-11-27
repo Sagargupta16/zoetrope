@@ -3,6 +3,8 @@
   python -I studio/selftest.py --quick           the lint's rules, shotkit, a drawn probe film's timeline (standard library only)
   python studio/selftest.py --render             also render the probe at four times and compare the frames with the golden (needs
                                                  playwright, Chrome, Pillow, numpy: uv run --no-project --with-requirements studio/requirements.txt)
+                                                 and check that a film with one frame five ticks short is refused by the
+                                                 file check and by package
   python studio/selftest.py --bless              --render, then write selftest/golden/<os>/frames.json (look at the frames first)
   python studio/selftest.py --bless-timeline     rebuild selftest/probe/timeline.golden.json after a deliberate build.py change
 
@@ -481,6 +483,234 @@ def part_options() -> tuple[str | None, str]:
     return None, (
         "a standing hook, number and stamp hold across their cuts, a number takes x and the centre, the end card"
         " sets its chip, its marked words and its line break"
+    )
+
+
+def part_tag_warning() -> str | None:
+    """`build` warns when a film's script.json tag is not the batch's (the script step copies the batch's tag, so
+    a batch that changed or emptied its tag does not reach the film until script.json follows), and says nothing
+    about the tag when the two agree. The probe's tag is PROBE."""
+    with tempfile.TemporaryDirectory(prefix="studio-selftest-") as scratch:
+        root = Path(scratch)
+        build = plant_probe(root)
+        settings = {
+            "root": ".",
+            "accent": "#ffd60a",
+            "end": {},
+            "music_dir": "music",
+            "voice": {},
+        }
+        for tag, expected in (("", True), ("PROBE", False)):
+            (root / "batch.json").write_text(
+                json.dumps({**settings, "tag": tag}), encoding="utf-8"
+            )
+            done = run(STUDIO / "build.py", "timeline", build, "--batch", root)
+            if done.returncode:
+                return f"tag warning: the probe did not build under a batch with the tag {tag!r}: {last_line(done)}"
+            warned = "WARN script.json sets the tag 'PROBE'" in done.stdout
+            if warned != expected:
+                return (
+                    f"tag warning: under a batch with the tag {tag!r} the build "
+                    f"{'warned' if warned else 'did not warn'} about the film's tag PROBE"
+                )
+    return None
+
+
+def part_timing() -> tuple[str | None, str]:
+    """A film with one frame five ticks short, as a join by container length once left finished films: its
+    r_frame_rate still reads 30/1, its average rate does not. `check file` must give a V01 FIX for it and `package`
+    must refuse it. The same film before the fault, and again after the manual's ffmpeg line has put its timestamps
+    back on the grid, must pass both. Needs ffmpeg and the --render tier's modules. Returns (problem, note)."""
+    ffmpeg, ffprobe = shutil.which("ffmpeg"), shutil.which("ffprobe")
+    if not ffmpeg or not ffprobe:
+        return "timing: ffmpeg or ffprobe not found", ""
+    if str(STUDIO) not in sys.path:
+        sys.path.insert(0, str(STUDIO))
+    try:
+        import package
+        import qa
+    except ImportError as error:
+        return f"timing: {error} (run with studio/requirements.txt)", ""
+
+    def made(*args: str) -> bool:
+        return (
+            subprocess.run(
+                [ffmpeg, "-v", "error", "-y", *args], capture_output=True, check=False
+            ).returncode
+            == 0
+        )
+
+    def rates(video: Path) -> list[str]:
+        """[r_frame_rate, avg_frame_rate] as ffprobe prints them."""
+        done = subprocess.run(
+            [
+                ffprobe,
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=r_frame_rate,avg_frame_rate",
+                "-of",
+                "json",
+                str(video),
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        try:
+            stream = json.loads(done.stdout)["streams"][0]
+        except (ValueError, KeyError, IndexError):
+            return ["", ""]
+        return [stream.get("r_frame_rate", ""), stream.get("avg_frame_rate", "")]
+
+    with tempfile.TemporaryDirectory(prefix="studio-selftest-") as scratch:
+        root = Path(scratch)
+        build = root / "builds" / "01-timing"
+        (build / "out").mkdir(parents=True)
+        even, uneven, mended = (
+            root / name for name in ("even.mp4", "uneven.mp4", "mended.mp4")
+        )
+        # two seconds of a moving test picture, no B-frames, so a packet's number is its place on screen
+        if not made(
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=1080x1920:rate=30:duration=2",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=2",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-profile:v",
+            "high",
+            "-pix_fmt",
+            "yuv420p",
+            "-bf",
+            "0",
+            "-c:a",
+            "aac",
+            str(even),
+        ):
+            return "timing: the test film was not made", ""
+        # the fault: packet 29 lasts 5 ticks less and every later one starts 5 ticks early (512 ticks to a frame)
+        fault = "setts=pts=PTS-5*gte(N\\,30):dts=DTS-5*gte(N\\,30):duration=if(eq(N\\,29)\\,DURATION-5\\,DURATION)"
+        if not made(
+            "-i", str(even), "-map", "0", "-c", "copy", "-bsf:v", fault, str(uneven)
+        ):
+            return "timing: the fault was not planted", ""
+        # the cure the manual names (studio.md, V01)
+        cure = "setts=pts=round(PTS/512)*512:dts=round(DTS/512)*512:duration=512"
+        if not made(
+            "-i",
+            str(uneven),
+            "-map",
+            "0",
+            "-c",
+            "copy",
+            "-bsf:v",
+            cure,
+            "-movflags",
+            "+faststart",
+            str(mended),
+        ):
+            return "timing: the manual's ffmpeg line did not run", ""
+        if rates(even) != ["30/1", "30/1"]:
+            return f"timing: the test film reads {rates(even)}, not an even 30/1", ""
+        if rates(uneven)[0] != "30/1" or rates(uneven)[1] in ("30/1", ""):
+            return (
+                f"timing: the planted film reads {rates(uneven)}: the fault is not the one films carried",
+                "",
+            )
+        if rates(mended) != ["30/1", "30/1"]:
+            return (
+                f"timing: after the manual's ffmpeg line the film reads {rates(mended)}",
+                "",
+            )
+
+        def digest(video: Path, *stream: str) -> str:
+            """ffmpeg's md5 of one stream: the decoded picture, or the sound as it lies in the file."""
+            done = subprocess.run(
+                [ffmpeg, "-v", "error", "-i", str(video), *stream, "-f", "md5", "-"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return done.stdout.strip()
+
+        for name, stream in (
+            ("picture", ("-map", "0:v:0")),
+            ("sound", ("-map", "0:a:0", "-c", "copy")),
+        ):
+            before, after = digest(uneven, *stream), digest(mended, *stream)
+            if not before.startswith("MD5=") or before != after:
+                return (
+                    f"timing: the manual's ffmpeg line changed the {name} ({before} to {after})",
+                    "",
+                )
+        (build / "timeline.json").write_text(
+            json.dumps({"slug": "timing"}), encoding="utf-8"
+        )
+        (build / "post.json").write_text(
+            json.dumps(
+                {
+                    "title": "Timing",
+                    "caption": "A test film.",
+                    "alt_text": "A moving test pattern under a tone.",
+                    "sources": [{"title": "A source", "url": "https://example.org/"}],
+                    "cover_ms": 500,
+                }
+            ),
+            encoding="utf-8",
+        )
+        batch = mock.Mock(package={}, videos=root / "videos")
+
+        def judged(video: Path) -> tuple[list[dict], int, str]:
+            """(the file check's rows about timing, package's exit code, what package printed)."""
+            rows: list[dict] = []
+            said = io.StringIO()
+            with contextlib.redirect_stdout(io.StringIO()):
+                qa.encoded(video, 2.0, rows)
+            shutil.copyfile(video, build / "out" / "timing.mp4")
+            with contextlib.redirect_stdout(said):
+                code = package.package(batch, build)
+            return (
+                [row for row in rows if "evenly timed" in row["what"]],
+                code,
+                said.getvalue(),
+            )
+
+        for name, video in (("even", even), ("mended", mended)):
+            rows, code, said = judged(video)
+            if rows:
+                return (
+                    f"timing: the {name} film drew {rows[0]['code']} {rows[0]['level']}: {rows[0]['what']}",
+                    "",
+                )
+            if code != 0:
+                return (
+                    f"timing: package refused the {name} film: {said.strip().splitlines()[0] if said.strip() else code}",
+                    "",
+                )
+        rows, code, said = judged(uneven)
+        if [(row["code"], row["level"]) for row in rows] != [("V01", "FIX")]:
+            return (
+                f"timing: a frame five ticks short drew {[(row['code'], row['level']) for row in rows]}, not one V01 FIX",
+                "",
+            )
+        if code != 1 or "evenly timed" not in said:
+            return (
+                f"timing: package gave exit {code} for a frame five ticks short and did not refuse it for its timing",
+                "",
+            )
+    return (
+        None,
+        "a frame five ticks short is a V01 FIX and package refuses it; the even film and the mended one pass",
     )
 
 
@@ -1257,6 +1487,7 @@ def main(argv: list[str]) -> int:
         ("film comparison: stats lines, runs and the shots a run names", part_filmdiff),
         ("probe timeline equals the golden", part_timeline),
         ("probe lint, static tier, 0 FIX", part_probe_lint),
+        ("build warns when a film's tag is not the batch's", part_tag_warning),
         (
             "command line: stale, failed build, exit codes, script, slugs, dates, bare plate, keep, review, diff, upgrade",
             part_cli,
@@ -1291,6 +1522,13 @@ def main(argv: list[str]) -> int:
             failed.append("kit options")
         else:
             print(f"ok   kit options: {note}")
+        problem, note = part_timing()
+        count += 1
+        if problem:
+            print(f"FAIL {problem}")
+            failed.append("uneven timing")
+        else:
+            print(f"ok   uneven timing: {note}")
     if failed:
         print(f"STUDIO SELFTEST: FAIL ({'; '.join(failed)})")
         return 1

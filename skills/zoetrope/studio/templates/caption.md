@@ -1,9 +1,13 @@
 # Caption rules (the text under the film, `post.json`)
 
 - The first line is one sentence under 125 characters. It makes the claim and does not give the payoff away.
-- The second paragraph is the AI disclosure, not the last: the pictures and the voice are AI-generated, the
-  pictures are illustrations and not photographs of the real things or places, and diagrams and cards are drawn
-  or redrawn by us.
+- The second paragraph, not the last, says what the pictures are: illustrations and not photographs of the real
+  things or places, with diagrams and cards drawn or redrawn by us.
+- The AI disclosure follows the batch. When batch.json sets `tag` or `end.ai_line` (either one means the batch
+  discloses AI generation, whatever the tag's wording), that second paragraph also says that the pictures and the
+  voice are AI-generated, and the alt text says that the pictures are. When both are empty, nothing in the
+  caption, the alt text or the hashtags says that the pictures or the voice are AI-made (a film whose subject is
+  AI still names its subject; "illustrations" and "drawn by us" say what a picture is and stay).
 - Then the facts in plain sentences, each source's own qualifier kept ("about", "reportedly", "one study").
   Where a fact rests on one source, say so.
 - A negative is written as what we found, never as a universal: "we found no published test", not "nobody has

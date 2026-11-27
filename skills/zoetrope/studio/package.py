@@ -26,7 +26,7 @@ def probe(path: Path) -> dict:
             "-show_entries",
             "format=duration,size",
             "-show_entries",
-            "stream=codec_type,codec_name,profile,pix_fmt,width,height,r_frame_rate",
+            "stream=codec_type,codec_name,profile,pix_fmt,width,height,r_frame_rate,avg_frame_rate",
             "-of",
             "json",
             str(path),
@@ -67,6 +67,18 @@ def package(batch, build: Path) -> int:
     ):
         problems.append(
             f"video is {picture.get('width')}x{picture.get('height')} at {picture.get('r_frame_rate')}, not 1080x1920 at 30"
+        )
+    # The average rate as well: a file with one frame a few ticks short still reads r_frame_rate 30/1, its
+    # average reads 30.0001, and a publisher that asks for exactly 30/1 refuses it (qa.py V01 says the same).
+    average = picture.get("avg_frame_rate")
+    if picture.get("r_frame_rate") == "30/1" and average in (None, "", "0/0"):
+        problems.append(
+            "ffprobe gave no average frame rate: the timing of the frames is not checked"
+        )
+    elif picture.get("r_frame_rate") == "30/1" and average != "30/1":
+        problems.append(
+            f"the frames are not evenly timed (average rate {average}, not 30/1): render again with render.py, "
+            "or for a file this engine did not render use the ffmpeg line in the manual (studio.md, V01)"
         )
     if streams.get("audio", {}).get("codec_name") != "aac":
         problems.append("no AAC audio stream")

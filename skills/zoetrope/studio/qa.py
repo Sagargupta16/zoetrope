@@ -765,7 +765,8 @@ def engine():
 
 
 def encoded(video: Path, expect: float, rows: list[dict]) -> list[str]:
-    """Spec, length, loudness, flashes and black spans of the encoded file, each a V01 FIX when it fails.
+    """Spec, length, even timing, loudness, flashes and black spans of the encoded file, each a V01 FIX when it
+    fails.
     A check that cannot run is a V00 FIX and is named in the returned list: never a silent pass."""
     unchecked: list[str] = []
     try:
@@ -779,7 +780,7 @@ def encoded(video: Path, expect: float, rows: list[dict]) -> list[str]:
             f"the engine checks did not load: {error}",
             "run with numpy and pillow",
         )
-        return ["spec", "length", "loudness", "flashes", "black"]
+        return ["spec", "length", "timing", "loudness", "flashes", "black"]
     try:
         info = tools.probe(str(video))
         print(
@@ -808,7 +809,9 @@ def encoded(video: Path, expect: float, rows: list[dict]) -> list[str]:
                 row(rows, "V01", "FIX", None, what, "render again with render.py")
         # Evenly timed frames: a join between rendered parts once left every later frame a fraction of a
         # millisecond early (the average rate then reads 26519040/883963, not 30/1). No player shows it,
-        # but a tool that pairs frames by time pairs neighbours from there on.
+        # but a tool that pairs frames by time pairs neighbours from there on, and a publisher that asks for
+        # an average rate of exactly 30/1 refuses the file: finished films waited in a queue that way.
+        # So it is a FIX, and `package` refuses such a file too.
         even = (
             subprocess.run(
                 [
@@ -831,24 +834,36 @@ def encoded(video: Path, expect: float, rows: list[dict]) -> list[str]:
             .stdout.strip()
             .strip(",")
         )
-        if even and even != "30/1":
+        if not even or even == "0/0":
+            unchecked.append("timing")
+            row(
+                rows,
+                "V00",
+                "FIX",
+                None,
+                "ffprobe gave no average frame rate",
+                "the timing of the frames is NOT CHECKED",
+            )
+        elif even != "30/1":
             row(
                 rows,
                 "V01",
-                "NOTE",
+                "FIX",
                 None,
-                f"the frames are not evenly timed (average rate {even})",
-                "render again: render.py joins its parts by their exact lengths",
+                f"the frames are not evenly timed (average rate {even}, not 30/1)",
+                "render again with render.py, which joins its parts by their exact lengths; for a file this "
+                "engine did not render, the manual (studio.md, V01) has the ffmpeg line that puts its "
+                "timestamps back on the grid without an encode",
             )
     except Exception as error:
-        unchecked += ["spec", "length"]
+        unchecked += ["spec", "length", "timing"]
         row(
             rows,
             "V00",
             "FIX",
             None,
             f"ffprobe did not run: {error}",
-            "the spec and length are NOT CHECKED",
+            "the spec, the length and the timing of the frames are NOT CHECKED",
         )
     try:
         level = tools.loud(str(video))

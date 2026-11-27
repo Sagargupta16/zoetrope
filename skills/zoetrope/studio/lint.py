@@ -44,7 +44,7 @@ RULES = {
     "L07": "A number is never on screen before its spoken word / A count lands by the clock on its spoken word.",
     "L08": "The picture changes three times in the first 3.5 s: count the cuts and punch-ins before review.",
     "L09": "At most three whips or zooms in a film / never two in a row",
-    "L10": "The top row (y 282 to 345) belongs to one chip on the left and the film's tag on the right.",
+    "L10": "The top row (y 282 to 345) belongs to one chip on the left and the film's tag, when the batch sets one, on the right.",
     "L11": "A row of a word card stands lit 2 s or more",
     "L12": "A drawn diagram is as bright as the pictures around it (mean brightness 60 of 255 or more)",
     "L13": "A caption page never drops the NOT of its sentence",

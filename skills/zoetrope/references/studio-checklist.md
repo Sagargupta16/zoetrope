@@ -45,7 +45,7 @@ Run `build` again after any change to `shots.py`, `shots.json`, `script.json`, `
 - [lint L05] A list sits on a dark plate, and each outcome turns to the accent as it lands.
 - [lint L06] A source line on a generated picture says what it is, with the source's year.
 - [lint L07] A number is never on screen before its spoken word: a `number` has `landAt`, a `rail` or `years` has `until`, within 0.1 s of the word.
-- [lint L10] The top row (y 282 to 345) holds one chip on the left and the tag on the right: 30 characters or fewer in the chip.
+- [lint L10] The top row (y 282 to 345) holds one chip on the left and the tag, when the batch sets one, on the right: 30 characters or fewer in the chip (not linted when the tag is empty).
 - [lint L11] A row of a word card stands lit 2 s or more after it lights (a `stepsrow`'s `steps` count like `rows`).
 - [lint L15] A lower third is five words or fewer on one line.
 - [lint L16] A present-day claim on a chip carries its year.
@@ -84,7 +84,7 @@ Open each frame the checklist names at full size with the captions on, corners a
 - [qa F06] Frame 0 is lit and has the hook on it.
 - [qa F07] Text boxes cover under 45% of a frame.
 - [lint L07] On the frames, a count shows its last value only from its word on.
-- [lint L10] On the frames, a chip in the top row ends 16 px or more before the tag.
+- [lint L10] On the frames, a chip in the top row ends 16 px or more before the tag, where the film has one.
 - [lint L12] A drawn diagram or plate has a mean brightness of 60 of 255 or more.
 - [lint L13] A caption page never drops the NOT of its sentence; the negator opens its page.
 - [look] Open every `proof/sheet_NN.png` at phone size: text does not fight the picture (F04 notes it), every label reads.
@@ -92,6 +92,7 @@ Open each frame the checklist names at full size with the captions on, corners a
 ## 6. The file
 
 - [qa V01] Loudness -14 LUFS within 1, true peak at or under -1 dBTP, no flash sequence, no black frame.
+- [qa V01] The frames are evenly timed: the file's average frame rate is exactly 30/1 (`package` refuses a file that is not).
 - [qa V02] The file is under 95 MB.
 - [qa V03] The picture changes at least every 3 s on the file itself.
 - [look] Watch it once with the sound off and once with it on, as a first-time viewer.
@@ -100,7 +101,8 @@ Open each frame the checklist names at full size with the captions on, corners a
 ## 7. The text under the film (`post.json`)
 
 - [look] The first line is one sentence under 125 characters that does not give the payoff away.
-- [look] The disclosure that pictures and voice are AI-generated is the second paragraph.
+- [look] The second paragraph says the pictures are illustrations, not photographs of the real things or places, and that diagrams and cards are drawn or redrawn by us.
+- [look] The AI disclosure follows the batch: `tag` or `end.ai_line` set, that paragraph also says pictures and voice are AI-generated and the alt text that the pictures are; both empty, nothing in the caption, the alt text or the hashtags says that the pictures or the voice are AI-made.
 - [look] A negative is written as what we found; a one-source figure says so.
 - [look] Sources are named by kind and every url is one `facts.md` cites.
 - [look] `cover_ms` lands where the hook has settled and no caption page is up.

@@ -523,6 +523,14 @@ def write_timeline(batch: object, build: Path) -> None:
     print(
         f"{len(shots)} shots, {duration:.2f} s, median shot {middle:.2f} s, longest {max(lengths):.2f} s, speech ends {layout['speech_end']:.2f} s"
     )
+    # The script step copies the batch's tag into script.json and the film's own copy wins, so a batch that
+    # changed its tag since (or dropped it: an empty tag means no disclosure) does not reach this film yet.
+    ours, theirs = script.get("tag"), setting(batch, "tag")
+    if ours is not None and theirs is not None and ours != theirs:
+        warnings.append(
+            f"script.json sets the tag {ours!r} and the batch says {theirs!r}: the film's own stands "
+            "(script.json holds the film's copy of the batch's tag)"
+        )
     for warning in warnings:
         print("WARN " + warning)
     if not warnings:

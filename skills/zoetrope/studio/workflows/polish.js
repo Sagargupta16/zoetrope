@@ -45,7 +45,7 @@ const LENSES = args.lenses || [
   {
     key: 'honesty',
     role: 'You check facts and honesty.',
-    look: 'Every word, number, date, name and source that the pass put on screen or into post.json, against facts.md and the saved copies it cites; hedges and qualifiers kept as the source has them; a picture that claims more than its line; a source line that lends its source to a neighbouring claim.',
+    look: 'Every word, number, date, name and source that the pass put on screen or into post.json, against facts.md and the saved copies it cites; hedges and qualifiers kept as the source has them; a picture that claims more than its line; a source line that lends its source to a neighbouring claim. The AI disclosure follows the batch ("tag" and "end"."ai_line" in batch.json), and wording the pass added or changed must follow it: a surface whose own key is empty carries no AI wording; with both empty it says nowhere that the pictures or the voice are AI-made; with either set the caption\'s second paragraph says that the pictures and the voice are AI-generated and the alt text says that the pictures are. A breach the pass introduced is a P1.',
   },
 ]
 
@@ -85,6 +85,7 @@ Build folder: ${B} (work inside it; read access to the rest of ${BATCH}).
 READ FIRST
 1. ${DOC} (the pipeline, the commands, the shot JSON and every device with its settings) and ${CHECKLIST} (the house rules, one per line).
 2. In ${B}: brief.md, shots.py (it writes shots.json; later blocks override earlier ones), graphics.js if present, script.json (never change a caption or a spoken word; a gap may change where an item says so), cues.txt, facts.md, post.json, proof/shots_table.md, proof/blocks.md, every proof/fix*_answers.md and proof/polish*_answers.md, and the reader files under proof/reviews/.
+3. ${BATCH}/batch.json, the keys "tag" and "end"."ai_line": the batch decides the AI disclosure, each surface by its own key (the chip follows "tag", the end card line follows "ai_line"; a surface whose own key is empty carries no AI wording). When either is set, the caption's second paragraph says that the pictures and the voice are AI-generated and the alt text says that the pictures are; keep it so. With both empty, add no wording anywhere that says the pictures or the voice are AI-made.
 ${NOTE}
 THE CHANGES (follow each ruling; where a ruling leaves a choice, take the smallest change that meets it)
 ${list}

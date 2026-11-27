@@ -22,7 +22,7 @@ python <skill>/studio/studio.py new-batch outputs/<batch> --config <skill>/studi
 
 A batch keeps the engine it was made with. To give it a newer one, run the NEWER engine's command line: `python <newer>/studio/studio.py upgrade <batch> [--force]`. It replaces `studio/`, `engine/` and `docs/`, writes `SNAPSHOT.txt` again and prints every file that changed, was added or was removed (a tool's cache, `__pycache__`, a `.pyc` or a dot-folder such as `.ruff_cache`, is neither copied nor written into the snapshot, and such a line in a snapshot of an older engine is not read); `builds/`, `videos/` and `batch.json` are not touched, and the copy it replaced is kept in `<batch>/engine-before-upgrade/` (one generation). It refuses (exit 3) when it is run from the batch's own copy, when the batch has no `SNAPSHOT.txt` (`REFUSED no SNAPSHOT.txt: the copy cannot be checked for edits`), and when a file of the batch's copy was edited, added (a font put in `studio/fonts/`, say) or deleted since its snapshot: `REFUSED N file(s) of the batch's copy changed since its snapshot (<file> (changed|added|missing), up to five)`. `--force` goes ahead and prints `dropped a local edit`, `dropped an added file` (it stays in `engine-before-upgrade/` until the next upgrade) or `dropped a local deletion` for each, and with no snapshot `note: there was no SNAPSHOT.txt, so the copy was replaced without an edit check`. A file under a dot-folder (a tool's cache such as `studio/.ruff_cache/`), under `__pycache__` or ending `.pyc` is never an added file. The parts move by rename only, so an upgrade never leaves half an engine: when it cannot clear its own folders (an open file) it exits 2 with `NOT CHECKED upgrade did not start, the batch's copy was not touched`; when a move fails it puts the old parts back and exits 2 with `NOT CHECKED upgrade stopped, the batch's copy is as it was`, or, if putting one back fails too, names it and says to move its old copy in `engine-before-upgrade/` back by hand. A batch made when the engine still held a `studio/SNAPSHOT.txt` prints `removed: studio/SNAPSHOT.txt` at its next upgrade. Never upgrade while a builder is using the batch.
 
-Check a change to the studio itself with `python -I studio/selftest.py --quick` (the lint rules, shotkit, the workflow scripts' syntax (and no `Date.now`, `new Date`, bare `Date(` or `Math.random` however spaced, which throw in a workflow), the film comparison's arithmetic and, with ffmpeg on the path, a moved cut on two test films and fine detail against a change on four, a drawn probe film's timeline and the command line's contract on a scratch batch made from the probe (`command line: stale, failed build, exit codes, script, slugs, dates, bare plate, keep, review, diff, upgrade`: refusals, a bare-plate run, `review save` and `answers`, `diff` and an `upgrade` that fails midway included), with no Chrome; it needs `node` on the path for the workflow scripts and ends `STUDIO SELFTEST: PASS (12 parts)`). `--render` (in the studio's environment) adds four rendered frames of the probe compared with `selftest/golden/<os>/frames.json`: by PNG digest first, and a frame whose digest differs by the mean colour of each 60 px block, within 0.25 of 255. Chrome's GPU rasteriser is not bit-stable (two runs of the same code differ by one or two levels on a few edge pixels of large type), so its line says how many frames matched by digest and how many by blocks. It also runs `look` on a test film built like a rendered one, and shoots a short film of the kit's carried overlays and end card options (`selftest/options/shots.json`) to check the boxes on the frames either side of each cut (15 parts in all). `--bless` rewrites the golden after you have looked at the frames.
+Check a change to the studio itself with `python -I studio/selftest.py --quick` (the lint rules, shotkit, the workflow scripts' syntax (and no `Date.now`, `new Date`, bare `Date(` or `Math.random` however spaced, which throw in a workflow), the film comparison's arithmetic and, with ffmpeg on the path, a moved cut on two test films and fine detail against a change on four, a drawn probe film's timeline and the command line's contract on a scratch batch made from the probe (`command line: stale, failed build, exit codes, script, slugs, dates, bare plate, keep, review, diff, upgrade`: refusals, a bare-plate run, `review save` and `answers`, `diff` and an `upgrade` that fails midway included), with no Chrome; it needs `node` on the path for the workflow scripts and ends `STUDIO SELFTEST: PASS (13 parts)`). `--render` (in the studio's environment) adds four rendered frames of the probe compared with `selftest/golden/<os>/frames.json`: by PNG digest first, and a frame whose digest differs by the mean colour of each 60 px block, within 0.25 of 255. Chrome's GPU rasteriser is not bit-stable (two runs of the same code differ by one or two levels on a few edge pixels of large type), so its line says how many frames matched by digest and how many by blocks. It also runs `look` on a test film built like a rendered one, and shoots a short film of the kit's carried overlays and end card options (`selftest/options/shots.json`) to check the boxes on the frames either side of each cut, and it makes a test film with one frame five ticks short, which `check file` and `package` must refuse while the same film before the fault and after the V01 ffmpeg line pass (17 parts in all). `--quick` also builds the probe under a batch whose tag is not the film's and under one whose tag is, for the warning `build` gives in the first case (13 parts). `--bless` rewrites the golden after you have looked at the frames.
 
 ## The pipeline, in order
 
@@ -117,8 +117,8 @@ The one place an account's, a machine's and a look's settings live. Paths are re
 |---|---|---|
 | `root` | yes | The batch's working root; `builds/` and `videos/` sit in it. Only the batch folder itself is supported, so it must be `"."`: any other value stops with `key 'root' resolves to <path>; only the batch folder itself is supported`. |
 | `accent` | yes | The one accent colour of the film (`#ffd60a` is the kit's default). |
-| `tag` | yes | The short disclosure the kit prints on every shot that shows a generated picture. |
-| `end` | yes | `handle`, `follow`, `ai_line`: the wording of the end card. The shot list's `end` overlay carries it (`handle`, `line`). |
+| `tag` | yes | The short disclosure the kit prints on every shot that shows a generated picture, such as `AI illustration`. The key must be there and may be empty (`""`): then no chip is drawn on any shot. |
+| `end` | yes | `handle`, `follow`, `ai_line`: the wording of the end card. The shot list's `end` overlay carries it (`handle`, `line`). `ai_line` must be there and may be empty: the end card then carries no AI line. |
 | `music_dir` | yes | The folder of licensed tracks, `<theme>/<track>.mp3`. |
 | `voice` | yes | `name` and `speed` of the narrator; `script.json` may override it per film. |
 | `comfy` | no | `exe`, `home`, `url` of the ComfyUI that makes stills and clips. |
@@ -128,6 +128,8 @@ The one place an account's, a machine's and a look's settings live. Paths are re
 | `engine` | no | The folder of the audio engine; `<root>/engine` when absent. |
 
 A missing required key stops with the key and file named.
+
+The batch decides the AI disclosure, each surface by its own key: `tag` puts the chip on generated pictures and `end.ai_line` puts the line on the end card. When either is set (either one means the batch discloses AI generation, whatever the tag's wording), each caption's second paragraph also says that the pictures and the voice are AI-generated and the alt text says that the pictures are. A batch that leaves both empty gets films with no AI disclosure anywhere: nothing on screen or in `post.json` says that the pictures or the voice are AI-made (a film whose subject is AI still names its subject), and a surface whose own key is empty carries no AI wording even when the other key is set. Either way the caption says that the pictures are illustrations and not photographs of the real things or places (`templates/caption.md`).
 
 ## Build folder
 
@@ -152,7 +154,7 @@ proof/  qa_*.json  frames/  sheet_NN.png  checklist.md  checklist_answers.json
 | Key | Use |
 |---|---|
 | `slug`, `title` | Name the film in the timeline. |
-| `accent`, `tag` | Override the batch's. |
+| `accent`, `tag` | The batch's values, copied here by the `script` step; the build reads them here. Typed by hand they override the batch's until `script` runs again and writes the batch's back. A batch that changes its `tag` (or empties it) therefore reaches a finished film only when its `script.json` is edited or `script` runs again; `build` warns while the film's tag and the batch's differ. |
 | `progress` | `false` leaves out the progress bar. |
 | `lines` | Rows with `id`, `caption`, `spoken` (or one `text` with `{shown\|spoken}`), `gap`, and `payoff: true` or `beat: "payoff"` on the payoff line. |
 | `voice` | `{voice, speed}` for this film; `script` keeps what an earlier `script.json` holds and fills a missing `speed` from the batch. |
@@ -208,7 +210,7 @@ A drawn device may take cues in `aAt` to `mAt`, `failAt`, `moveAt`, `until`, `cl
 | `bright` | The brightness of the shot's still or clip, in place of its grade's own (blur 0.55, dim 0.5, soft 0.78, lift 1.24, past 1.08, no grade 1): a blurred picture as bright as the pictures around it, or a dark picture lifted to its neighbours. A number above 0; `build` refuses anything else (`shot <id>: bright <value> is not a brightness (a number above 0)`). A shot with no picture (`media` kind `none`) ignores it: the `plate` device takes `bright` inside its own `media` spec. |
 | `shade` | `true` puts the kit's top shade over the picture and under the tag. |
 | `floor`, `vignette` | `false` leaves out the bottom shade or the corner vignette. |
-| `tag` | `false` takes the tag off a generated picture; `true` puts it on a drawn shot that shows one. |
+| `tag` | `false` takes the tag off a generated picture; `true` puts it on a drawn shot that shows one. Neither draws anything when the tag is empty. |
 | `captions` | `false` mutes captions for the shot; `"quiet"` shows whole sentences, small, dim and still (for a stretch where the viewer watches one mark). |
 | `exempt` | `true` takes the shot out of the pace rules (a test card). |
 | `long` | `true` marks a shot meant to run past 4.6 s. |
@@ -285,11 +287,11 @@ A film's own devices go in `<build>/graphics.js` as `Kit.graphic(name, (wrap, sp
 | `number(value, land, **k)` | a count that lands on the cue `land` (sets `landAt`); y 352, size 300 |
 | `stamp(text, who=None, **k)` | a stamp, size 100 |
 | `ladder(rows)` | a ladder on its dark plate with every `reveal` row `hot` |
-| `end_card(big, line=None, *, use, cue, seconds=3.0, chip=None, **k)` | the fields of the closing shot (`plan.shot("end", **end_card([...], "send line", use="s01", cue="L32:end"))`): the `end` overlay over a blurred earlier picture, with the handle and the AI line read from the batch's `end` settings (`batch_end()`), so no film types them again; without a `line` the batch's `follow` line stands. The closing shot shows its owner's still (`media: "still"`), never the owner's clip, so no clip plays past its end; if the owner has no `media/<use>.png`, `build` warns and draws the plain ground |
+| `end_card(big, line=None, *, use, cue, seconds=3.0, chip=None, **k)` | the fields of the closing shot (`plan.shot("end", **end_card([...], "send line", use="s01", cue="L32:end"))`): the `end` overlay over a blurred earlier picture, with the handle and, when the batch sets one, the AI line read from the batch's `end` settings (`batch_end()`), so no film types them again (`plan.find("end", "source")` is that line, or None on a batch whose `ai_line` is empty); without a `line` the batch's `follow` line stands. The closing shot shows its owner's still (`media: "still"`), never the owner's clip, so no clip plays past its end; if the owner has no `media/<use>.png`, `build` warns and draws the plain ground |
 | `real(spec)` | marks a chip as naming a real person or place |
 | `still(prompt, seed, check=())`, `clip(prompt, seconds=4)` | the media specs |
 | `PUNCH`, `HELD`, `PLATE` | `{"kind": "punch", "d": 0.35, "from": 1.06}`; a camera that does not move under standing type (`from` 1, `to` 1, `shake` 0); `{"kind": "none", "graphic": "ground"}` as media: the plain plate the stage draws. For one of the build's pictures blurred past reading use the kit's `plate` device, which needs a `src`: `{"kind": "none", "graphic": "plate", "src": "media/p01.jpg"}` |
-| `Plan(slug, look)` | `plan.shot(id, **fields)`, `plan.part(id, kind, i)`, `plan.after(id, new)`, `plan.drop(*ids)`, `plan.own_still(id, spec, **more)`, `plan.write(until=None)` |
+| `Plan(slug, look)` | `plan.shot(id, **fields)`, `plan.part(id, kind, i)` (the overlay must be there), `plan.find(id, kind, i)` (None when it is not: for an overlay a batch setting can leave out), `plan.after(id, new)`, `plan.drop(*ids)`, `plan.own_still(id, spec, **more)`, `plan.write(until=None)` |
 | `@plan.block("YYYY-MM-DD fix 1: name")` | a function of the plan; blocks run in the order declared |
 
 The `look` line is the film's palette and grain; end every still prompt with it. Fix blocks never edit an earlier block. `plan.write()` writes `shots.json` and `proof/blocks.md`, which lists the last block to touch each shot: those are the windows to look at again after a fix. `write(until="2026-11-25 fix 1")` rebuilds an earlier state. `python studio/shotkit.py --selftest` ends `SHOTKIT: PASS`.
@@ -334,7 +336,7 @@ Besides the lint, `qa.py` gives rows with these codes.
 | F06 | frame 0 dark (mean under 40 of 255) or without a hook | FIX |
 | F07 | text boxes cover over 45% of the frame (NOTE over 32%) | FIX |
 | V01 | loudness off -14 LUFS by more than 1, true peak over -1 dBTP, a flash sequence, or black frames | FIX |
-| V01 | the frames are not evenly timed (the average frame rate is not 30/1): a film rendered before `render.py` joined its parts by their exact lengths | NOTE |
+| V01 | the frames are not evenly timed (the average frame rate is not exactly 30/1 while the nominal rate is): one frame a few ticks short, as a join that took a part's length from its container leaves it. No player shows it, but a publisher that asks for exactly 30/1 refuses the file, and `package` refuses it as well. Render again (`render.py` joins its parts by their exact lengths); for a file this engine did not render, put the timestamps back on the grid without an encode: `ffmpeg -i in.mp4 -map 0 -c copy -bsf:v "setts=pts=round(PTS/512)*512:dts=round(DTS/512)*512:duration=512" -movflags +faststart out.mp4` (512 ticks are one frame at 30 fps in the 1/15360 time base ffmpeg writes; read the stream's `time_base` with ffprobe first) | FIX |
 | V02 | file over 95 MB | FIX |
 | V03 | the picture does not change for 3 s | FIX |
 | V00 | a check could not run | FIX |
@@ -369,7 +371,7 @@ Each rule is tagged. Where a lint id or a checklist id is given, the program che
 - A real, specific object the model cannot know exactly (a named probe, a coin, a map) is not prompted as a close-up: prompt the setting and keep it small and far, or draw it. `[look]`
 - When no honest picture exists for a data device, put it on a blurred plate (`grade: "blur"`, `cam: {"from": 1, "to": 1, "shake": 0}`): a readable picture under a named thing claims to be it. `[look]`
 - A drawn diagram is as bright as the pictures around it (mean brightness 60 of 255 or more), with thin outlines and muted fills. What the voice names is the lightest and heaviest mark. `[lint L12]`
-- A redrawn document stands on the stage's plain plate (`ground`), never on a generated picture, so the tag is not on the film's one real piece of evidence. `[lint L18]`
+- A redrawn document stands on the stage's plain plate (`ground`), never on a generated picture, so the tag (where the batch sets one) is not on the film's one real piece of evidence. `[lint L18]`
 - Maps that touch India follow the Survey of India depiction; safest is relief with no political borders. `[look]`
 - Time passing is drawn (a sapling that grows); a label never names something that has left the frame; a step chip is a verb. `[look]`
 
@@ -377,7 +379,7 @@ Each rule is tagged. Where a lint id or a checklist id is given, the program che
 
 - Safe box for all text: x 60 to 1020, y 270 to 1252. Nothing under 32 px. `[qa F01]` `[qa F02]`
 - Roles: hook up to 190 and six words or fewer; hero number up to 300 with its unit at half size; title 150; lower third 70 and five words or fewer on one line; label chip 40; source line 32; captions 72. `[lint L15]` `[qa P04]`
-- The top row (y 282 to 345) belongs to one chip on the left and the film's tag on the right; a chip there holds 30 characters at most and ends 16 px or more before the tag. Numbers, lists and lower thirds start at y 352 or lower; a title under a chip at y 380. A source line sits just above the captions (y 1012 to 1063), never below them. `[lint L10]`
+- The top row (y 282 to 345) belongs to one chip on the left and the film's tag, when the batch sets one, on the right; a chip there holds 30 characters at most and ends 16 px or more before the tag (with an empty tag the row is the chip's alone and the lint checks neither limit). Numbers, lists and lower thirds start at y 352 or lower; a title under a chip at y 380. A source line sits just above the captions (y 1012 to 1063), never below them. `[lint L10]`
 - Words on screen never repeat the caption's words in the same frame. Where a title is the spoken line itself, give it `says: true` (the caption pages that would begin while it stands are left out) or give its shot `captions: false`; where a chip repeats the line, give it something the voice does not say (a date, a place, a source). `[lint L03]`
 - A device that speaks the line (a title, a quote, an answer, a stamp, a hero number with its second line) takes `says: true`. `says` may be seconds: the pages left out are those that would begin within that long of the device landing. `[lint L03]`
 - Hero text is five words or fewer and names the thing, the number or the turn. One hero element per shot. `[look]`
@@ -392,7 +394,7 @@ Each rule is tagged. Where a lint id or a checklist id is given, the program che
 - The words that mark one part of a row mark the same part in every row. `[look]`
 - A relation between two words keeps the dictionary's own word: "akin to" is drawn dashed and labelled (`route.dashed`), "from" solid. `[look]`
 - One family for display (Barlow Condensed, upper case), Poppins 700 for captions, Inter for the source line. White fill, a dark outline, one accent per film for the spoken word, hero units, marked words and bars. No glow, no gradient text, no emoji. `[look]`
-- The tag is set like a label chip; a shot with a generated picture carries it unless the shot turns it off. `[look]`
+- The tag, when the batch sets one, is set like a label chip; a shot with a generated picture carries it unless the shot turns it off. With an empty `tag` there is no chip and no shot is asked for one. `[look]`
 - Where the viewer watches one mark (a test card), the accent belongs to that mark alone, from the first step of the test to the end of its hold, and nothing appears, moves or leaves anywhere else on the card. A list the viewer must read before acting is whole and white from its first frame. `[look]`
 
 ### Devices
@@ -402,7 +404,7 @@ Each rule is tagged. Where a lint id or a checklist id is given, the program che
 - A redrawn document says so beside it ("Entry text: Gundert, 1872, redrawn. Dark chips are our notes"), keeps the source's own spelling in full, and looks like paper (square corners, a hairline border). `[lint L18]`
 - The film's question and its answer are title size (150), not list size; a two-row comparison of sources puts each answer at title size under a small label naming the source. `[look]`
 - A device drawn to scale names its scale and whose arithmetic it is, once per picture; a sketch that is not to scale says so when another picture in the film is. `[look]`
-- A demonstration that could be taken for a test of the body says on screen that it is not one, from the first frame of the first test, and the caption's second line says it again. No line promises the viewer an outcome. `[look]`
+- A demonstration that could be taken for a test of the body says on screen that it is not one, from the first frame of the first test, and the caption says it again before its facts. No line promises the viewer an outcome. `[look]`
 - A measure the viewer must act on is given in units nobody can misread (about 10 cm, not "a hand's width"). `[look]`
 - A film whose claim is that nothing on the card moves is rendered without the progress bar (`"progress": false` in `script.json`), and its hold starts on the word that starts the viewer's action. `[look]`
 
@@ -436,7 +438,8 @@ Each rule is tagged. Where a lint id or a checklist id is given, the program che
 ### The text under a film (`post.json`)
 
 - The first line is one sentence under 125 characters that makes the claim without giving the payoff away. `[look]`
-- The disclosure that the pictures and the voice are AI-generated is the second paragraph, not the last. `[look]`
+- The second paragraph, not the last, says what the pictures are: illustrations and not photographs of the real things or places, with diagrams and cards drawn or redrawn by us. `[look]`
+- The AI disclosure follows the batch: when `tag` or `end.ai_line` is set, that paragraph also says that the pictures and the voice are AI-generated and the alt text says that the pictures are; when both are empty, nothing in the caption, the alt text or the hashtags says that the pictures or the voice are AI-made. `[look]`
 - A universal negative ("nobody has published") is written as what we found ("we found no published test"). A figure with one source keeps the source's qualifier and says it has one source. `[look]`
 - A source is named by its kind (a letter, a review, a dictionary, a journal paper); every url is one a row of `facts.md` cites. `[look]`
 - The cover frame is one where the hook has settled and no caption page is up. `[look]`

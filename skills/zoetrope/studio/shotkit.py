@@ -159,7 +159,8 @@ def end_card(
     """The fields of the closing shot: the end overlay over a blurred earlier picture, with the handle and the
     AI line the batch names (batch.json `end`), so no film types them again. `line` is this film's send line
     (a line break in it is kept); without one the batch's `follow` line stands. `chip` is a small dark chip
-    under the big words (AS OF 2026 under a claim about today).
+    under the big words (AS OF 2026 under a claim about today). A batch whose `ai_line` is empty gets no AI
+    line: the card then holds the end overlay alone, and `plan.find("end", "source")` is None.
 
         plan.shot("end", **end_card(["IT CAME", "BY SHIP"], "Send this to someone who loves chilli",
                                     use="s01", cue="L32:end"))
@@ -224,14 +225,23 @@ class Plan:
         self.shots.append(shot)
         return shot
 
-    def part(self, id: str, kind: str, i: int = 0) -> dict:
-        """The i-th overlay of a kind in a shot, to change in place."""
+    def find(self, id: str, kind: str, i: int = 0) -> dict | None:
+        """The i-th overlay of a kind in a shot, or None when the shot has none: for an overlay a batch setting
+        can leave out, such as the end card's AI line (`line = plan.find("end", "source")`, then change it
+        only `if line`)."""
         found = [item for item in self.by_id[id]["over"] if item.get("type") == kind]
-        if i >= len(found):
+        return found[i] if -len(found) <= i < len(found) else None
+
+    def part(self, id: str, kind: str, i: int = 0) -> dict:
+        """The i-th overlay of a kind in a shot, to change in place. It must be there: use find() for one that
+        a batch setting can leave out."""
+        found = self.find(id, kind, i)
+        if found is None:
+            count = sum(item.get("type") == kind for item in self.by_id[id]["over"])
             raise KeyError(
-                f"shot {id} has {len(found)} {kind} overlay(s), asked for index {i}"
+                f"shot {id} has {count} {kind} overlay(s), asked for index {i} (find() gives None instead)"
             )
-        return found[i]
+        return found
 
     def after(self, id: str, new: dict) -> dict:
         """Put a new shot right after an existing one."""
@@ -421,6 +431,31 @@ def selftest() -> None:
     card = end_card(["END"], "Send it", use="s01", cue="L02:end", end={})
     if card.get("media") != "still":
         problems.append("end_card would play its owner's clip past its end")
+    # the AI line follows the batch: there when `ai_line` is set, absent when it is empty
+    names = {"handle": "h", "follow": "f"}
+    told = end_card(
+        ["END"], use="s01", cue="L02:end", end={**names, "ai_line": "A line"}
+    )
+    bare = end_card(["END"], use="s01", cue="L02:end", end={**names, "ai_line": ""})
+    if [item["type"] for item in told["over"]] != ["end", "source"]:
+        problems.append("end_card left out the AI line of a batch that sets one")
+    if [item["type"] for item in bare["over"]] != ["end"]:
+        problems.append("end_card drew an AI line for a batch whose ai_line is empty")
+    closing = Plan("probe", "look")
+    closing.shot("end", **bare)
+    if (
+        closing.find("end", "source") is not None
+        or closing.find("end", "source", -1) is not None
+        or closing.find("end", "end") is None
+    ):
+        problems.append(
+            "find must give None for an absent overlay and the overlay for a present one"
+        )
+    try:
+        closing.part("end", "source")
+        problems.append("part must stop on an absent overlay")
+    except KeyError:
+        pass
     if problems:
         print("\n".join(problems))
         print("SHOTKIT: FAIL")

@@ -57,8 +57,10 @@ plan.shot(
 )
 plan.shot("s03", cue="L03:0", use="s01", tin=PUNCH)
 
-# The closing shot. The handle and the AI line come from batch.json (`end`); only the big words and the
-# send line are this film's. `use` names an earlier picture, which the end card blurs.
+# The closing shot. The handle and, when the batch sets one, the AI line come from batch.json (`end`); only
+# the big words and the send line are this film's. `use` names an earlier picture, which the end card blurs.
+# To move the AI line in a later block, ask for it with plan.find("end", "source"): it is None on a batch
+# whose `ai_line` is empty, where plan.part() would stop the build.
 plan.shot(
     "end",
     **end_card(

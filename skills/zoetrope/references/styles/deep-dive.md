@@ -19,7 +19,7 @@ Total 60 to 90 s for a first cut; go longer (up to 180 s) only when the facts ho
 
 ## Look
 - A photo plate under every scene (`image-plates.md`); drawn graphics over it: maps, gauges, counters, timelines, labels. The engine draws every word and number; no text inside any plate.
-- On-plate labels in a corner of the scene: "AI ILLUSTRATION" on a generated picture, "SIMPLIFIED DIAGRAM" or "SIMPLIFIED MAP" on a drawn one.
+- On-plate labels in a corner of the scene: "AI ILLUSTRATION" on a generated picture (left out when the brief says the film carries no AI label), "SIMPLIFIED DIAGRAM" or "SIMPLIFIED MAP" on a drawn one.
 - Keep the caption band and the platform margins clear (`formats.md`). Type in one sans, large, with a halo or a dark band where the plate is bright, so every text pair keeps 4.5:1 on the real pixels (Q301).
 
 ## Motion
@@ -40,7 +40,7 @@ A caption per spoken line in the caption band. A number or name reveals on its s
 
 ## Facts
 - Every number is checked against two independent sources before the storyboard; film only what both support. Numbers are spoken as words, and the sources are named in the caption or description where the video is posted.
-- That caption or description also says that the pictures and the voice are AI-generated.
+- That caption or description also says that the pictures are illustrations, not photographs of the real things or places, and that the pictures and the voice are AI-generated (the second half is left out when the brief says the film carries no AI label: then nothing in the caption or description says that the pictures or the voice are AI-made).
 - Maps that touch India's borders follow India's official depiction (Survey of India): Aksai Chin, the Shaksgam valley and all of Jammu and Kashmir are never inside China or Pakistan, and Arunachal Pradesh is never inside China.
 
 ## Build notes
@@ -62,6 +62,6 @@ The 2.8.0 parts that fit this look (`blocks.md`); pass the card's own colours an
 ## Style QA
 - Every number on screen and in the voice is in the facts list with two sources.
 - Every reveal lands on its spoken word (check with `qa.py speech` and the cue times).
-- Every generated picture carries "AI ILLUSTRATION"; every drawn map or diagram carries its "SIMPLIFIED" label.
+- Every generated picture carries "AI ILLUSTRATION", unless the brief says the film carries no AI label; every drawn map or diagram carries its "SIMPLIFIED" label.
 - A visible change at least every 5 s; the end card holds at least 3 s.
 - Loudness near -14 LUFS, peak under -1 dBTP.
