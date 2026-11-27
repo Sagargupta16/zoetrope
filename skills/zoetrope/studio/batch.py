@@ -4,7 +4,8 @@
 
 Keys: root, accent, tag, end {handle, follow, ai_line}, music_dir, voice {name, speed}; optional comfy {exe, home,
 url}, render {workers, maxrate}, readers {audience_file}, package {check}, engine (folder). A missing required key raises
-BatchError naming the key and the file.
+BatchError naming the key and the file. `tag` and `end.ai_line` must be there and may be empty: a batch with both
+empty makes films that carry no AI chip, no AI line and no AI wording.
 """
 
 from __future__ import annotations
@@ -132,6 +133,15 @@ def selftest() -> int:
         file = Path(folder) / "batch.json"
         file.write_text(json.dumps(sample), encoding="utf-8")
         made = load(file)
+        # a batch may carry no disclosure: the keys stay, their values are empty
+        bare = Path(folder) / "bare"
+        bare.mkdir()
+        quiet = {**sample, "tag": "", "end": {**sample["end"], "ai_line": ""}}
+        (bare / "batch.json").write_text(json.dumps(quiet), encoding="utf-8")
+        loaded = load(bare)
+        assert loaded.tag == "" and loaded.end["ai_line"] == "", (
+            "an empty tag and ai_line must load"
+        )
         import audio
         import gen
 

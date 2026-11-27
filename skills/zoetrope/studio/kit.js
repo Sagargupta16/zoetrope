@@ -393,7 +393,8 @@ const Kit = (() => {
     if (m.kind === 'none' && m.graphic && !custom[m.graphic]) throw new Error('unknown graphic: ' + m.graphic + ' in shot ' + s.id);
     const tinD = s.tin && OVERLAP[s.tin.kind] && Number.isFinite(s.tin.d) ? s.tin.d / 2 : 0;
     const drawn = m.kind === 'none' && m.graphic ? custom[m.graphic](cam, m, { at: s.t0 - tinD, out: null, shot: s }) : null;
-    // Every generated picture carries the film's tag (the AI disclosure) unless the shot turns it off.
+    // Every generated picture carries the film's tag (the batch's disclosure chip; an empty tag draws none)
+    // unless the shot turns it off.
     // (a drawn shot that shows a generated picture inside its drawing asks for the tag with "tag": true)
     // The top shade lies over the picture and under the tag, so the tag keeps its full strength.
     if (s.shade) el.appendChild(h('div', { class: 'k-top' }));

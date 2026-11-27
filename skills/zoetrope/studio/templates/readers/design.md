@@ -15,7 +15,9 @@ it, `proof/shots_table.md`, `proof/frames/` (full-size frames named t<seconds>.p
 `proof/check<round>/`. Write nothing anywhere else and change no file of the film.
 
 The house safe box for text is x 60 to 1020, y 270 to 1252. Captions sit from y 1074. A source line sits at
-y 1012 to 1058. The tag stands on every shot that shows a generated picture.
+y 1012 to 1058. When the film has a tag (the batch's `tag`, which the script step copied into `script.json`;
+the kit draws that copy), it stands on every shot that shows a generated picture; with an empty tag there is
+no chip and its absence is not a finding. If the film's tag and the batch's differ, say so.
 
 ## What to measure
 
